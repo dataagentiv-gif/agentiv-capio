@@ -15,8 +15,14 @@ def create(url: str, target_clips: int) -> dict:
 
 
 def get(job_id: str | uuid.UUID) -> dict | None:
+    try:
+        key = uuid.UUID(str(job_id))
+    except ValueError:
+        # job_id datang dari path URL. Bentuk yang bukan UUID artinya tidak ada,
+        # bukan error server.
+        return None
     with session_scope() as s:
-        job = s.get(Job, uuid.UUID(str(job_id)))
+        job = s.get(Job, key)
         return job.as_dict() if job else None
 
 

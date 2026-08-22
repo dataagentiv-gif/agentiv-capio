@@ -2,9 +2,6 @@
 fastapi>=0.115
 uvicorn>=0.30
 jinja2>=3.1
-# Wajib ada, kalau tidak `POST /jobs` dari <form> HTML balas 422: FastAPI butuh
-# ini untuk mem-parse multipart/form-urlencoded.
-python-multipart>=0.0.9
 pydantic>=2.9
 pydantic-settings>=2.5
 python-dotenv>=1.0
