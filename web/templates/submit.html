@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Clipping Engine</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>Video Clipping Engine</h1>
+  <nav>
+    <a href="/" class="active">Submit</a>
+    <a href="/history">History</a>
+  </nav>
+</header>
+
+<main>
+  <div class="card">
+    <form id="f">
+      <div class="row">
+        <div>
+          <label for="url">Link YouTube</label>
+          <input type="text" id="url" placeholder="https://www.youtube.com/watch?v=..." required>
+        </div>
+        <div>
+          <label for="n">Jumlah klip</label>
+          <input type="number" id="n" value="{{ default_clips }}" min="1" max="20">
+        </div>
+      </div>
+      <button type="submit" id="go">Proses</button>
+    </form>
+    <p class="hint">
+      Video diproses di background. Durasi 1 jam biasanya selesai dalam belasan menit —
+      pantau progresnya di halaman History.
+    </p>
+    <div id="out"></div>
+  </div>
+</main>
+
+<script>
+const f = document.getElementById('f');
+const out = document.getElementById('out');
+const go = document.getElementById('go');
+
+f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  go.disabled = true;
+  out.innerHTML = '';
+  try {
+    const r = await fetch('/jobs', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        url: document.getElementById('url').value,
+        target_clips: Number(document.getElementById('n').value)
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      // Error validasi FastAPI datang sebagai detail[].msg, bukan string.
+      const msg = Array.isArray(d.detail) ? d.detail.map(x => x.msg).join('; ') : (d.detail || 'Gagal');
+      out.innerHTML = `<div class="note err">${msg}</div>`;
+    } else {
+      out.innerHTML = `<div class="note ok">Job dibuat: <code>${d.job_id}</code> —
+        <a href="/history" style="color:inherit">lihat progres</a></div>`;
+      f.reset();
+    }
+  } catch (err) {
+    out.innerHTML = `<div class="note err">${err}</div>`;
+  } finally {
+    go.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

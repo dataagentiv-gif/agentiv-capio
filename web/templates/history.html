@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>History — Video Clipping Engine</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>Video Clipping Engine</h1>
+  <nav>
+    <a href="/">Submit</a>
+    <a href="/history" class="active">History</a>
+  </nav>
+</header>
+
+<main id="list"><div class="empty">Memuat…</div></main>
+
+<script>
+const RUNNING = ['queued','downloading','transcribing','segmenting','refining',
+                 'captioning','cropping','rendering','metadata','uploading'];
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function badge(s) {
+  const kind = s === 'done' ? 'done' : s === 'failed' ? 'failed' : 'running';
+  return `<span class="badge ${kind}">${esc(s)}</span>`;
+}
+
+function clipHtml(c) {
+  const tags = (c.hashtags || []).map(h => `<span>#${esc(h)}</span>`).join('');
+  return `
+    <div class="clip">
+      <div class="score">${c.score}<small>SCORE</small></div>
+      <div>
+        <h3><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.title || c.id)}</a></h3>
+        <div class="field reason"><b>Alasan LLM:</b>${esc(c.reason)}</div>
+        <div class="field"><b>Hook:</b>${esc(c.hook)}</div>
+        ${c.caption ? `<div class="field"><b>Caption:</b>${esc(c.caption)}</div>` : ''}
+        <div class="field"><b>Durasi:</b>${c.duration}s</div>
+        <div class="tags">${tags}</div>
+      </div>
+    </div>`;
+}
+
+function jobHtml(j) {
+  const clips = (j.clips || []).map(clipHtml).join('');
+  const when = j.created_at ? new Date(j.created_at).toLocaleString('id-ID') : '';
+  return `
+    <div class="job">
+      <div class="job-head">
+        ${badge(j.status)}
+        <a class="job-url" href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>
+        <span class="job-time">${esc(when)} · target ${j.target_clips} klip</span>
+      </div>
+      ${RUNNING.includes(j.status) ? `<div class="bar"><i style="width:${j.progress}%"></i></div>` : ''}
+      ${j.error ? `<div class="error-box">${esc(j.error)}</div>` : ''}
+      ${clips ? `<div class="clips">${clips}</div>` : ''}
+    </div>`;
+}
+
+async function tick() {
+  try {
+    const jobs = await (await fetch('/jobs')).json();
+    document.getElementById('list').innerHTML = jobs.length
+      ? jobs.map(jobHtml).join('')
+      : '<div class="empty">Belum ada job. <a href="/" style="color:var(--accent)">Submit satu</a>.</div>';
+    // Polling hanya selama masih ada job berjalan — kalau semua sudah selesai,
+    // tidak ada gunanya menghantam /jobs tiap 3 detik.
+    return jobs.some(j => RUNNING.includes(j.status));
+  } catch (e) {
+    document.getElementById('list').innerHTML = `<div class="empty">API tidak bisa dihubungi: ${esc(e)}</div>`;
+    return true;
+  }
+}
+
+(async function loop() {
+  while (true) {
+    const busy = await tick();
+    await new Promise(r => setTimeout(r, busy ? 3000 : 15000));
+  }
+})();
+</script>
+</body>
+</html>
