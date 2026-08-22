@@ -43,11 +43,14 @@ def run(
     cwd: Path | None = None,
     cap: float = 600.0,
     check: bool = True,
+    binary: bool = False,
 ) -> subprocess.CompletedProcess:
     """Jalankan ffmpeg/ffprobe/yt-dlp. Selalu argv list, tidak pernah shell.
 
     shell=False bukan gaya-gayaan: home directory di mesin ini ada spasinya, dan
     command yang dirakit jadi string bakal pecah di path pertama yang lewat.
+
+    `binary=True` untuk output rawvideo — stdout tidak boleh di-decode teks.
     """
     log.debug("run: %s", " ".join(args[:6]))
     proc = subprocess.run(
@@ -57,10 +60,15 @@ def run(
         # sesekali menggantung. Dua sabuk pengaman sekaligus.
         stdin=subprocess.DEVNULL,
         capture_output=True,
-        encoding="utf-8",
-        errors="replace",
+        encoding=None if binary else "utf-8",
+        errors=None if binary else "replace",
         timeout=deadline.remaining(cap),
     )
+    if binary and check and proc.returncode != 0:
+        raise RuntimeError(
+            f"{args[0]} keluar dengan kode {proc.returncode}:\n"
+            f"{proc.stderr.decode('utf-8', 'replace')[-3000:]}"
+        )
     if check and proc.returncode != 0:
         raise RuntimeError(
             f"{args[0]} keluar dengan kode {proc.returncode}:\n{proc.stderr[-3000:]}"
