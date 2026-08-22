@@ -23,8 +23,6 @@ CHUNK_SEC = 1200.0  # 20 menit
 def _client():
     from groq import Groq
 
-    if not settings.GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY kosong")
     return Groq(api_key=settings.GROQ_API_KEY)
 
 
@@ -80,6 +78,12 @@ def run(ctx: dict) -> dict:
     workdir: Path = ctx["workdir"]
     deadline = ctx["deadline"]
     duration = float(ctx["meta"]["duration"])
+
+    # Diperiksa di luar _transcribe_file: key yang kosong adalah salah
+    # konfigurasi, bukan kegagalan sementara, dan me-retry-nya 3x dengan backoff
+    # hanya menunda pesan error yang sudah pasti.
+    if not settings.GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY kosong — isi di .env")
 
     if audio.stat().st_size <= SIZE_LIMIT:
         words = _transcribe_file(audio, 0.0)
