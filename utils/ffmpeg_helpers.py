@@ -127,20 +127,20 @@ def rmtree_retry(path: Path, attempts: int = 3) -> None:
             time.sleep(1.0)
 
 
-def warm_font_cache(deadline: Deadline) -> None:
-    """Panggilan `subtitles` pertama bisa berhenti 10-60 detik karena libass
-    membangun cache font Windows lewat fontconfig. Dibayar sekali di awal worker
-    supaya tidak muncul sebagai 'render stage hang' di job pertama.
+def rmtree_stale(root: Path, keep: int = 20) -> None:
+    """Sapu workdir job gagal yang menumpuk.
+
+    Workdir job yang gagal sengaja tidak dihapus supaya artefaknya bisa
+    diperiksa, tapi tanpa penyapuan sesekali folder itu tumbuh tanpa batas —
+    isinya source video mentah.
     """
-    try:
-        ffmpeg(
-            [
-                "-f", "lavfi", "-i", "color=c=black:s=64x64:d=0.1",
-                "-vf", "drawtext=text=x:fontsize=12:fontcolor=white",
-                "-frames:v", "1", "-f", "null", "-",
-            ],
-            deadline,
-            cap=120,
-        )
-    except Exception as e:  # noqa: BLE001 - pemanasan opsional, jangan matikan worker
-        log.warning("pemanasan font cache dilewati: %s", e)
+    if not root.exists():
+        return
+    dirs = sorted(
+        (d for d in root.iterdir() if d.is_dir()),
+        key=lambda d: d.stat().st_mtime,
+        reverse=True,
+    )
+    for d in dirs[keep:]:
+        log.info("menyapu workdir lama: %s", d)
+        rmtree_retry(d)

@@ -1,11 +1,11 @@
 """RQ worker. Satu job per proses (PRD Bagian 5); scale horizontal dengan
 menjalankan lebih banyak proses, tanpa ubah kode.
 """
-from rq import SimpleWorker
+from rq import Queue, SimpleWorker
 
+from config.settings import settings
 from jobqueue.client import QUEUE_NAME, connection
-from rq import Queue
-from utils.ffmpeg_helpers import Deadline, warm_font_cache
+from utils.ffmpeg_helpers import rmtree_stale
 from utils.logging import get, setup
 
 log = get(__name__)
@@ -13,10 +13,9 @@ log = get(__name__)
 
 def main() -> None:
     setup()
-    # Panggilan filter `subtitles` pertama bisa berhenti puluhan detik karena
-    # libass membangun cache font Windows lewat fontconfig. Dibayar di sini
-    # sekali, supaya tidak muncul sebagai "stage render hang" di job pertama.
-    warm_font_cache(Deadline(180))
+    # Workdir job yang gagal sengaja ditinggal untuk diperiksa, jadi disapu di
+    # sini supaya tidak tumbuh tanpa batas — isinya source video mentah.
+    rmtree_stale(settings.WORK_DIR)
 
     conn = connection()
     # SimpleWorker, bukan Worker: rq.Worker default memakai os.fork() yang tidak
