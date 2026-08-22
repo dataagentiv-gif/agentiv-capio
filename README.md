@@ -167,6 +167,24 @@ balik oleh orang berikutnya:
 
 ---
 
+## Batasan yang diketahui
+
+- **Job yatim.** Kalau proses worker mati di tengah job (crash native, terminal
+  ditutup), row-nya tertinggal di status berjalan selamanya — halaman History
+  akan terus menampilkan "downloading". Belum ada reaper: menyapunya saat worker
+  start akan salah membunuh job milik worker lain begitu jumlah worker
+  ditambah. Untuk sekarang: submit ulang.
+- **Source lebih sempit dari 9:16** (mis. video 1:1) akan ter-stretch vertikal.
+  Perbaikannya mode `fit` dengan blur background, yang oleh PRD memang ditunda
+  ke versi berikutnya.
+- **Satu crop per klip**, bukan per shot. Untuk video talking-head sederhana
+  sudah memadai; source dengan banyak b-roll belum tertangani.
+- **Chunking transkrip** memotong tepat di menit ke-20 tanpa menyesuaikan ke
+  jeda bicara, jadi satu kata bisa terpotong di batas chunk. Cabang itu baru
+  aktif di atas ~2.3 jam audio.
+
+---
+
 ## Commit
 
 Conventional Commits, scope = nama folder, deskripsi Bahasa Indonesia. Untuk
