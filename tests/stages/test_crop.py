@@ -47,7 +47,11 @@ def test_daftar_frame_kosong_tidak_bikin_crash():
 
 @pytest.mark.parametrize(
     "src_w,src_h,expect_w",
-    [(1920, 1080, 606), (1280, 720, 404), (3840, 2160, 1214)],
+    [
+        (1920, 1080, 608),  # 607.5 dibulatkan ke genap terdekat oleh round()
+        (1280, 720, 404),
+        (3840, 2160, 1214),
+    ],
 )
 def test_lebar_jendela_genap_dan_muat_di_frame(src_w, src_h, expect_w):
     """libx264 dengan yuv420p menolak dimensi ganjil."""
