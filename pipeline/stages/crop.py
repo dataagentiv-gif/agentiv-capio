@@ -7,7 +7,9 @@ import statistics
 from functools import lru_cache
 from pathlib import Path
 
-from utils.ffmpeg_helpers import run
+# Di-alias: tiap stage mengekspor run(ctx) sendiri, dan nama itu akan
+# menimpa helper ini di namespace modul.
+from utils.ffmpeg_helpers import run as ff
 from utils.logging import get
 
 log = get(__name__)
@@ -49,7 +51,7 @@ def _sample(source: Path, start: float, dur: float, deadline) -> list:
     """
     import numpy as np
 
-    proc = run(
+    proc = ff(
         [
             "ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-v", "error",
             "-ss", f"{start:.3f}", "-i", str(source), "-t", f"{dur:.3f}",

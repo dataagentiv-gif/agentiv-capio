@@ -17,3 +17,6 @@ work/
 
 *.log
 .DS_Store
+
+# Fixture test di-generate, bukan di-commit (tests/fixtures/make_fixture.py).
+tests/fixtures/sample.mp4

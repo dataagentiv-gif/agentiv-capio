@@ -5,7 +5,9 @@ Output : clips/{clip_id}.mp4
 """
 from pathlib import Path
 
-from utils.ffmpeg_helpers import run
+# Di-alias: tiap stage mengekspor run(ctx) sendiri, dan nama itu akan
+# menimpa helper ini di namespace modul.
+from utils.ffmpeg_helpers import run as ff
 from utils.logging import get
 from utils.retry import retry
 
@@ -25,7 +27,7 @@ def _render_one(source: Path, workdir: Path, seg: dict, crop: dict, src_h: int, 
         # berlapis. Dengan nama relatif, tidak ada yang perlu di-escape.
         f"subtitles={seg['id']}.ass"
     )
-    run(
+    ff(
         [
             "ffmpeg", "-y", "-nostdin", "-hide_banner", "-nostats", "-v", "error",
             # -ss WAJIB sebelum -i. Input seek melewatkan hanya frame yang

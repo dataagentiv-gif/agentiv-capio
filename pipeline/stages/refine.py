@@ -13,7 +13,9 @@ import re
 from pathlib import Path
 
 from config.settings import settings
-from utils.ffmpeg_helpers import run
+# Di-alias: tiap stage mengekspor run(ctx) sendiri, dan nama itu akan
+# menimpa helper ini di namespace modul.
+from utils.ffmpeg_helpers import run as ff
 from utils.logging import get
 
 log = get(__name__)
@@ -29,7 +31,7 @@ TAIL = 0.15         # majukan end sedikit supaya kata terakhir tidak terasa dipo
 
 def _silences(audio: Path, duration: float, deadline) -> list[tuple[float, float]]:
     """Daftar (mulai, selesai) tiap jeda hening di seluruh audio. Satu pass."""
-    proc = run(
+    proc = ff(
         [
             # WAJIB -v info. silencedetect menulis hasilnya ke log level info;
             # dengan -v error output-nya tertelan habis dan yang balik adalah
@@ -58,7 +60,7 @@ def _silences(audio: Path, duration: float, deadline) -> list[tuple[float, float
 def _scene_cuts(source: Path, t: float, deadline) -> list[float]:
     """Potongan visual di sekitar t saja, bukan di seluruh video."""
     t0 = max(0.0, t - SCENE_WINDOW)
-    proc = run(
+    proc = ff(
         [
             "ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-v", "info",
             "-ss", f"{t0:.3f}", "-i", str(source),

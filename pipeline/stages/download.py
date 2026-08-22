@@ -7,7 +7,10 @@ import json
 import sys
 from pathlib import Path
 
+# run di-alias: stage ini mengekspor run(ctx) sendiri, dan nama itu akan
+# menimpa helper di namespace modul.
 from utils.ffmpeg_helpers import ffmpeg, probe
+from utils.ffmpeg_helpers import run as ff
 from utils.logging import get
 from utils.retry import retry
 
@@ -20,9 +23,7 @@ FORMAT = "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=
 
 
 def _ytdlp(url: str, workdir: Path, deadline) -> None:
-    from utils.ffmpeg_helpers import run
-
-    run(
+    ff(
         [
             sys.executable, "-m", "yt_dlp",
             "-f", FORMAT,
