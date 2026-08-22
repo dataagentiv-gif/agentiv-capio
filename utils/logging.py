@@ -3,6 +3,12 @@ import sys
 
 
 def setup(level: int = logging.INFO) -> None:
+    # Saat stdout diarahkan ke file, Windows memakai encoding locale (cp1252) dan
+    # baris log berisi transkrip Indonesia/CJK meledak UnicodeEncodeError.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
     logging.basicConfig(
         level=level,
         format="%(asctime)s %(levelname)-7s %(name)-22s %(message)s",
