@@ -1,0 +1,19 @@
+.env
+# Backup .env tetap berisi kredensial, jadi jangan sampai lolos ke commit.
+.env.*
+!.env.example
+
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Working directory per job. Isinya source.mp4 mentah (bisa ratusan MB) plus
+# artefak antar-stage; semuanya sekali pakai dan dihapus setelah upload ke R2.
+work/
+*.mp4
+*.ogg
+*.ass
+
+*.log
+.DS_Store

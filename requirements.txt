@@ -1,0 +1,47 @@
+# --- API + web UI (satu proses, FastAPI serve REST sekaligus Jinja2) ---
+fastapi>=0.115
+uvicorn>=0.30
+jinja2>=3.1
+# Wajib ada, kalau tidak `POST /jobs` dari <form> HTML balas 422: FastAPI butuh
+# ini untuk mem-parse multipart/form-urlencoded.
+python-multipart>=0.0.9
+pydantic>=2.9
+pydantic-settings>=2.5
+python-dotenv>=1.0
+
+# --- State job ---
+SQLAlchemy>=2.0
+psycopg[binary]>=3.2
+
+# --- Queue ---
+redis>=5.0
+# rq 2.x sudah Windows-aware: BaseWorker memilih TimerDeathPenalty otomatis saat
+# signal.SIGALRM tidak ada. Yang tetap wajib dari sisi kita: SimpleWorker, karena
+# rq.Worker default pakai os.fork() yang tidak eksis di Windows.
+rq>=2.0
+
+# --- Storage ---
+# R2 itu S3-compatible, jadi boto3 apa adanya sudah cukup; tidak ada SDK khusus
+# Cloudflare yang perlu ditambah.
+boto3>=1.35
+
+# --- Pipeline ---
+yt-dlp>=2024.8
+groq>=0.11
+# Dipakai untuk OpenRouter. Bukan SDK openai: yang dibutuhkan cuma satu endpoint
+# chat/completions, dan satu POST httpx lebih ringan daripada satu SDK penuh.
+httpx>=0.27
+# Pin eksak. mediapipe 0.10.x memaksa numpy<2 + protobuf<5 dan menarik jax —
+# pin itu berantem dengan dep lain di venv ini. 1.0.1 tidak memaksa apa pun.
+mediapipe==1.0.1
+
+# --- Test ---
+pytest>=8.0
+
+# Sengaja TIDAK dipasang:
+#   torch/torchaudio/silero-vad -> ~2.4GB wheel Windows, cuma untuk mencari batas
+#     hening. ffmpeg silencedetect (sudah terinstall) memberi output yang sama.
+#   scenedetect -> decode seluruh file 1 jam; kita cuma butuh window +/-1.5 detik
+#     di sekitar tiap boundary. Filter `select=gt(scene,..)` ffmpeg sudah cukup.
+#   opencv-python -> ikut transitif lewat mediapipe, tapi tidak dipakai langsung;
+#     sampling frame lewat pipe rawvideo ffmpeg lebih andal di source VFR.
