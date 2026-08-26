@@ -17,10 +17,19 @@ class Settings(BaseSettings):
 
     # --- Kredensial eksternal ---
     GROQ_API_KEY: str = ""
+
+    # Stage 3 (segment) dan Stage 8 (metadata) sama-sama lewat llm/, jadi ganti
+    # provider atau model cukup ubah env var di sini — kode stage tidak disentuh.
+    LLM_PROVIDER: str = "openrouter"  # openrouter | gemini
+
     OPENROUTER_API_KEY: str = ""
-    # Stage 3 (segment) dan Stage 8 (metadata) sama-sama lewat llm/client.py, jadi
-    # ganti model cukup ubah satu env var ini — tidak menyentuh kode stage.
     OPENROUTER_MODEL: str = "google/gemini-2.5-flash-lite"
+
+    # Gemini dipanggil langsung (endpoint OpenAI-compatible milik Google), bukan
+    # lewat OpenRouter. Boleh diisi lebih dari satu key dipisah koma: free tier
+    # Gemini dibatasi PER KEY, jadi key yang dirotasi menaikkan atap tanpa biaya.
+    GEMINI_API_KEYS: str = ""  # "key1,key2,key3"
+    GEMINI_MODEL: str = "gemini-2.5-flash-lite"
 
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -50,6 +59,14 @@ class Settings(BaseSettings):
     # Workdir sengaja pendek. Path Windows mentok di MAX_PATH 260, dan
     # C:\Users\<nama>\AppData\Local\Temp\<uuid>\... sudah makan separuh jatah.
     WORK_DIR: Path = Path("C:/work")
+
+    @property
+    def gemini_keys(self) -> list[str]:
+        """Key Gemini sebagai list. Entri kosong dan spasi sisa copy-paste
+        dibuang, supaya "key1, key2," tidak menghasilkan key kosong yang
+        dikirim ke API dan balik 400.
+        """
+        return [k.strip() for k in self.GEMINI_API_KEYS.split(",") if k.strip()]
 
     @property
     def r2_endpoint(self) -> str:
