@@ -15,8 +15,17 @@ class Settings(BaseSettings):
         env_file=ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    # --- Kredensial eksternal ---
+    # --- Transkrip (Stage 2) ---
+    # groq       : murah ($0.04/jam) dan sangat cepat, tapi meleset di campuran
+    #              Indonesia-Inggris dan MENOLAK IP datacenter dengan 403 —
+    #              perhatikan ini kalau worker nanti dijalankan di VPS.
+    # elevenlabs : jauh lebih akurat untuk Bahasa Indonesia (~2.4% vs ~7.7% WER),
+    #              $0.22/jam, tanpa blokir IP.
+    ASR_PROVIDER: str = "groq"  # groq | elevenlabs
+
     GROQ_API_KEY: str = ""
+    ELEVENLABS_API_KEY: str = ""
+    ELEVENLABS_MODEL: str = "scribe_v2"
 
     # Stage 3 (segment) dan Stage 8 (metadata) sama-sama lewat llm/, jadi ganti
     # provider atau model cukup ubah env var di sini — kode stage tidak disentuh.

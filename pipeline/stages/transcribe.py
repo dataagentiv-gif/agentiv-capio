@@ -1,74 +1,38 @@
-"""Stage 2: transkrip Groq Whisper dengan timestamp per kata.
+"""Stage 2: transkrip dengan timestamp per kata.
 
-Input  : ctx[audio], ctx[workdir], ctx[deadline]
-Output : words.json -> [{"i": 0, "w": "jadi", "s": 12.34, "e": 12.51}]
+Input  : ctx[audio], ctx[workdir], ctx[deadline], ctx[meta]
+Output : words.json     -> [{"i", "w", "s", "e"}]        caption karaoke (Stage 5)
+         sentences.json -> [{"text", "s", "e"}]          bahan LLM (Stage 3)
+
+Provider mana yang dipakai ditentukan ASR_PROVIDER di .env; stage ini tidak
+tahu-menahu soal Groq maupun ElevenLabs.
 """
 import json
 import math
 from pathlib import Path
 
+import asr
 from config.settings import settings
 from utils.ffmpeg_helpers import ffmpeg
 from utils.logging import get
-from utils.retry import retry
 
 log = get(__name__)
 
-MODEL = "whisper-large-v3-turbo"
-# Limit Groq free tier 25MB; disisakan margin supaya tidak mepet.
-SIZE_LIMIT = 24 * 1024 * 1024
 CHUNK_SEC = 1200.0  # 20 menit
 
 
-def _client():
-    from groq import Groq
+def _chunks(audio: Path, workdir: Path, duration: float, deadline) -> tuple[list, list]:
+    """Cabang untuk audio melebihi batas provider.
 
-    return Groq(api_key=settings.GROQ_API_KEY)
-
-
-@retry(attempts=3, backoff=5.0)
-def _transcribe_file(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
-    """Satu panggilan Groq. Kembalikan (kata, kalimat) dengan timestamp absolut.
-
-    Dua-duanya dipakai, untuk keperluan yang berbeda:
-    - kata    -> caption karaoke (Stage 5) yang butuh timing per kata.
-    - kalimat -> bahan baca untuk LLM (Stage 3). Teks level kalimat dari Whisper
-      MEMBAWA TANDA BACA, sementara level kata tidak. Tanpa titik dan koma,
-      LLM tidak bisa membedakan kalimat yang selesai dari kalimat yang
-      menggantung — dan itu penyebab klip terpotong di tengah gagasan.
-    """
-    with open(path, "rb") as f:
-        resp = _client().audio.transcriptions.create(
-            file=(path.name, f.read()),
-            model=MODEL,
-            response_format="verbose_json",
-            # Tanpa timestamp_granularities word, yang balik cuma level segmen
-            # dan caption karaoke per kata mustahil dibuat.
-            timestamp_granularities=["word", "segment"],
-        )
-    data = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
-    words = [
-        {"w": w["word"].strip(), "s": w["start"] + offset, "e": w["end"] + offset}
-        for w in (data.get("words") or [])
-        if w.get("word", "").strip()
-    ]
-    sentences = [
-        {"text": s["text"].strip(), "s": s["start"] + offset, "e": s["end"] + offset}
-        for s in (data.get("segments") or [])
-        if s.get("text", "").strip()
-    ]
-    return words, sentences
-
-
-def _chunks(audio: Path, workdir: Path, duration: float, deadline) -> tuple[list[dict], list[dict]]:
-    """Cabang untuk audio > limit. Pada 24kbps ini baru kena di ~2.3 jam audio,
-    jadi sengaja dibiarkan sederhana: potong tepat 20 menit tanpa snap ke silence.
-    Satu kata terpotong di batas chunk tiap 20 menit tidak mengubah hasil seleksi.
+    Pada Groq (25MB, opus 24kbps) ini baru kena di ~2.3 jam audio; pada Scribe
+    (3GB) praktis tidak pernah. Karena itu sengaja dibiarkan sederhana: potong
+    tepat 20 menit tanpa menyesuaikan ke jeda bicara. Satu kata terpotong di
+    batas chunk tiap 20 menit tidak mengubah hasil seleksi momen.
     """
     words: list[dict] = []
     sentences: list[dict] = []
     n = math.ceil(duration / CHUNK_SEC)
-    log.info("audio > %d MB, dipecah jadi %d chunk", SIZE_LIMIT // 1_000_000, n)
+    log.info("audio melebihi batas provider, dipecah jadi %d chunk", n)
     for i in range(n):
         off = i * CHUNK_SEC
         part = workdir / f"chunk{i}.ogg"
@@ -83,7 +47,7 @@ def _chunks(audio: Path, workdir: Path, duration: float, deadline) -> tuple[list
             cwd=workdir,
             cap=300,
         )
-        w, s = _transcribe_file(part, off)
+        w, s = asr.transcribe(part, off)
         words += w
         sentences += s
         part.unlink(missing_ok=True)
@@ -93,19 +57,17 @@ def _chunks(audio: Path, workdir: Path, duration: float, deadline) -> tuple[list
 def run(ctx: dict) -> dict:
     audio: Path = ctx["audio"]
     workdir: Path = ctx["workdir"]
-    deadline = ctx["deadline"]
     duration = float(ctx["meta"]["duration"])
 
-    # Diperiksa di luar _transcribe_file: key yang kosong adalah salah
-    # konfigurasi, bukan kegagalan sementara, dan me-retry-nya 3x dengan backoff
-    # hanya menunda pesan error yang sudah pasti.
-    if not settings.GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY kosong — isi di .env")
+    # Diperiksa di luar pemanggilan ber-retry: key kosong adalah salah
+    # konfigurasi, bukan kegagalan sementara, dan me-retry-nya hanya menunda
+    # pesan error yang sudah pasti.
+    asr.check_config()
 
-    if audio.stat().st_size <= SIZE_LIMIT:
-        words, sentences = _transcribe_file(audio, 0.0)
+    if audio.stat().st_size <= asr.size_limit():
+        words, sentences = asr.transcribe(audio, 0.0)
     else:
-        words, sentences = _chunks(audio, workdir, duration, deadline)
+        words, sentences = _chunks(audio, workdir, duration, ctx["deadline"])
 
     if not words:
         raise RuntimeError("Transkrip kosong — audio kemungkinan tanpa suara")
@@ -113,11 +75,11 @@ def run(ctx: dict) -> dict:
     # Re-index setelah semua chunk digabung; `i` inilah yang dipakai LLM di
     # Stage 3 untuk menunjuk batas segmen.
     words.sort(key=lambda w: w["s"])
-    for i, w in enumerate(words):
-        w["i"] = i
-    words = [{"i": w["i"], "w": w["w"], "s": w["s"], "e": w["e"]} for w in words]
-
+    words = [
+        {"i": i, "w": w["w"], "s": w["s"], "e": w["e"]} for i, w in enumerate(words)
+    ]
     sentences.sort(key=lambda s: s["s"])
+
     (workdir / "words.json").write_text(
         json.dumps(words, ensure_ascii=False), encoding="utf-8"
     )
@@ -125,7 +87,7 @@ def run(ctx: dict) -> dict:
         json.dumps(sentences, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     log.info(
-        "transkrip: %d kata, %d kalimat, %.0f detik",
-        len(words), len(sentences), words[-1]["e"],
+        "transkrip [%s]: %d kata, %d kalimat, %.0f detik",
+        settings.ASR_PROVIDER, len(words), len(sentences), words[-1]["e"],
     )
     return {"words": words, "sentences": sentences}

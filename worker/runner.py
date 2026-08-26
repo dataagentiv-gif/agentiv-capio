@@ -3,6 +3,7 @@ menjalankan lebih banyak proses, tanpa ubah kode.
 """
 from rq import Queue, SimpleWorker
 
+import asr
 from config.settings import settings
 from jobqueue.client import QUEUE_NAME, connection
 from storage.client import check_config
@@ -19,6 +20,7 @@ def main() -> None:
     # download, transkrip, dan render selesai — belasan menit terbuang untuk job
     # yang sejak awal pasti gagal.
     check_config()
+    asr.check_config()
 
     # Workdir job yang gagal sengaja ditinggal untuk diperiksa, jadi disapu di
     # sini supaya tidak tumbuh tanpa batas — isinya source video mentah.
