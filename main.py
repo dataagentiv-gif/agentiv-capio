@@ -9,12 +9,18 @@ import sys
 def run_api() -> None:
     import uvicorn
 
+    from config.settings import settings
     from utils.logging import setup
 
     setup()
     # reload=False disengaja: reloader memakai multiprocessing spawn di Windows,
     # dan proses anaknya membuka koneksi Postgres kedua yang tidak pernah ditutup.
-    uvicorn.run("api.routes:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run(
+        "api.routes:app",
+        host=settings.API_HOST,
+        port=settings.API_PORT,
+        reload=False,
+    )
 
 
 def run_worker() -> None:

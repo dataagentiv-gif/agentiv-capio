@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8000
+
     R2_ACCOUNT_ID: str = ""
     R2_ACCESS_KEY_ID: str = ""
     R2_SECRET_ACCESS_KEY: str = ""

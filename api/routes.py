@@ -25,7 +25,7 @@ templates = Jinja2Templates(directory=str(WEB / "templates"))
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     models.init()
-    log.info("API siap di http://localhost:8000")
+    log.info("API siap di http://localhost:%d", settings.API_PORT)
     yield
 
 
