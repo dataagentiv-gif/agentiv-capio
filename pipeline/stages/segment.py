@@ -1,8 +1,18 @@
 """Stage 3: seleksi momen oleh LLM.
 
-Input  : ctx[words], ctx[target_clips], ctx[workdir]
+Input  : ctx[words], ctx[sentences], ctx[target_clips], ctx[workdir]
 Output : segments_raw.json -> [{start_idx, end_idx, hook, reason, score}]
+
+Transkrip disajikan ke LLM per KALIMAT, bukan per kata, dengan dua tambahan
+yang tidak ada di teks mentah: tanda baca, dan durasi jeda bicara. Keduanya
+menentukan kualitas titik potong.
+
+Tanpa tanda baca, "kelas menengah menuju kehancuran" terlihat seperti akhir
+kalimat yang wajar padahal pembicara masih menggantung. Tanpa durasi jeda, LLM
+tidak bisa membedakan orang yang selesai berpikir dari orang yang menarik napas
+di tengah argumen — dua-duanya terlihat identik sebagai teks.
 """
+import bisect
 import json
 from pathlib import Path
 
@@ -12,10 +22,15 @@ from utils.logging import get
 
 log = get(__name__)
 
-# Kata per baris transkrip ber-index. 10 kata (~3 detik) cukup halus untuk
-# menandai batas momen, dan jauh lebih hemat token daripada memberi nomor pada
-# setiap kata — untuk video 1 jam selisihnya ribuan token.
+# Dipakai hanya kalau daftar kalimat kosong (fallback). Normalnya satu baris =
+# satu kalimat, yang lebih baik karena batasnya jatuh di tempat yang memang
+# masuk akal untuk memotong.
 WORDS_PER_LINE = 10
+
+# Jeda di bawah ini tidak ditandai. Itu tarikan napas, bukan batas gagasan —
+# menandainya cuma menambah token tanpa menambah informasi. Ketiadaan tanda
+# jeda sudah berarti "kalimatnya langsung nyambung".
+PAUSE_MARK_MIN = 0.4
 
 SCHEMA = {
     "type": "object",
@@ -46,11 +61,24 @@ kata pertama pada baris itu.
 
 Tugas: pilih {n} momen paling layak dijadikan klip pendek berdiri sendiri.
 
+Tiap baris adalah satu kalimat. Angka `(jeda 1.4s)` di akhir baris berarti \
+pembicara BERHENTI selama itu sebelum kalimat berikutnya. Baris tanpa tanda \
+jeda berarti kalimatnya langsung nyambung tanpa henti.
+
 Kriteria momen yang bagus:
 - Punya kail pembuka yang bikin orang berhenti scroll di 3 detik pertama.
 - Utuh: ada pembuka, isi, dan penutup. Bukan potongan kalimat menggantung.
 - Bisa dipahami tanpa menonton sisa video.
 - Ada opini tajam, cerita konkret, angka mengejutkan, atau pembalikan asumsi.
+
+CARA MENENTUKAN BATAS — ini bagian yang paling sering salah:
+- AKHIRI klip di baris yang diikuti jeda panjang. Jeda panjang artinya \
+pembicara benar-benar menutup gagasannya.
+- JANGAN akhiri di baris tanpa tanda jeda. Kalimat yang langsung disambung \
+berarti pembicara masih melanjutkan — memotong di situ membuat klip terasa \
+putus di tengah, walau kalimatnya sendiri terlihat lengkap.
+- Waspadai kalimat yang MEMBUKA sesuatu tanpa menutupnya ("ada satu fenomena", \
+"gue kasih tiga alasan"). Klip harus memuat isinya, bukan cuma janjinya.
 
 Aturan keras:
 - Durasi tiap klip WAJIB antara {min_s:.0f} dan {max_s:.0f} detik. Rata-rata \
@@ -69,15 +97,65 @@ Transkrip:
 {transcript}"""
 
 
-def _indexed_transcript(words: list[dict]) -> str:
+def _anchors(words: list[dict], sentences: list[dict]) -> list[int]:
+    """Index kata pertama tiap kalimat.
+
+    Inilah satu-satunya titik yang boleh jadi awal klip. Dengan hanya
+    menampilkan index ini ke LLM, batas yang bisa dipilihnya otomatis jatuh di
+    awal kalimat, bukan di tengah.
+    """
+    starts = [w["s"] for w in words]
+    out = set()
+    for s in sentences:
+        # -0.05 memberi toleransi: timestamp kalimat dan kata dari Whisper bisa
+        # meleset beberapa puluh milidetik satu sama lain.
+        i = bisect.bisect_left(starts, s["s"] - 0.05)
+        out.add(min(max(i, 0), len(words) - 1))
+    return sorted(out)
+
+
+def _indexed_transcript(words: list[dict], sentences: list[dict]) -> str:
+    """Transkrip per kalimat, ber-index, dengan jeda bicara yang menonjol."""
+    if not sentences:
+        # Fallback kalau Whisper tidak mengembalikan level kalimat. Kualitas
+        # potongnya lebih buruk, tapi pipeline tetap jalan.
+        return "\n".join(
+            f"[{words[i]['i']}] " + " ".join(w["w"] for w in words[i : i + WORDS_PER_LINE])
+            for i in range(0, len(words), WORDS_PER_LINE)
+        )
+
+    idx = _anchors(words, sentences)
     lines = []
-    for i in range(0, len(words), WORDS_PER_LINE):
-        chunk = words[i : i + WORDS_PER_LINE]
-        lines.append(f"[{chunk[0]['i']}] " + " ".join(w["w"] for w in chunk))
+    for n, s in enumerate(sentences):
+        anchor = idx[min(n, len(idx) - 1)]
+        line = f"[{words[anchor]['i']}] {s['text']}"
+        if n + 1 < len(sentences):
+            jeda = sentences[n + 1]["s"] - s["e"]
+            if jeda >= PAUSE_MARK_MIN:
+                line += f"  (jeda {jeda:.1f}s)"
+        lines.append(line)
     return "\n".join(lines)
 
 
-def _validate(raw: list[dict], words: list[dict], target: int) -> list[dict]:
+def _snap_idx(i: int, anchors: list[int], last: int, edge: str) -> int:
+    """Tarik index ke batas kalimat terdekat.
+
+    Penjaga terakhir supaya klip tidak mulai atau berhenti di tengah kalimat,
+    walau LLM mengembalikan angka sembarangan.
+    """
+    if not anchors:
+        return i
+    if edge == "start":
+        cand = anchors
+    else:
+        # Akhir kalimat = satu kata sebelum kalimat berikutnya dimulai.
+        cand = [a - 1 for a in anchors[1:]] + [last]
+    return min(cand, key=lambda c: abs(c - i))
+
+
+def _validate(
+    raw: list[dict], words: list[dict], target: int, anchors: list[int] | None = None
+) -> list[dict]:
     """Buang kandidat yang melanggar kontrak, lalu buang yang tumpang tindih.
 
     Dijalankan di sini, sebelum Stage 4, karena segmen di luar rentang durasi
@@ -92,6 +170,11 @@ def _validate(raw: list[dict], words: list[dict], target: int) -> list[dict]:
         except (KeyError, TypeError, ValueError):
             continue
         a, b = max(0, min(a, last)), max(0, min(b, last))
+        # Di-snap SEBELUM cek durasi: menarik batas ke kalimat terdekat mengubah
+        # panjang klip, jadi yang divalidasi harus angka final.
+        if anchors:
+            a = _snap_idx(a, anchors, last, "start")
+            b = _snap_idx(b, anchors, last, "end")
         if b <= a:
             log.warning("segmen dibuang (end_idx <= start_idx): %s-%s", a, b)
             continue
@@ -122,6 +205,7 @@ def _validate(raw: list[dict], words: list[dict], target: int) -> list[dict]:
 
 def run(ctx: dict) -> dict:
     words: list[dict] = ctx["words"]
+    sentences: list[dict] = ctx.get("sentences") or []
     workdir: Path = ctx["workdir"]
     target = int(ctx["target_clips"])
 
@@ -136,12 +220,13 @@ def run(ctx: dict) -> dict:
         min_w=int(settings.MIN_CLIP_SEC * wps),
         max_w=int(settings.MAX_CLIP_SEC * wps),
         max_idx=len(words) - 1,
-        transcript=_indexed_transcript(words),
+        transcript=_indexed_transcript(words, sentences),
     )
 
     result = call_llm(prompt, SCHEMA)
     raw = result.get("segments", []) if isinstance(result, dict) else result
-    segments = _validate(raw, words, target)
+    anchors = _anchors(words, sentences) if sentences else []
+    segments = _validate(raw, words, target, anchors)
 
     if not segments:
         raise RuntimeError(
