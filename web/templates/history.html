@@ -29,24 +29,29 @@ function badge(s) {
   return `<span class="badge ${kind}">${esc(s)}</span>`;
 }
 
-function clipHtml(c) {
+function clipHtml(c, jobId) {
   const tags = (c.hashtags || []).map(h => `<span>#${esc(h)}</span>`).join('');
+  // Diputar lewat server ini, bukan lewat URL r2.dev: banyak ISP Indonesia
+  // memblokir r2.dev di level DNS. URL R2 aslinya tetap disediakan di samping.
+  const local = `/clips/${encodeURIComponent(jobId)}/${encodeURIComponent(c.id)}`;
   return `
     <div class="clip">
       <div class="score">${c.score}<small>SCORE</small></div>
       <div>
-        <h3><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.title || c.id)}</a></h3>
+        <h3><a href="${local}" target="_blank" rel="noopener">${esc(c.title || c.id)}</a></h3>
         <div class="field reason"><b>Alasan LLM:</b>${esc(c.reason)}</div>
         <div class="field"><b>Hook:</b>${esc(c.hook)}</div>
         ${c.caption ? `<div class="field"><b>Caption:</b>${esc(c.caption)}</div>` : ''}
-        <div class="field"><b>Durasi:</b>${c.duration}s</div>
+        <div class="field"><b>Durasi:</b>${c.duration}s
+          · <a href="${local}" target="_blank" rel="noopener">putar</a>
+          · <a href="${esc(c.url)}" target="_blank" rel="noopener">R2</a></div>
         <div class="tags">${tags}</div>
       </div>
     </div>`;
 }
 
 function jobHtml(j) {
-  const clips = (j.clips || []).map(clipHtml).join('');
+  const clips = (j.clips || []).map(c => clipHtml(c, j.id)).join('');
   const when = j.created_at ? new Date(j.created_at).toLocaleString('id-ID') : '';
   return `
     <div class="job">

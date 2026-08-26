@@ -123,3 +123,29 @@ def test_end_to_end_sampai_done(client):
         assert 0 <= c["score"] <= 100
         assert c["reason"].strip()
         assert settings.MIN_CLIP_SEC <= c["duration"] <= settings.MAX_CLIP_SEC
+
+
+# --- pemutar klip lokal ---
+#
+# Route ini ada karena banyak ISP Indonesia memblokir r2.dev di level DNS,
+# sementara menyalakan VPN membuat Groq menolak request dengan 403.
+
+@pytest.mark.parametrize(
+    "job_id,clip_id",
+    [
+        ("bukan-uuid", "c1"),
+        ("../../etc", "c1"),
+        ("00000000-0000-0000-0000-000000000000", "../secret"),
+        ("00000000-0000-0000-0000-000000000000", "c1/../../x"),
+        ("00000000-0000-0000-0000-000000000000", "cX"),
+    ],
+)
+def test_id_tidak_valid_ditolak_404(client, job_id, clip_id):
+    """job_id dan clip_id masuk ke key objek R2 — bentuknya wajib dikunci."""
+    r = client.get(f"/clips/{job_id}/{clip_id}", follow_redirects=False)
+    assert r.status_code in (404, 307), r.status_code
+
+
+def test_klip_yang_tidak_ada_balas_404(client):
+    r = client.get("/clips/00000000-0000-0000-0000-000000000000/c1")
+    assert r.status_code == 404

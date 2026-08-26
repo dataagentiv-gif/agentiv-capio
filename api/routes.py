@@ -3,11 +3,12 @@
 Route di sini tidak pernah menjalankan pipeline secara sinkron: terima request
 -> tulis row awal -> push job_id ke queue -> balas. Sisanya urusan worker.
 """
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -15,9 +16,13 @@ from api.schemas import JobCreate, JobCreated, JobOut
 from config.settings import settings
 from db import jobs, models
 from jobqueue.client import enqueue
+from storage.client import get_clip
 from utils.logging import get
 
 log = get(__name__)
+
+_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+_CLIP = re.compile(r"^c\d{1,3}$")
 WEB = Path(__file__).resolve().parent.parent / "web"
 templates = Jinja2Templates(directory=str(WEB / "templates"))
 
@@ -45,6 +50,39 @@ def submit_page(request: Request):
 @app.get("/history", response_class=HTMLResponse)
 def history_page(request: Request):
     return templates.TemplateResponse(request, "history.html", {})
+
+
+@app.get("/clips/{job_id}/{clip_id}")
+def play_clip(job_id: str, clip_id: str, range: str | None = Header(default=None)):
+    """Putar klip lewat server ini, bukan lewat URL publik r2.dev.
+
+    Banyak ISP Indonesia memblokir r2.dev di level DNS, jadi link R2 langsung
+    tidak kebuka tanpa VPN — sementara menyalakan VPN membuat Groq menolak
+    request dengan 403. Route ini memutus lingkaran itu: file diambil dari R2
+    lewat endpoint S3 yang tidak diblokir, lalu disalurkan dari localhost.
+    """
+    # Batas kepercayaan: dua nilai ini masuk ke key objek R2, jadi bentuknya
+    # dikunci ketat supaya tidak bisa dipakai menjangkau objek lain.
+    if not _UUID.match(job_id) or not _CLIP.match(clip_id):
+        raise HTTPException(404, "Klip tidak ditemukan")
+
+    try:
+        obj = get_clip(job_id, clip_id, range)
+    except Exception as e:  # noqa: BLE001
+        log.warning("gagal ambil klip %s/%s: %s", job_id, clip_id, e)
+        raise HTTPException(404, "Klip tidak ada di storage") from e
+
+    headers = {"Accept-Ranges": "bytes", "Content-Length": str(obj["ContentLength"])}
+    if "ContentRange" in obj:
+        headers["Content-Range"] = obj["ContentRange"]
+    return StreamingResponse(
+        obj["Body"].iter_chunks(chunk_size=256 * 1024),
+        # 206 saat browser meminta sebagian: tanpa itu pemutar video tidak bisa
+        # menggeser posisi, cuma bisa memutar dari awal.
+        status_code=206 if range else 200,
+        media_type="video/mp4",
+        headers=headers,
+    )
 
 
 # --- REST API ---

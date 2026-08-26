@@ -48,6 +48,20 @@ def _client():
     )
 
 
+def get_clip(job_id: str, clip_id: str, byte_range: str | None = None):
+    """Ambil objek klip dari R2, opsional sebagian lewat header Range.
+
+    Dipakai route pemutar lokal. Lewat endpoint S3 (*.r2.cloudflarestorage.com),
+    BUKAN domain publik r2.dev — banyak ISP Indonesia memblokir r2.dev di level
+    DNS, sementara endpoint S3 tidak kena. Detail boto3 sengaja ditahan di sini
+    supaya api/ tidak perlu tahu soal S3.
+    """
+    kw = {"Bucket": settings.R2_BUCKET, "Key": f"{job_id}/clips/{clip_id}.mp4"}
+    if byte_range:
+        kw["Range"] = byte_range
+    return _client().get_object(**kw)
+
+
 def upload_clip(job_id: str, clip_id: str, path: Path) -> str:
     """Upload satu klip, kembalikan URL publiknya."""
     key = f"{job_id}/clips/{clip_id}.mp4"
