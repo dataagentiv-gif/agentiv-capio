@@ -78,20 +78,34 @@ def _scene_cuts(source: Path, t: float, deadline) -> list[float]:
     return [c for c in cuts if c - t0 > 0.1]
 
 
+# Bobot jarak saat menilai kandidat hening. Kandidat dinilai
+# `durasi_hening - JARAK_PENALTI * jarak`, jadi hening 1.5 detik yang berjarak
+# 1 detik masih mengalahkan hening 0.3 detik yang berjarak 0.1 detik.
+JARAK_PENALTI = 0.5
+
+
 def _snap(t: float, sils, cuts, edge: str, drift: float) -> float:
     """Potongan visual menang atas jeda audio — pergantian shot adalah batas
     alami yang lebih kuat daripada sekadar jeda bicara.
+
+    Di antara sesama jeda audio, yang dipilih adalah yang PALING PANJANG, bukan
+    yang paling dekat. Hening 1.5 detik adalah penutup gagasan; hening 0.3 detik
+    cuma tarikan napas. Memilih berdasarkan kedekatan membuat tarikan napas yang
+    kebetulan lebih dekat mengalahkan batas yang sebenarnya.
     """
     near = [c for c in cuts if abs(c - t) <= drift]
     if near:
         return min(near, key=lambda c: abs(c - t))
+
     # start: mulai tepat setelah hening SELESAI. end: berhenti tepat saat hening MULAI.
-    cand = (
-        [e for _, e in sils if abs(e - t) <= drift]
-        if edge == "start"
-        else [s for s, _ in sils if abs(s - t) <= drift]
-    )
-    return min(cand, key=lambda x: abs(x - t)) if cand else t
+    cand = [
+        (e if edge == "start" else s, e - s)
+        for s, e in sils
+        if abs((e if edge == "start" else s) - t) <= drift
+    ]
+    if not cand:
+        return t
+    return max(cand, key=lambda c: c[1] - JARAK_PENALTI * abs(c[0] - t))[0]
 
 
 def run(ctx: dict) -> dict:

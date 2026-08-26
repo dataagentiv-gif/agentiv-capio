@@ -43,6 +43,35 @@ def test_tanpa_hening_sama_sekali_batas_dipakai_apa_adanya():
     assert _snap(42.0, [], [], "start", DRIFT) == 42.0
 
 
+# --- hening terpanjang menang atas hening terdekat ---
+#
+# Hening 1.5 detik adalah penutup gagasan; hening 0.3 detik cuma tarikan napas.
+# Memilih berdasarkan kedekatan membuat tarikan napas yang kebetulan lebih dekat
+# mengalahkan batas yang sebenarnya — dan klip terasa terpotong di tengah.
+
+def test_hening_panjang_menang_walau_lebih_jauh():
+    # Keduanya di dalam drift, jadi yang diuji benar-benar skornya:
+    #   dekat+pendek : 0.3 - 0.5*0.1 = 0.25
+    #   jauh+panjang : 1.5 - 0.5*0.9 = 1.05  <- menang
+    sils = [(49.9, 50.2), (50.9, 52.4)]
+    assert _snap(50.0, sils, [], "end", DRIFT) == 50.9
+
+
+def test_hening_pendek_menang_kalau_yang_panjang_terlalu_jauh():
+    """Durasi tidak boleh mengalahkan jarak yang keterlaluan.
+       dekat+pendek : 0.35 - 0.5*0.05 =  0.325  <- menang
+       jauh+panjang : 0.50 - 0.5*1.10 = -0.05
+    """
+    sils = [(49.7, 50.05), (50.6, 51.1)]
+    assert _snap(50.0, sils, [], "start", DRIFT) == 50.05
+
+
+def test_di_antara_dua_hening_sama_panjang_yang_terdekat_menang():
+    # Durasi identik (1.0s), keduanya di dalam drift -> jarak jadi penentu.
+    sils = [(48.5, 49.5), (49.7, 50.7)]
+    assert _snap(50.0, sils, [], "start", DRIFT) == 49.5
+
+
 def test_parser_silencedetect_membaca_format_stderr_ffmpeg():
     stderr = (
         "[Parsed_silencedetect_0 @ 0000021a] silence_start: 9.5\n"
