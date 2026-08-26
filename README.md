@@ -69,8 +69,48 @@ momen) dan Stage 8 (metadata), tidak pernah memutuskan urutan eksekusi.
 - `utils/` dan `config/` foundational, tidak mengimpor folder lain.
 - `api/routes.py` tidak pernah menjalankan pipeline secara sinkron.
 
-Ganti model LLM cukup ubah `OPENROUTER_MODEL` di `.env` — Stage 3 dan 8
-sama-sama lewat `llm/client.py`.
+### Provider LLM
+
+Stage 3 dan 8 sama-sama lewat `llm/`, jadi ganti provider atau model cukup ubah
+`.env` — kode stage tidak disentuh.
+
+```
+llm/
+├── __init__.py            call_llm() -> memilih provider dari LLM_PROVIDER
+├── _engine.py             logika bersama (request, parsing, retry)
+├── client_openrouter.py   satu key
+└── client_gemini.py       banyak key, dirotasi
+```
+
+Keduanya bicara protokol OpenAI `chat/completions` — Gemini punya endpoint
+OpenAI-compatible di `generativelanguage.googleapis.com/v1beta/openai` — jadi
+yang benar-benar berbeda cuma tiga: URL, sumber API key, dan dukungan
+`json_schema`. Sisanya dipakai bersama di `_engine.py`.
+
+**Rotasi key Gemini.** Isi `GEMINI_API_KEYS` dipisah koma:
+
+```
+GEMINI_API_KEYS=key1,key2,key3
+```
+
+Key dipakai bergiliran (x+1) tiap panggilan. Gunanya bukan kecepatan, tapi
+kuota: free tier Gemini dibatasi **per key** (flash-lite: 15 request/menit,
+1.000/hari). `_engine` memanggil `get_key()` ulang di **tiap percobaan**, jadi
+panggilan yang kena 429 otomatis lanjut ke key berikutnya alih-alih mengulang ke
+key yang kuotanya sedang habis.
+
+Satu key sudah cukup untuk testing: pipeline cuma memakai **2 panggilan LLM per
+video**, jadi 1.000/hari setara ~500 video/hari.
+
+Catatan: `gemini-2.5-flash-lite` (langsung) dan `google/gemini-2.5-flash-lite`
+(via OpenRouter) adalah **model yang sama**. Pindah provider mengubah biaya dan
+rate limit, bukan kualitas seleksi momen.
+
+Gemini dikirimi `response_format: json_object`, bukan `json_schema` — dukungan
+`json_schema` di layer OpenAI-compatible Google belum terverifikasi. Bentuk
+output tetap terjaga karena prompt menyebut tiap field, stage memvalidasi
+sendiri, dan error parsing disuntikkan balik ke prompt. Kalau nanti terbukti
+`json_schema` diterima, ubah `use_schema=True` di `client_gemini.py`.
 
 ---
 
