@@ -59,11 +59,20 @@ PROMPT = """Kamu editor video short-form. Di bawah ini transkrip lengkap sebuah 
 video, dipecah per baris. Angka dalam kurung siku di awal baris adalah index \
 kata pertama pada baris itu.
 
-Tugas: pilih {n} momen paling layak dijadikan klip pendek berdiri sendiri.
+Tugas: pilih {n} momen paling layak dijadikan klip pendek berdiri sendiri. \
+Yang akhirnya dipakai cuma {target} terbaik, jadi beri lebih banyak pilihan \
+daripada memaksakan momen yang lemah.
 
-Tiap baris adalah satu kalimat. Angka `(jeda 1.4s)` di akhir baris berarti \
-pembicara BERHENTI selama itu sebelum kalimat berikutnya. Baris tanpa tanda \
-jeda berarti kalimatnya langsung nyambung tanpa henti.
+Tiap baris adalah satu kalimat, diawali `[index @ mm:ss]` — index kata pertama \
+kalimat itu, dan menit:detik kapan kalimat itu diucapkan.
+
+`(jeda 1.4s)` di akhir baris berarti pembicara BERHENTI selama itu sebelum \
+kalimat berikutnya. Baris tanpa tanda jeda berarti kalimatnya langsung \
+nyambung tanpa henti.
+
+HITUNG DURASI KLIP DARI JAM, BUKAN DARI JUMLAH KATA. Klip dari baris `@ 03:10` \
+sampai baris `@ 04:05` berdurasi 55 detik. Periksa hitungan ini untuk SETIAP \
+klip sebelum menjawab — klip di luar {min_s:.0f}-{max_s:.0f} detik akan dibuang.
 
 Kriteria momen yang bagus:
 - Punya kail pembuka yang bikin orang berhenti scroll di 3 detik pertama.
@@ -81,8 +90,9 @@ putus di tengah, walau kalimatnya sendiri terlihat lengkap.
 "gue kasih tiga alasan"). Klip harus memuat isinya, bukan cuma janjinya.
 
 Aturan keras:
-- Durasi tiap klip WAJIB antara {min_s:.0f} dan {max_s:.0f} detik. Rata-rata \
-{wps:.1f} kata per detik, jadi pilih rentang sekitar {min_w}-{max_w} kata.
+- Durasi tiap klip WAJIB antara {min_s:.0f} dan {max_s:.0f} detik, dihitung \
+dari selisih jam baris awal dan baris akhir. Ini penyebab kegagalan paling \
+sering: rentang yang isinya menarik tapi cuma 10-20 detik akan dibuang.
 - end_idx harus lebih besar dari start_idx.
 - Antar klip tidak boleh tumpang tindih.
 - Index tertinggi yang tersedia adalah {max_idx}.
@@ -95,6 +105,11 @@ Isi tiap field:
 
 Transkrip:
 {transcript}"""
+
+
+def _mmss(t: float) -> str:
+    m, s = divmod(int(t), 60)
+    return f"{m:02d}:{s:02d}"
 
 
 def _anchors(words: list[dict], sentences: list[dict]) -> list[int]:
@@ -128,7 +143,13 @@ def _indexed_transcript(words: list[dict], sentences: list[dict]) -> str:
     lines = []
     for n, s in enumerate(sentences):
         anchor = idx[min(n, len(idx) - 1)]
-        line = f"[{words[anchor]['i']}] {s['text']}"
+        # Waktu mulai ikut ditampilkan. Tanpa ini LLM tidak punya cara menaksir
+        # durasi: saat tiap baris masih 10 kata, jumlah baris jadi penggaris
+        # implisit, tapi begitu baris berubah jadi kalimat dengan panjang
+        # berbeda-beda penggaris itu hilang — dan model memilih rentang 8 detik
+        # untuk target 30-90 detik. Dengan jam di tiap baris, durasi bisa
+        # dihitung langsung, bukan ditaksir dari jumlah kata.
+        line = f"[{words[anchor]['i']} @ {_mmss(s['s'])}] {s['text']}"
         if n + 1 < len(sentences):
             jeda = sentences[n + 1]["s"] - s["e"]
             if jeda >= PAUSE_MARK_MIN:
@@ -209,16 +230,15 @@ def run(ctx: dict) -> dict:
     workdir: Path = ctx["workdir"]
     target = int(ctx["target_clips"])
 
-    total_dur = words[-1]["e"] - words[0]["s"]
-    wps = len(words) / total_dur if total_dur > 0 else 2.5
-
     prompt = PROMPT.format(
-        n=target,
+        # Diminta lebih banyak dari target sebagai cadangan. Sebagian kandidat
+        # selalu gugur di validasi durasi, dan tanpa kelebihan ini permintaan
+        # 5 klip bisa pulang cuma 3. _validate tetap memotong ke `target`,
+        # mengambil skor tertinggi.
+        n=target + 2,
+        target=target,
         min_s=settings.MIN_CLIP_SEC,
         max_s=settings.MAX_CLIP_SEC,
-        wps=wps,
-        min_w=int(settings.MIN_CLIP_SEC * wps),
-        max_w=int(settings.MAX_CLIP_SEC * wps),
         max_idx=len(words) - 1,
         transcript=_indexed_transcript(words, sentences),
     )

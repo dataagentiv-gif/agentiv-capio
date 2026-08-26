@@ -120,8 +120,8 @@ def test_jeda_pendek_tidak_ditandai():
 
 def test_index_baris_menunjuk_kata_pertama_kalimat():
     lines = _indexed_transcript(SENT_WORDS, SENTENCES).splitlines()
-    assert lines[0].startswith("[0] ")
-    assert lines[1].startswith("[3] ")  # kata pertama kalimat kedua ada di t=3.0
+    assert lines[0].startswith("[0 @")
+    assert lines[1].startswith("[3 @")  # kata pertama kalimat kedua ada di t=3.0
 
 
 # --- snap index ke batas kalimat ---
@@ -156,3 +156,24 @@ def test_validate_menarik_batas_ke_kalimat():
 def test_tanpa_anchors_index_tidak_diubah():
     out = _validate([seg(100, 220)], WORDS, target=8)
     assert out[0]["start_idx"] == 100 and out[0]["end_idx"] == 220
+
+
+# --- jam di tiap baris ---
+#
+# Tanpa jam, LLM tidak punya cara menaksir durasi: saat tiap baris masih 10
+# kata, jumlah baris jadi penggaris implisit, tapi begitu baris berubah jadi
+# kalimat dengan panjang berbeda-beda penggaris itu hilang — dan model memilih
+# rentang 8 detik untuk target 30-90 detik.
+
+def test_mmss_format():
+    from pipeline.stages.segment import _mmss
+
+    assert _mmss(0) == "00:00"
+    assert _mmss(65) == "01:05"
+    assert _mmss(936) == "15:36"
+
+
+def test_tiap_baris_mencantumkan_jam_mulai():
+    lines = _indexed_transcript(SENT_WORDS, SENTENCES).splitlines()
+    assert lines[0].startswith("[0 @ 00:00]")
+    assert lines[1].startswith("[3 @ 00:03]")
