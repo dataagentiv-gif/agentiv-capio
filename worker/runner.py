@@ -5,6 +5,7 @@ from rq import Queue, SimpleWorker
 
 from config.settings import settings
 from jobqueue.client import QUEUE_NAME, connection
+from storage.client import check_config
 from utils.ffmpeg_helpers import rmtree_stale
 from utils.logging import get, setup
 
@@ -13,6 +14,12 @@ log = get(__name__)
 
 def main() -> None:
     setup()
+    # Diperiksa SEBELUM worker menerima job. Upload adalah langkah terakhir
+    # pipeline, jadi tanpa ini satu env var R2 yang kosong baru ketahuan setelah
+    # download, transkrip, dan render selesai — belasan menit terbuang untuk job
+    # yang sejak awal pasti gagal.
+    check_config()
+
     # Workdir job yang gagal sengaja ditinggal untuk diperiksa, jadi disapu di
     # sini supaya tidak tumbuh tanpa batas — isinya source video mentah.
     rmtree_stale(settings.WORK_DIR)

@@ -8,6 +8,32 @@ from botocore.config import Config
 from config.settings import settings
 
 
+REQUIRED = (
+    "R2_ACCOUNT_ID",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+    "R2_BUCKET",
+    "R2_PUBLIC_BASE_URL",
+)
+
+
+def check_config() -> None:
+    """Pastikan konfigurasi R2 lengkap. Dipanggil saat worker start.
+
+    Upload adalah langkah TERAKHIR pipeline, jadi tanpa pemeriksaan di depan
+    satu env var yang kosong baru ketahuan setelah download, transkrip, dan
+    render selesai — belasan menit terbuang untuk job yang sejak awal pasti
+    gagal. Lebih buruk lagi, pesannya muncul sebagai ValueError dari dalam
+    botocore ("Invalid endpoint: https://.r2.cloudflarestorage.com") yang tidak
+    menyebut env var mana yang bolong.
+    """
+    kosong = [k for k in REQUIRED if not getattr(settings, k, "")]
+    if kosong:
+        raise RuntimeError(
+            "Konfigurasi R2 belum lengkap, isi di .env: " + ", ".join(kosong)
+        )
+
+
 @lru_cache(maxsize=1)
 def _client():
     # region_name="auto" wajib untuk R2 — dia tidak punya region ala AWS, tapi
