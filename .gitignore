@@ -20,3 +20,6 @@ work/
 
 # Fixture test di-generate, bukan di-commit (tests/fixtures/make_fixture.py).
 tests/fixtures/sample.mp4
+
+# Cache lokal wrangler (login state), bukan bagian dari project.
+.wrangler/
