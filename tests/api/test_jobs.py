@@ -12,16 +12,22 @@ from config.settings import settings
 
 
 def _infra_ready() -> bool:
+    """Timeout-nya sengaja pendek. Dengan default, menjalankan pytest tanpa
+    Docker hidup menggantung berbelas menit di TCP connect timeout sebelum
+    akhirnya skip — dan itu terlihat seperti test yang hang, bukan infra mati.
+    """
     try:
-        from sqlalchemy import text
+        from redis import Redis
+        from sqlalchemy import create_engine, text
 
-        from db.models import engine
-
-        with engine.connect() as c:
+        probe = create_engine(
+            settings.DATABASE_URL, connect_args={"connect_timeout": 2}
+        )
+        with probe.connect() as c:
             c.execute(text("select 1"))
-        from jobqueue.client import connection
+        probe.dispose()
 
-        connection().ping()
+        Redis.from_url(settings.REDIS_URL, socket_connect_timeout=2).ping()
         return True
     except Exception:  # noqa: BLE001
         return False
