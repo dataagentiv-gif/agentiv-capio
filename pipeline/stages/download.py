@@ -19,7 +19,19 @@ log = get(__name__)
 # Dibatasi 1080p. Klip akhir 1080x1920 dipotong dari tinggi penuh source, jadi
 # source 1080p memberi jendela 608x1080 — sedikit di-upscale, dan itu trade-off
 # yang benar dibanding mengunduh 4K yang bikin download plus decode berkali lipat.
-FORMAT = "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/b"
+#
+# avc1 (H.264) DIPRIORITASKAN di atas AV1, walau file AV1 jauh lebih kecil
+# (47MB vs 104MB untuk video 15 menit yang sama). Alasannya bukan ukuran, tapi
+# jumlah decode: pipeline ini membaca source berulang kali — dua scan
+# scene-detect per klip, satu sampling frame per klip, plus satu render per klip
+# (~20 pass untuk 5 klip). Decode AV1 3-5x lebih mahal dari H.264, jadi hemat
+# 57MB unduhan dibayar berkali lipat di CPU. `[ext=mp4]` saja tidak cukup:
+# av01 juga dikemas dalam mp4, dan yt-dlp memilihnya karena lebih kecil.
+FORMAT = (
+    "bv*[height<=1080][vcodec^=avc1]+ba[ext=m4a]/"
+    "bv*[height<=1080][ext=mp4]+ba/"
+    "b[height<=1080]/b"
+)
 
 
 def _ytdlp(url: str, workdir: Path, deadline) -> None:
@@ -31,6 +43,16 @@ def _ytdlp(url: str, workdir: Path, deadline) -> None:
             "--no-playlist",
             "--no-progress",
             "--write-info-json",
+            # Tanpa ini, koneksi yang menggantung di tengah fragmen tidak pernah
+            # putus sendiri — yt-dlp diam menunggu sampai deadline job habis.
+            # Terjadi sungguhan: unduhan berhenti 8 menit tanpa satu byte pun,
+            # padahal jaringannya sehat.
+            "--socket-timeout", "30",
+            "--retries", "10",
+            "--fragment-retries", "10",
+            # Unduh beberapa fragmen sekaligus. Video DASH YouTube dipecah jadi
+            # ratusan fragmen kecil, dan satu per satu membuang waktu di latensi.
+            "-N", "4",
             # Nama file literal pendek, bukan %(title)s: path Windows mentok di
             # MAX_PATH 260 dan judul YouTube bisa 100 karakter sendiri.
             "-o", "source.%(ext)s",
