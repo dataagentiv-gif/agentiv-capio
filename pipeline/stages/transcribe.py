@@ -27,8 +27,16 @@ def _client():
 
 
 @retry(attempts=3, backoff=5.0)
-def _transcribe_file(path: Path, offset: float) -> list[dict]:
-    """Satu panggilan Groq. Kembalikan list kata dengan timestamp absolut."""
+def _transcribe_file(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
+    """Satu panggilan Groq. Kembalikan (kata, kalimat) dengan timestamp absolut.
+
+    Dua-duanya dipakai, untuk keperluan yang berbeda:
+    - kata    -> caption karaoke (Stage 5) yang butuh timing per kata.
+    - kalimat -> bahan baca untuk LLM (Stage 3). Teks level kalimat dari Whisper
+      MEMBAWA TANDA BACA, sementara level kata tidak. Tanpa titik dan koma,
+      LLM tidak bisa membedakan kalimat yang selesai dari kalimat yang
+      menggantung — dan itu penyebab klip terpotong di tengah gagasan.
+    """
     with open(path, "rb") as f:
         resp = _client().audio.transcriptions.create(
             file=(path.name, f.read()),
@@ -39,19 +47,26 @@ def _transcribe_file(path: Path, offset: float) -> list[dict]:
             timestamp_granularities=["word", "segment"],
         )
     data = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
-    return [
+    words = [
         {"w": w["word"].strip(), "s": w["start"] + offset, "e": w["end"] + offset}
         for w in (data.get("words") or [])
         if w.get("word", "").strip()
     ]
+    sentences = [
+        {"text": s["text"].strip(), "s": s["start"] + offset, "e": s["end"] + offset}
+        for s in (data.get("segments") or [])
+        if s.get("text", "").strip()
+    ]
+    return words, sentences
 
 
-def _chunks(audio: Path, workdir: Path, duration: float, deadline) -> list[dict]:
+def _chunks(audio: Path, workdir: Path, duration: float, deadline) -> tuple[list[dict], list[dict]]:
     """Cabang untuk audio > limit. Pada 24kbps ini baru kena di ~2.3 jam audio,
     jadi sengaja dibiarkan sederhana: potong tepat 20 menit tanpa snap ke silence.
     Satu kata terpotong di batas chunk tiap 20 menit tidak mengubah hasil seleksi.
     """
     words: list[dict] = []
+    sentences: list[dict] = []
     n = math.ceil(duration / CHUNK_SEC)
     log.info("audio > %d MB, dipecah jadi %d chunk", SIZE_LIMIT // 1_000_000, n)
     for i in range(n):
@@ -68,9 +83,11 @@ def _chunks(audio: Path, workdir: Path, duration: float, deadline) -> list[dict]
             cwd=workdir,
             cap=300,
         )
-        words += _transcribe_file(part, off)
+        w, s = _transcribe_file(part, off)
+        words += w
+        sentences += s
         part.unlink(missing_ok=True)
-    return words
+    return words, sentences
 
 
 def run(ctx: dict) -> dict:
@@ -86,9 +103,9 @@ def run(ctx: dict) -> dict:
         raise RuntimeError("GROQ_API_KEY kosong — isi di .env")
 
     if audio.stat().st_size <= SIZE_LIMIT:
-        words = _transcribe_file(audio, 0.0)
+        words, sentences = _transcribe_file(audio, 0.0)
     else:
-        words = _chunks(audio, workdir, duration, deadline)
+        words, sentences = _chunks(audio, workdir, duration, deadline)
 
     if not words:
         raise RuntimeError("Transkrip kosong — audio kemungkinan tanpa suara")
@@ -100,8 +117,15 @@ def run(ctx: dict) -> dict:
         w["i"] = i
     words = [{"i": w["i"], "w": w["w"], "s": w["s"], "e": w["e"]} for w in words]
 
+    sentences.sort(key=lambda s: s["s"])
     (workdir / "words.json").write_text(
         json.dumps(words, ensure_ascii=False), encoding="utf-8"
     )
-    log.info("transkrip: %d kata, %.0f detik", len(words), words[-1]["e"])
-    return {"words": words}
+    (workdir / "sentences.json").write_text(
+        json.dumps(sentences, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    log.info(
+        "transkrip: %d kata, %d kalimat, %.0f detik",
+        len(words), len(sentences), words[-1]["e"],
+    )
+    return {"words": words, "sentences": sentences}
