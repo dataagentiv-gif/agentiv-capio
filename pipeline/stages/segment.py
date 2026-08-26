@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from config.settings import settings
-from llm.client import call_llm
+from llm import call_llm
 from utils.logging import get
 
 log = get(__name__)

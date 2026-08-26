@@ -5,7 +5,7 @@ Output : {clip_id: {title, caption, hashtags[]}}
 """
 import json
 
-from llm.client import call_llm
+from llm import call_llm
 from utils.logging import get
 
 log = get(__name__)
