@@ -1,179 +1,400 @@
+/* Design tokens: sistem Atlassian (refero.design).
+   Charlie Display/Text adalah font proprietary Atlassian; dipakai substitusi
+   resmi dari style guide-nya — Manrope untuk display, Inter untuk teks. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Manrope:wght@400;500;700;800&display=swap');
+
 :root {
-  --bg: #0f1115;
-  --panel: #171a21;
-  --panel-2: #1e222b;
-  --line: #2a2f3a;
-  --text: #e8eaed;
-  --muted: #9aa3b2;
-  --accent: #ffc857;
-  --ok: #4ade80;
-  --err: #f87171;
-  --run: #60a5fa;
+  --color-action: #1868db;
+  --color-action-hover: #1257bd;
+  --color-ink: #101214;
+  --color-body: #292a2e;
+  --color-muted: #42526e;
+  --color-white: #ffffff;
+  --color-fog: #f0f1f2;
+  --color-ash: #b7b9be;
+
+  --surface-canvas: #ffffff;
+  --surface-soft: #f0f1f2;
+  --surface-tinted: #e9f2fe;
+  --surface-lavender: #eed7fc;
+  --surface-dark: #101214;
+
+  /* PERLUASAN di luar token asli. Sistem Atlassian yang diberikan tidak punya
+     warna sukses/gagal sama sekali — kuning, violet, dan hijau di sana khusus
+     dekorasi dan dilarang masuk UI fungsional. Tapi daftar job wajib bisa
+     dibedakan sekilas antara selesai dan gagal, dan itu kebutuhan keterbacaan,
+     bukan hiasan. Nilainya diambil dari keluarga palet Atlassian yang sama
+     supaya tetap menyatu. */
+  --success-fg: #216e4e;
+  --success-bg: #dcfff1;
+  --danger-fg: #ae2e24;
+  --danger-bg: #ffecea;
+
+  --font-display: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-text: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --radius-cards: 20px;
+  --radius-buttons: 28px;
+  --radius-inputs: 8px;
+  --radius-images: 5px;
+  --radius-full: 10000px;
+
+  --shadow-subtle: rgba(9, 30, 66, 0.31) 0 0 1px 0, rgba(9, 30, 66, 0.25) 0 1px 1px 0;
+  --page-max: 1200px;
 }
 
-* { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 15px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--surface-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-text);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-header {
-  border-bottom: 1px solid var(--line);
-  padding: 18px 28px;
+a { color: var(--color-action); }
+
+/* ---------- Navigasi ---------- */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface-canvas);
+  border-bottom: 1px solid var(--color-fog);
+}
+
+.nav-inner {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  height: 56px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 32px;
 }
 
-header h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .2px; }
-header nav { margin-left: auto; display: flex; gap: 18px; }
-header nav a { color: var(--muted); text-decoration: none; font-size: 14px; }
-header nav a:hover, header nav a.active { color: var(--accent); }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+  text-decoration: none;
+}
 
-main { max-width: 1080px; margin: 0 auto; padding: 34px 28px 80px; }
+.brand svg { display: block; }
+
+.nav-links { margin-left: auto; display: flex; gap: 24px; }
+
+.nav-links a {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-ink);
+  text-decoration: none;
+  padding: 4px 0;
+}
+
+.nav-links a:hover { color: var(--color-action); }
+
+.nav-links a.active {
+  color: var(--color-action);
+  font-weight: 500;
+  box-shadow: inset 0 -2px 0 var(--color-action);
+}
+
+/* ---------- Layout ---------- */
+
+main {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 64px 24px 100px;
+}
+
+main.narrow { max-width: 760px; }
+
+.page-head { margin-bottom: 40px; }
+
+/* Weight 700, bukan 800. Style guide-nya menempatkan Charlie Display di bobot
+   400-500 untuk headline editorial dan menyisakan 700+ untuk penegasan; 800 di
+   ukuran 40px terbaca blocky, bukan humanis seperti yang dimaksud sistemnya. */
+h1.display {
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 1.17;
+  font-weight: 700;
+  letter-spacing: -0.021em;
+  margin: 0 0 10px;
+}
+
+.lede {
+  color: var(--color-muted);
+  font-size: 20px;
+  line-height: 1.4;
+  margin: 0;
+  max-width: 68ch;
+}
+
+/* ---------- Kartu ---------- */
 
 .card {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 26px;
+  background: var(--surface-canvas);
+  border: 1px solid var(--color-fog);
+  border-radius: var(--radius-cards);
+  padding: 24px;
 }
 
-label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 7px; }
+/* ---------- Form ---------- */
+
+.field { margin-bottom: 20px; }
+.field:last-of-type { margin-bottom: 0; }
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-muted);
+  margin-bottom: 6px;
+}
 
 input[type=text], input[type=number] {
   width: 100%;
-  padding: 11px 13px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  color: var(--text);
-  font-size: 14px;
+  padding: 11px 14px;
   font-family: inherit;
+  font-size: 16px;
+  color: var(--color-ink);
+  background: var(--surface-canvas);
+  border: 1px solid var(--color-ash);
+  border-radius: var(--radius-inputs);
+  transition: border-color .15s, box-shadow .15s;
 }
 
-input:focus { outline: none; border-color: var(--accent); }
+input::placeholder { color: var(--color-ash); }
 
-.row { display: flex; gap: 16px; }
-.row > *:first-child { flex: 1; }
-.row > *:last-child { width: 130px; }
+input:focus {
+  outline: none;
+  border-color: var(--color-action);
+  box-shadow: 0 0 0 3px rgba(24, 104, 219, .2);
+}
 
-button {
-  margin-top: 20px;
-  padding: 11px 22px;
-  background: var(--accent);
-  color: #16181d;
+.form-row { display: flex; gap: 16px; align-items: flex-start; }
+.form-row > .field { flex: 1; margin-bottom: 0; }
+.form-row > .field.compact { flex: 0 0 140px; }
+
+.btn {
+  margin-top: 24px;
+  padding: 11px 24px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-white);
+  background: var(--color-action);
   border: 0;
-  border-radius: 7px;
-  font-size: 14px;
-  font-weight: 600;
+  border-radius: var(--radius-buttons);
   cursor: pointer;
-  font-family: inherit;
+  transition: background .15s;
 }
 
-button:disabled { opacity: .5; cursor: default; }
+.btn:hover:not(:disabled) { background: var(--color-action-hover); }
+.btn:disabled { opacity: .5; cursor: default; }
 
-.hint { color: var(--muted); font-size: 13px; margin-top: 14px; }
-.note { margin-top: 18px; padding: 12px 14px; border-radius: 7px; font-size: 14px; }
-.note.ok { background: rgba(74, 222, 128, .1); color: var(--ok); }
-.note.err { background: rgba(248, 113, 113, .1); color: var(--err); }
+.hint {
+  margin: 16px 0 0;
+  font-size: 13px;
+  line-height: 1.29;
+  color: var(--color-muted);
+}
 
-/* --- history --- */
+.note {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border-radius: var(--radius-inputs);
+  font-size: 14px;
+}
+
+.note.ok { background: var(--surface-tinted); color: var(--color-action); }
+.note.err { background: var(--danger-bg); color: var(--danger-fg); }
+.note code { font-size: 13px; }
+
+/* ---------- Badge ---------- */
+
+.badge {
+  display: inline-block;
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  background: var(--surface-soft);
+  color: var(--color-muted);
+}
+
+.badge.running { background: var(--surface-tinted); color: var(--color-action); }
+.badge.done { background: var(--success-bg); color: var(--success-fg); }
+.badge.failed { background: var(--danger-bg); color: var(--danger-fg); }
+
+/* ---------- Daftar job ---------- */
 
 .job {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  margin-bottom: 16px;
+  border: 1px solid var(--color-fog);
+  border-radius: var(--radius-cards);
+  margin-bottom: 20px;
   overflow: hidden;
+  background: var(--surface-canvas);
 }
 
 .job-head {
-  padding: 16px 20px;
+  padding: 20px 24px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .job-url {
-  font-size: 14px;
-  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-ink);
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 44ch;
+  max-width: 52ch;
 }
 
-.job-url:hover { color: var(--accent); }
-.job-time { color: var(--muted); font-size: 12px; margin-left: auto; }
+.job-url:hover { color: var(--color-action); }
 
-.badge {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .6px;
-  padding: 4px 9px;
-  border-radius: 20px;
-  font-weight: 600;
-  background: var(--panel-2);
-  color: var(--muted);
+.job-meta {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--color-muted);
+  white-space: nowrap;
 }
 
-.badge.done { background: rgba(74, 222, 128, .14); color: var(--ok); }
-.badge.failed { background: rgba(248, 113, 113, .14); color: var(--err); }
-.badge.running { background: rgba(96, 165, 250, .14); color: var(--run); }
-
-.bar { height: 3px; background: var(--panel-2); }
-.bar > i { display: block; height: 100%; background: var(--run); transition: width .4s; }
+.bar { height: 2px; background: var(--color-fog); }
+.bar > i { display: block; height: 100%; background: var(--color-action); transition: width .4s ease; }
 
 .error-box {
-  margin: 0 20px 18px;
-  padding: 12px 14px;
-  background: rgba(248, 113, 113, .08);
-  border-radius: 7px;
-  color: var(--err);
+  margin: 0 24px 20px;
+  padding: 14px 16px;
+  background: var(--danger-bg);
+  border-radius: var(--radius-images);
+  color: var(--danger-fg);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
   font-size: 12.5px;
-  font-family: ui-monospace, Consolas, monospace;
+  line-height: 1.5;
   white-space: pre-wrap;
-  max-height: 190px;
+  max-height: 200px;
   overflow: auto;
 }
 
-.clips { border-top: 1px solid var(--line); }
+/* ---------- Klip ---------- */
+
+.clips { border-top: 1px solid var(--color-fog); }
 
 .clip {
   display: grid;
-  grid-template-columns: 60px 1fr;
-  gap: 18px;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--line);
+  grid-template-columns: 64px 1fr;
+  gap: 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-fog);
 }
 
 .clip:last-child { border-bottom: 0; }
 
 .score {
   text-align: center;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--accent);
-  line-height: 1.1;
+  padding-top: 2px;
 }
 
-.score small { display: block; font-size: 10px; color: var(--muted); font-weight: 500; letter-spacing: .5px; }
+.score b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-action);
+  letter-spacing: -0.02em;
+}
 
-.clip h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
-.clip h3 a { color: var(--text); text-decoration: none; }
-.clip h3 a:hover { color: var(--accent); }
+.score span {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .06em;
+  color: var(--color-muted);
+}
 
-.field { font-size: 13.5px; margin: 6px 0; }
-.field b { color: var(--muted); font-weight: 500; margin-right: 6px; }
-.reason { color: var(--muted); font-style: italic; }
+.clip h3 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 10px;
+}
 
-.tags { margin-top: 9px; display: flex; gap: 7px; flex-wrap: wrap; }
-.tags span { font-size: 11.5px; background: var(--panel-2); color: var(--muted); padding: 3px 9px; border-radius: 20px; }
+.clip h3 a { color: var(--color-ink); text-decoration: none; }
+.clip h3 a:hover { color: var(--color-action); }
 
-.empty { color: var(--muted); text-align: center; padding: 60px 0; }
+.row { font-size: 14px; line-height: 1.5; margin: 5px 0; color: var(--color-body); }
+
+/* Label dan isinya perlu pemisah tegas. Tanpa titik dua, "Hook Kali ini gue
+   akan bahas" terbaca sebagai satu kalimat dan labelnya hilang di dalamnya. */
+.row b { font-weight: 500; color: var(--color-muted); margin-right: 8px; }
+.row b::after { content: ':'; }
+.row.reason { color: var(--color-muted); font-style: italic; }
+.row a { text-decoration: none; font-weight: 500; }
+.row a:hover { text-decoration: underline; }
+.sep { color: var(--color-ash); margin: 0 6px; }
+
+.tags { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+
+.tags span {
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--surface-soft);
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ---------- Kosong ---------- */
+
+.empty {
+  border: 1px solid var(--color-fog);
+  border-radius: var(--radius-cards);
+  padding: 64px 24px;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.empty strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin-bottom: 6px;
+}
+
+@media (max-width: 640px) {
+  main { padding: 40px 16px 64px; }
+  h1.display { font-size: 32px; }
+  .lede { font-size: 16px; }
+  .form-row { flex-direction: column; }
+  .form-row > .field.compact { flex: 1; width: 100%; }
+  .clip { grid-template-columns: 1fr; gap: 12px; }
+  .score { display: flex; align-items: baseline; gap: 8px; text-align: left; }
+  .score span { margin-top: 0; }
+  .job-meta { margin-left: 0; width: 100%; }
+}
