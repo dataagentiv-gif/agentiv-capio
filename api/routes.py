@@ -3,11 +3,13 @@
 Route di sini tidak pernah menjalankan pipeline secara sinkron: terima request
 -> tulis row awal -> push job_id ke queue -> balas. Sisanya urusan worker.
 """
+import base64
 import re
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -33,12 +35,56 @@ templates = Jinja2Templates(directory=str(WEB / "templates"))
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     models.init()
-    log.info("API siap di http://localhost:%d", settings.API_PORT)
+    # Peringatan ini ada karena kesalahan yang paling mungkin terjadi bukan
+    # serangan canggih, melainkan seseorang mengubah API_HOST agar bisa dibuka
+    # dari HP-nya, lalu lupa bahwa /settings memajang status seluruh kredensial.
+    if settings.host_terbuka and not settings.AUTH_TOKEN:
+        log.warning(
+            "API_HOST=%s membuka server ke jaringan TANPA autentikasi. "
+            "Halaman /settings bisa dipakai siapa pun untuk melihat status "
+            "kredensial dan menimpanya. Isi AUTH_TOKEN di .env, atau kembalikan "
+            "API_HOST ke 127.0.0.1.",
+            settings.API_HOST,
+        )
+    log.info(
+        "API siap di http://localhost:%d%s",
+        settings.API_PORT,
+        " (autentikasi aktif)" if settings.AUTH_TOKEN else "",
+    )
     yield
 
 
 app = FastAPI(title="Video Clipping Engine", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(WEB / "static")), name="static")
+
+
+@app.middleware("http")
+async def basic_auth(request: Request, call_next):
+    """HTTP Basic saat AUTH_TOKEN diisi. Kosong = tidak aktif.
+
+    Dipakai Basic, bukan halaman login, karena browser sudah menanganinya
+    sendiri — tidak perlu form, cookie, maupun sesi, dan `curl -u` tetap jalan.
+
+    compare_digest, bukan `==`: perbandingan string biasa berhenti di karakter
+    pertama yang beda, dan selisih waktunya bisa dipakai menebak token per
+    karakter.
+    """
+    token = settings.AUTH_TOKEN
+    if token:
+        header = request.headers.get("authorization", "")
+        ok = False
+        if header.startswith("Basic "):
+            try:
+                _, _, sandi = base64.b64decode(header[6:]).decode().partition(":")
+                ok = secrets.compare_digest(sandi, token)
+            except (ValueError, UnicodeDecodeError):
+                ok = False
+        if not ok:
+            return Response(
+                status_code=401,
+                headers={"WWW-Authenticate": 'Basic realm="Video Clipping Engine"'},
+            )
+    return await call_next(request)
 
 
 # --- Web UI ---

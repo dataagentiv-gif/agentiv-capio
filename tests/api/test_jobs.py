@@ -191,3 +191,45 @@ def test_api_status_merangkum_kesiapan(client):
     d = client.get("/api/status").json()
     assert set(d) >= {"asr", "llm", "storage", "ready", "default_clips"}
     assert isinstance(d["ready"], bool)
+
+
+# --- autentikasi opsional ---
+#
+# Mati secara default (aman selama server hanya di loopback). Begitu diisi,
+# SELURUH halaman dan endpoint harus tertutup — termasuk /settings yang bisa
+# menimpa kredensial.
+
+@pytest.fixture
+def berkunci(monkeypatch):
+    from api.routes import app
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(settings, "AUTH_TOKEN", "rahasia-panjang-sekali")
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.mark.parametrize("path", ["/", "/settings", "/jobs", "/api/settings"])
+def test_tanpa_token_semua_ditolak_401(berkunci, path):
+    r = berkunci.get(path)
+    assert r.status_code == 401
+    assert "Basic" in r.headers.get("www-authenticate", "")
+
+
+def test_token_benar_diterima(berkunci):
+    assert berkunci.get("/", auth=("apa saja", "rahasia-panjang-sekali")).status_code == 200
+
+
+def test_token_salah_ditolak(berkunci):
+    assert berkunci.get("/", auth=("x", "rahasia-panjang-sekalii")).status_code == 401
+
+
+def test_header_rusak_tidak_bikin_crash(berkunci):
+    """Basic yang bukan base64 valid harus jadi 401, bukan 500."""
+    r = berkunci.get("/", headers={"Authorization": "Basic bukan-base64!!"})
+    assert r.status_code == 401
+
+
+def test_default_tanpa_token_tetap_terbuka(client):
+    assert settings.AUTH_TOKEN == ""
+    assert client.get("/").status_code == 200

@@ -50,6 +50,17 @@ class Settings(BaseSettings):
     API_HOST: str = "127.0.0.1"
     API_PORT: int = 8000
 
+    # Kosong = tanpa autentikasi, aman selama server hanya mendengar di
+    # loopback. Diisi = seluruh halaman dan endpoint meminta HTTP Basic dengan
+    # nilai ini sebagai password (username diabaikan). Wajib diisi kalau
+    # API_HOST diubah ke 0.0.0.0 atau di-tunnel keluar: halaman /settings bisa
+    # membaca status kredensial dan menimpanya.
+    AUTH_TOKEN: str = ""
+
+    @property
+    def host_terbuka(self) -> bool:
+        return self.API_HOST not in ("127.0.0.1", "localhost", "::1")
+
     R2_ACCOUNT_ID: str = ""
     R2_ACCESS_KEY_ID: str = ""
     R2_SECRET_ACCESS_KEY: str = ""

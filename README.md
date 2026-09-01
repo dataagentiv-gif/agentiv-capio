@@ -67,6 +67,27 @@ dilonggarkan** tanpa memahami akibatnya:
 `.env` berisi kredensial asli dan sudah masuk `.gitignore` — pastikan tetap
 begitu sebelum mem-push repo ini ke mana pun.
 
+### Kalau perlu diakses dari luar localhost
+
+Isi `AUTH_TOKEN` di `.env` dengan string acak panjang. Begitu terisi, seluruh
+halaman dan endpoint meminta HTTP Basic (username diabaikan, password = token
+itu). Kosongkan hanya kalau server benar-benar cuma mendengar di loopback.
+
+Server akan mencetak peringatan saat start kalau `API_HOST` bukan loopback
+sementara `AUTH_TOKEN` masih kosong.
+
+### Port container sengaja diikat ke loopback
+
+`docker-compose.yml` mem-publish Postgres dan Redis sebagai
+`127.0.0.1:5432:5432` dan `127.0.0.1:6379:6379`. **Jangan hapus awalan
+`127.0.0.1` itu.** Tanpa awalan tersebut Docker membuka port ke semua
+interface, dan Redis di sini berjalan tanpa password.
+
+Akibatnya bukan sekadar data terbaca. RQ menyimpan nama fungsi sebagai string
+dotted-path yang di-import worker apa adanya, jadi siapa pun yang bisa
+menjangkau Redis dapat mengantre job berisi fungsi apa saja — itu eksekusi kode
+jarak jauh di mesin yang menjalankan worker.
+
 Buka `http://localhost:8000`, paste link YouTube, tentukan jumlah klip, submit.
 Pantau progresnya di `/history`.
 
