@@ -14,17 +14,47 @@ untuk b-roll, multi-tenant/auth/billing.
 
 ## Setup
 
-Butuh **Python 3.12**, **ffmpeg** di PATH, dan **Docker**.
+### Cara cepat — semua di Docker
+
+Cuma butuh **Docker**. Tidak perlu Python, ffmpeg, maupun akun Cloudflare.
 
 ```bash
-# 1. Dependency
+copy .env.example .env      # cp di Linux/macOS
+docker compose up -d
+```
+
+Buka **http://localhost:8000**, lalu isi API key di halaman **Setting**
+(Groq untuk transkrip, Gemini untuk seleksi momen — dua-duanya punya free
+tier). Klik Simpan lalu Tes. Setelah itu langsung bisa submit video.
+
+Klip hasilnya mendarat di folder **`clips/`** di dalam folder project — file
+mp4 biasa yang bisa dibuka, dihapus, atau disalin lewat File Explorer. Tidak
+ada storage cloud yang perlu disiapkan.
+
+```bash
+docker compose logs -f worker   # lihat prosesnya
+docker compose down             # matikan (data tetap tersimpan)
+```
+
+**Kalau mengubah kode, jalankan `docker compose up -d --build`.** Tanpa
+`--build`, compose memakai image lama dan perubahan kode tidak terpakai —
+tidak ada error, cuma perilaku yang tidak berubah. Mengubah **konfigurasi**
+lewat halaman Setting tidak perlu rebuild: worker membaca ulang `.env` di awal
+tiap job.
+
+**Ini untuk dijalankan di laptop sendiri, bukan VPS.** Groq menolak IP
+datacenter dengan 403, dan yt-dlp kena bot-detection YouTube yang jauh lebih
+galak dari sana. Kalau memang harus di server, pindahkan ASR ke ElevenLabs dan
+siapkan cookies untuk yt-dlp.
+
+### Cara manual — tanpa Docker untuk app-nya
+
+Butuh **Python 3.12** dan **ffmpeg** di PATH.
+
+```bash
 python -m venv venv
 venv\Scripts\python.exe -m pip install -r requirements.txt
-
-# 2. Infra
-docker compose up -d          # postgres:16 + redis:7
-
-# 3. Konfigurasi
+docker compose up -d postgres redis
 copy .env.example .env
 ```
 
@@ -121,6 +151,20 @@ momen) dan Stage 8 (metadata), tidak pernah memutuskan urutan eksekusi.
 - `db/` murni schema + CRUD, nol logic AI.
 - `utils/` dan `config/` foundational, tidak mengimpor folder lain.
 - `api/routes.py` tidak pernah menjalankan pipeline secara sinkron.
+
+### Penyimpanan klip
+
+`STORAGE_PROVIDER` menentukan ke mana klip jadi disimpan:
+
+| | |
+|---|---|
+| **`local`** (default) | File mp4 di folder `clips/`. Tidak butuh akun apa pun. Di Docker, folder itu di-bind-mount ke host jadi filenya terlihat langsung dari laptop. |
+| `r2` | Diunggah ke Cloudflare R2. Butuh bucket dan API token. |
+
+Halaman Hasil memutar klip lewat route `/clips/{job}/{id}` untuk **kedua**
+provider, jadi tidak ada perbedaan di sisi tampilan. Untuk R2 itu juga
+menghindari satu masalah nyata: banyak ISP Indonesia memblokir domain `r2.dev`
+di level DNS, sementara endpoint S3 yang dipakai route ini tidak kena.
 
 ### Provider LLM
 

@@ -79,7 +79,7 @@ def _gemini() -> tuple[bool, str]:
 
 
 def _r2() -> tuple[bool, str]:
-    from storage.client import REQUIRED, _client
+    from storage.client_r2 import REQUIRED, _client
 
     kosong = [k for k in REQUIRED if not getattr(settings, k, "")]
     if kosong:

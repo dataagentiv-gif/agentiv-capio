@@ -20,8 +20,8 @@ from config import env_store
 from config.settings import settings
 from db import jobs, models
 from jobqueue.client import enqueue
-from storage.client import REQUIRED as storage_required
-from storage.client import get_clip
+import storage
+from storage.client_r2 import REQUIRED as r2_required
 from utils.logging import get
 
 log = get(__name__)
@@ -139,7 +139,8 @@ def test_provider(provider: str):
 @app.get("/api/status")
 def config_status():
     """Ringkasan singkat untuk strip status di halaman Submit."""
-    r2_kurang = [k for k in storage_required if not getattr(settings, k, "")]
+    lokal = settings.STORAGE_PROVIDER == "local"
+    r2_kurang = [] if lokal else [k for k in r2_required if not getattr(settings, k, "")]
     asr_ok = bool(
         settings.GROQ_API_KEY if settings.ASR_PROVIDER == "groq"
         else settings.ELEVENLABS_API_KEY
@@ -151,7 +152,7 @@ def config_status():
     return {
         "asr": {"provider": settings.ASR_PROVIDER, "ok": asr_ok},
         "llm": {"provider": settings.LLM_PROVIDER, "ok": llm_ok},
-        "storage": {"provider": "r2", "ok": not r2_kurang},
+        "storage": {"provider": settings.STORAGE_PROVIDER, "ok": not r2_kurang},
         "ready": asr_ok and llm_ok and not r2_kurang,
         "default_clips": settings.TARGET_CLIPS_DEFAULT,
         "min_sec": settings.MIN_CLIP_SEC,
@@ -174,16 +175,16 @@ def play_clip(job_id: str, clip_id: str, range: str | None = Header(default=None
         raise HTTPException(404, "Klip tidak ditemukan")
 
     try:
-        obj = get_clip(job_id, clip_id, range)
+        potongan, panjang, content_range = storage.open_clip(job_id, clip_id, range)
     except Exception as e:  # noqa: BLE001
         log.warning("gagal ambil klip %s/%s: %s", job_id, clip_id, e)
         raise HTTPException(404, "Klip tidak ada di storage") from e
 
-    headers = {"Accept-Ranges": "bytes", "Content-Length": str(obj["ContentLength"])}
-    if "ContentRange" in obj:
-        headers["Content-Range"] = obj["ContentRange"]
+    headers = {"Accept-Ranges": "bytes", "Content-Length": str(panjang)}
+    if content_range:
+        headers["Content-Range"] = content_range
     return StreamingResponse(
-        obj["Body"].iter_chunks(chunk_size=256 * 1024),
+        potongan,
         # 206 saat browser meminta sebagian: tanpa itu pemutar video tidak bisa
         # menggeser posisi, cuma bisa memutar dari awal.
         status_code=206 if range else 200,

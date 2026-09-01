@@ -6,7 +6,7 @@ from rq import Queue, SimpleWorker
 import asr
 from config.settings import settings
 from jobqueue.client import QUEUE_NAME, connection
-from storage.client import check_config
+import storage
 from utils.ffmpeg_helpers import rmtree_stale
 from utils.logging import get, setup
 
@@ -19,7 +19,7 @@ def main() -> None:
     # pipeline, jadi tanpa ini satu env var R2 yang kosong baru ketahuan setelah
     # download, transkrip, dan render selesai — belasan menit terbuang untuk job
     # yang sejak awal pasti gagal.
-    check_config()
+    storage.check_config()
     asr.check_config()
 
     # Workdir job yang gagal sengaja ditinggal untuk diperiksa, jadi disapu di

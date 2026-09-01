@@ -59,7 +59,22 @@ class Settings(BaseSettings):
 
     @property
     def host_terbuka(self) -> bool:
+        """True kalau server benar-benar terbuka ke jaringan.
+
+        Di dalam container, 0.0.0.0 justru WAJIB — mengikat ke loopback membuat
+        service tidak bisa dijangkau sama sekali dari luar container. Yang
+        membatasi akses di sana adalah baris `ports` di compose, yang hanya
+        mem-publish ke loopback host. Jadi peringatannya dibungkam di container,
+        bukan karena aman diabaikan, tapi karena di sana ia salah sasaran.
+        """
+        if Path("/.dockerenv").exists():
+            return False
         return self.API_HOST not in ("127.0.0.1", "localhost", "::1")
+
+    # local = klip disimpan sebagai file mp4 biasa di CLIPS_DIR. Jadi default
+    # supaya project ini bisa dicoba tanpa akun Cloudflare sama sekali.
+    STORAGE_PROVIDER: str = "local"  # local | r2
+    CLIPS_DIR: Path = ROOT / "clips"
 
     R2_ACCOUNT_ID: str = ""
     R2_ACCESS_KEY_ID: str = ""

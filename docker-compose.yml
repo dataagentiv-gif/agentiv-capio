@@ -1,6 +1,32 @@
-# Postgres + Redis untuk development lokal. API dan worker jalan di host (bukan
-# di container): file video sampai ratusan MB, dan bind-mount Docker Desktop di
-# Windows terlalu lambat untuk I/O sebesar itu.
+# Seluruh sistem dalam satu perintah: docker compose up -d
+#
+# Ditujukan untuk dijalankan di laptop sendiri, BUKAN di VPS. Groq menolak IP
+# datacenter dengan 403 (terbukti di pemakaian), dan yt-dlp kena bot-detection
+# YouTube yang jauh lebih galak dari sana. Untuk VPS, ASR harus dipindah ke
+# ElevenLabs dan yt-dlp perlu cookies.
+
+x-app: &app
+  build: .
+  env_file: .env
+  environment:
+    # Menimpa nilai di .env yang menunjuk localhost. Di dalam jaringan compose,
+    # Postgres dan Redis dijangkau lewat nama service, bukan localhost.
+    DATABASE_URL: postgresql+psycopg://clipper:clipper@postgres:5432/clipper
+    REDIS_URL: redis://redis:6379/0
+    WORK_DIR: /work
+    CLIPS_DIR: /app/clips
+  volumes:
+    # Klip mendarat di folder ./clips pada laptop, bukan terkurung di dalam
+    # container — bisa dibuka lewat File Explorer, dihapus, atau di-zip.
+    - ./clips:/app/clips
+    # .env ikut di-mount supaya halaman Setting bisa menulis ke file yang sama
+    # dengan yang dibaca saat start, dan isinya bertahan setelah container mati.
+    - ./.env:/app/.env
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
+  restart: unless-stopped
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -19,6 +45,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U clipper"]
       interval: 5s
       retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -35,7 +62,40 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       retries: 10
+    restart: unless-stopped
+
+  api:
+    <<: *app
+    environment:
+      # Di dalam container WAJIB 0.0.0.0 — mengikat ke 127.0.0.1 membuatnya
+      # tidak bisa dijangkau dari luar container sama sekali. Yang membatasi
+      # akses adalah baris ports di bawah, yang hanya mem-publish ke loopback
+      # laptop.
+      API_HOST: 0.0.0.0
+      # Dipaku, TIDAK diwarisi dari .env. Port di dalam container adalah detail
+      # internal; yang boleh diubah pengguna adalah sisi host di baris ports.
+      # Tanpa ini, API_PORT=8080 di .env membuat container mendengar di 8080
+      # sementara Docker meneruskan ke 8000 — dan tidak ada yang nyambung.
+      API_PORT: 8000
+      DATABASE_URL: postgresql+psycopg://clipper:clipper@postgres:5432/clipper
+      REDIS_URL: redis://redis:6379/0
+      WORK_DIR: /work
+      CLIPS_DIR: /app/clips
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  worker:
+    <<: *app
+    command: ["python", "main.py", "worker"]
+    volumes:
+      - ./clips:/app/clips
+      - ./.env:/app/.env
+      # Video mentah tinggal di dalam container, TIDAK di-bind-mount. File
+      # source bisa ratusan MB dan dibaca berulang kali oleh ffmpeg; lewat
+      # bind-mount Docker Desktop di Windows, itu lambatnya terasa.
+      - work:/work
 
 volumes:
   pgdata:
   redisdata:
+  work:

@@ -1,0 +1,19 @@
+venv/
+.venv/
+.git/
+.wrangler/
+__pycache__/
+*.pyc
+.pytest_cache/
+# Klip dan artefak kerja tidak boleh ikut masuk image — ukurannya ratusan MB
+# dan isinya sekali pakai.
+clips/
+work/
+tests/fixtures/sample.mp4
+*.mp4
+*.log
+# .env TIDAK ikut ke dalam image; di-mount saat runtime lewat compose supaya
+# kredensial tidak tertanam di layer image yang bisa disebar.
+.env
+.env.*
+!.env.example

@@ -23,3 +23,6 @@ tests/fixtures/sample.mp4
 
 # Cache lokal wrangler (login state), bukan bagian dari project.
 .wrangler/
+
+# Klip hasil render saat STORAGE_PROVIDER=local.
+clips/

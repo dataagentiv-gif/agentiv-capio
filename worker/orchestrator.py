@@ -18,7 +18,7 @@ from pipeline.stages import (
     segment,
     transcribe,
 )
-from storage.client import upload_clip
+import storage
 from utils.ffmpeg_helpers import Deadline, rmtree_retry
 from utils.logging import get
 
@@ -45,7 +45,7 @@ def _build_clips(ctx: dict, job_id: str) -> list[dict]:
     clips = []
     for seg in ctx["segments_final"]:
         meta = ctx["metadata"][seg["id"]]
-        url = upload_clip(job_id, seg["id"], ctx["rendered"][seg["id"]])
+        url = storage.save_clip(job_id, seg["id"], ctx["rendered"][seg["id"]])
         clips.append(
             {
                 "id": seg["id"],
