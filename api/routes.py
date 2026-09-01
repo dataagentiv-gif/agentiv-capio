@@ -8,14 +8,17 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from api import checks
 from api.schemas import JobCreate, JobCreated, JobOut
+from config import env_store
 from config.settings import settings
 from db import jobs, models
 from jobqueue.client import enqueue
+from storage.client import REQUIRED as storage_required
 from storage.client import get_clip
 from utils.logging import get
 
@@ -47,9 +50,67 @@ def submit_page(request: Request):
     )
 
 
+@app.get("/process", response_class=HTMLResponse)
+def process_page(request: Request):
+    return templates.TemplateResponse(request, "process.html", {})
+
+
+@app.get("/results", response_class=HTMLResponse)
+def results_page(request: Request):
+    return templates.TemplateResponse(request, "results.html", {})
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    return templates.TemplateResponse(request, "settings.html", {})
+
+
+# /history tetap hidup supaya tautan lama tidak mati.
 @app.get("/history", response_class=HTMLResponse)
-def history_page(request: Request):
-    return templates.TemplateResponse(request, "history.html", {})
+def history_page():
+    return RedirectResponse("/results", status_code=308)
+
+
+# --- Konfigurasi ---
+
+@app.get("/api/settings")
+def read_settings():
+    return env_store.read_public()
+
+
+@app.post("/api/settings")
+def save_settings(payload: dict):
+    changed = env_store.write(payload.get("values") or {})
+    log.info("settings diubah: %s", ", ".join(changed) or "(tidak ada)")
+    return {"changed": changed, **env_store.read_public()}
+
+
+@app.post("/api/settings/test/{provider}")
+def test_provider(provider: str):
+    return {"provider": provider, **checks.run(provider)}
+
+
+@app.get("/api/status")
+def config_status():
+    """Ringkasan singkat untuk strip status di halaman Submit."""
+    r2_kurang = [k for k in storage_required if not getattr(settings, k, "")]
+    asr_ok = bool(
+        settings.GROQ_API_KEY if settings.ASR_PROVIDER == "groq"
+        else settings.ELEVENLABS_API_KEY
+    )
+    llm_ok = bool(
+        settings.OPENROUTER_API_KEY if settings.LLM_PROVIDER == "openrouter"
+        else settings.gemini_keys
+    )
+    return {
+        "asr": {"provider": settings.ASR_PROVIDER, "ok": asr_ok},
+        "llm": {"provider": settings.LLM_PROVIDER, "ok": llm_ok},
+        "storage": {"provider": "r2", "ok": not r2_kurang},
+        "ready": asr_ok and llm_ok and not r2_kurang,
+        "default_clips": settings.TARGET_CLIPS_DEFAULT,
+        "min_sec": settings.MIN_CLIP_SEC,
+        "max_sec": settings.MAX_CLIP_SEC,
+    }
 
 
 @app.get("/clips/{job_id}/{clip_id}")

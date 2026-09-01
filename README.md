@@ -25,7 +25,7 @@ venv\Scripts\python.exe -m pip install -r requirements.txt
 docker compose up -d          # postgres:16 + redis:7
 
 # 3. Konfigurasi
-copy .env.example .env        # lalu isi GROQ_API_KEY, OPENROUTER_API_KEY, R2_*
+copy .env.example .env
 ```
 
 Jalankan di **dua terminal terpisah**:
@@ -34,6 +34,38 @@ Jalankan di **dua terminal terpisah**:
 venv\Scripts\python.exe main.py api       # http://localhost:8000
 venv\Scripts\python.exe main.py worker
 ```
+
+**API key diisi lewat halaman Setting di browser**, bukan dengan menyunting
+`.env` manual. Buka `http://localhost:8000/settings`, tempel key, klik Simpan
+lalu Tes. Semuanya ditulis ke `.env` di folder project.
+
+### Halaman
+
+| Halaman | Isi |
+|---|---|
+| `/` Submit | Masukkan link, pilih jumlah klip. Strip di atas menunjukkan provider aktif dan apakah konfigurasi sudah lengkap — kalau belum, ketahuan **sebelum** submit, bukan belasan menit kemudian. |
+| `/process` Proses | Job berjalan dengan penanda 9 tahap, plus job gagal beserta error-nya. |
+| `/results` Hasil | Klip jadi, lengkap dengan skor dan alasan LLM. |
+| `/settings` Setting | Semua isi `.env`, dengan tombol tes per provider. |
+
+### Keamanan halaman Setting
+
+Halaman itu bisa menulis kredensial, jadi ada tiga pembatas yang **jangan
+dilonggarkan** tanpa memahami akibatnya:
+
+- **Server hanya mendengar di `127.0.0.1`.** Mengubah `API_HOST` ke `0.0.0.0`
+  membuat siapa pun di jaringan yang sama bisa membuka `/settings`, melihat
+  provider mana yang terisi, dan menimpa key. Jangan lakukan itu di jaringan
+  yang tidak lo kendalikan, dan jangan pernah ekspos ke internet apa adanya —
+  tidak ada autentikasi sama sekali di build ini.
+- **Nilai rahasia tidak pernah dikirim utuh ke browser**, hanya bentuk ter-mask
+  (`gsk_ew••••••••3io8`) plus penanda terisi/kosong.
+- **Hanya key di allowlist yang bisa ditulis.** `DATABASE_URL`, `REDIS_URL`,
+  `API_HOST`, dan `API_PORT` sengaja read-only: salah isi sekali, aplikasinya
+  mati dan halaman setting-nya ikut tidak bisa dibuka.
+
+`.env` berisi kredensial asli dan sudah masuk `.gitignore` — pastikan tetap
+begitu sebelum mem-push repo ini ke mana pun.
 
 Buka `http://localhost:8000`, paste link YouTube, tentukan jumlah klip, submit.
 Pantau progresnya di `/history`.

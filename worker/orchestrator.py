@@ -4,6 +4,7 @@ progress ke db/jobs.py. Stage sendiri tidak tahu-menahu soal HTTP atau queue.
 import traceback
 from pathlib import Path
 
+from config import env_store
 from config.settings import settings
 from db import jobs
 from db.models import Status
@@ -65,6 +66,12 @@ def run(job_id: str) -> None:
     """Entry point yang di-enqueue ke RQ. Payload cuma job_id — semua state lain
     dibaca dan ditulis lewat Postgres.
     """
+    # .env dibaca ulang tiap job. Halaman Settings menulis ke file itu dari
+    # proses API, sementara worker adalah proses terpisah yang memuat settings
+    # sekali saat start — tanpa ini, mengganti provider atau key lewat UI tidak
+    # berpengaruh sampai worker di-restart manual.
+    env_store.reload()
+
     job = jobs.get(job_id)
     if job is None:
         raise KeyError(f"job {job_id} tidak ada di database")

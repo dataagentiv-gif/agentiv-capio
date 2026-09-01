@@ -387,6 +387,184 @@ input:focus {
   margin-bottom: 6px;
 }
 
+/* ---------- Strip status (halaman Submit) ---------- */
+
+.status-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  background: var(--surface-soft);
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.stat b { font-weight: 500; color: var(--color-ink); }
+.stat.ok { background: var(--success-bg); color: var(--success-fg); }
+.stat.ok b { color: var(--success-fg); }
+.stat.off { background: var(--surface-soft); color: var(--color-muted); }
+.stat.warn { background: var(--danger-bg); color: var(--danger-fg); font-weight: 500; }
+
+/* ---------- Chip jumlah klip ---------- */
+
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.chip, .chip-num {
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-ink);
+  background: var(--surface-canvas);
+  border: 1px solid var(--color-ash);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.chip:hover { border-color: var(--color-action); }
+
+.chip.on {
+  background: var(--surface-tinted);
+  border-color: var(--color-action);
+  color: var(--color-action);
+}
+
+/* Ditulis `input.chip-num`, bukan `.chip-num`: aturan `input[type=number]`
+   punya spesifisitas lebih tinggi dan membuat kolomnya melebar penuh. */
+input.chip-num { width: 96px; cursor: text; text-align: center; }
+
+.sub { margin: 8px 0 0; font-size: 13px; line-height: 1.4; color: var(--color-muted); }
+
+.actions { display: flex; gap: 12px; align-items: center; margin-top: 24px; flex-wrap: wrap; }
+.actions .btn { margin-top: 0; }
+
+.btn.ghost {
+  background: transparent;
+  color: var(--color-ink);
+  border: 1px solid var(--color-slate-current, #1c2b42);
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn.ghost:hover:not(:disabled) { background: var(--surface-soft); }
+.btn.sm { padding: 7px 16px; font-size: 14px; }
+
+/* ---------- Penanda tahap (halaman Proses) ---------- */
+
+.job-body { padding: 4px 24px 20px; }
+
+.stepper {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-ash);
+  padding-right: 8px;
+}
+
+.step i {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--color-fog);
+  flex: none;
+}
+
+.step.done { color: var(--color-muted); }
+.step.done i { background: var(--success-fg); }
+.step.now { color: var(--color-action); font-weight: 500; }
+
+.step.now i {
+  background: var(--color-action);
+  box-shadow: 0 0 0 3px rgba(24, 104, 219, .2);
+  animation: denyut 1.4s ease-in-out infinite;
+}
+
+@keyframes denyut { 50% { opacity: .35; } }
+
+.job-body .bar { border-radius: var(--radius-full); }
+
+/* ---------- Setting ---------- */
+
+.group { margin-bottom: 20px; }
+
+.group h2, .readonly-card h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 18px;
+}
+
+select {
+  width: 100%;
+  padding: 11px 14px;
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--color-ink);
+  background: var(--surface-canvas);
+  border: 1px solid var(--color-ash);
+  border-radius: var(--radius-inputs);
+  cursor: pointer;
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--color-action);
+  box-shadow: 0 0 0 3px rgba(24, 104, 219, .2);
+}
+
+.mini {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  background: var(--surface-soft);
+  color: var(--color-muted);
+}
+
+.mini.on { background: var(--success-bg); color: var(--success-fg); }
+
+.note.warn { background: #fff7e6; color: #974f0c; }
+.note.warn b { display: block; margin-bottom: 2px; }
+.note code, .lede code, .sub code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(9, 30, 66, .06);
+  font-size: .92em;
+}
+
+.group .out:empty { display: none; }
+.group .out .note { margin-top: 16px; }
+
+.readonly-card { background: var(--surface-soft); border-color: transparent; }
+
+.ro-row {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-top: 1px solid rgba(9, 30, 66, .08);
+  font-size: 13px;
+}
+
+.ro-row b { flex: 0 0 130px; font-weight: 500; color: var(--color-muted); }
+.ro-row code { word-break: break-all; color: var(--color-body); }
+
 @media (max-width: 640px) {
   main { padding: 40px 16px 64px; }
   h1.display { font-size: 32px; }

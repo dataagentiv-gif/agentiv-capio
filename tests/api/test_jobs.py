@@ -149,3 +149,45 @@ def test_id_tidak_valid_ditolak_404(client, job_id, clip_id):
 def test_klip_yang_tidak_ada_balas_404(client):
     r = client.get("/clips/00000000-0000-0000-0000-000000000000/c1")
     assert r.status_code == 404
+
+
+# --- halaman dan endpoint setting ---
+
+@pytest.mark.parametrize("path", ["/", "/process", "/results", "/settings"])
+def test_semua_halaman_kebuka(client, path):
+    assert client.get(path).status_code == 200
+
+
+def test_history_lama_dialihkan_ke_hasil(client):
+    """Tautan lama tidak boleh mati begitu halaman dipecah jadi empat."""
+    r = client.get("/history", follow_redirects=False)
+    assert r.status_code == 308 and r.headers["location"] == "/results"
+
+
+def test_api_settings_tidak_membocorkan_rahasia(client):
+    from config.settings import settings
+
+    r = client.get("/api/settings")
+    assert r.status_code == 200
+    isi = r.text
+    for key in ("GROQ_API_KEY", "OPENROUTER_API_KEY", "R2_SECRET_ACCESS_KEY"):
+        nilai = getattr(settings, key, "")
+        if nilai:
+            assert nilai not in isi, f"{key} terkirim utuh ke browser"
+
+
+def test_api_settings_menolak_key_di_luar_allowlist(client):
+    r = client.post("/api/settings", json={"values": {"PATH": "/evil"}})
+    assert r.status_code == 200
+    assert r.json()["changed"] == []
+
+
+def test_tes_provider_tidak_dikenal_dijawab_sopan(client):
+    d = client.post("/api/settings/test/tidakada").json()
+    assert d["ok"] is False and "tidak dikenal" in d["message"]
+
+
+def test_api_status_merangkum_kesiapan(client):
+    d = client.get("/api/status").json()
+    assert set(d) >= {"asr", "llm", "storage", "ready", "default_clips"}
+    assert isinstance(d["ready"], bool)

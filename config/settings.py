@@ -43,7 +43,11 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    API_HOST: str = "0.0.0.0"
+    # Localhost, BUKAN 0.0.0.0. Halaman /settings bisa menulis API key ke .env,
+    # jadi mengikatnya ke semua interface berarti siapa pun di jaringan yang sama
+    # bisa membaca status kredensial dan menimpanya. Ubah ke 0.0.0.0 hanya kalau
+    # memang perlu diakses dari mesin lain, dan sadari konsekuensinya.
+    API_HOST: str = "127.0.0.1"
     API_PORT: int = 8000
 
     R2_ACCOUNT_ID: str = ""

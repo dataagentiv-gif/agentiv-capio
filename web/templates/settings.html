@@ -1,0 +1,121 @@
+{% extends "_layout.html" %}
+{% set page = 'settings' %}
+{% block title %}Setting — Video Clipping Engine{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block heading %}Setting{% endblock %}
+{% block lede %}Semua konfigurasi ditulis ke file <code>.env</code> di folder project. Tidak perlu menyunting file secara manual.{% endblock %}
+
+{% block content %}
+<div class="note warn" id="secnote">
+  <b>Key tersimpan di mesin ini, tidak dikirim ke mana pun.</b>
+  Nilai rahasia ditampilkan ter-mask dan tidak pernah dikembalikan utuh ke browser.
+  Server sengaja hanya mendengar di <code>127.0.0.1</code> — jangan buka ke jaringan
+  luar selama halaman ini aktif.
+</div>
+
+<div id="groups"><div class="empty">Memuat…</div></div>
+
+<div class="card readonly-card" id="ro"></div>
+{% endblock %}
+
+{% block script %}
+<script>
+const TES = { 'Transkrip': ['groq', 'elevenlabs'], 'Seleksi momen': ['openrouter', 'gemini'], 'Storage R2': ['r2'] };
+let data = null;
+
+function fieldHtml(f) {
+  const id = 'f_' + f.key;
+  const badgeTerisi = f.secret
+    ? `<span class="mini ${f.filled ? 'on' : ''}">${f.filled ? 'terisi' : 'kosong'}</span>` : '';
+  let input;
+  if (f.kind === 'select') {
+    input = `<select id="${id}" data-key="${f.key}">` +
+      f.options.map(o => `<option value="${o}" ${o === f.value ? 'selected' : ''}>${esc(o)}</option>`).join('') +
+      `</select>`;
+  } else {
+    // Rahasia dibiarkan kosong dengan placeholder ter-mask. Mengisi ulang
+    // nilai ter-mask ke dalam input membuat orang tidak sadar sedang menyimpan
+    // titik-titik itu sebagai key baru.
+    const tipe = f.kind === 'number' ? 'number' : 'text';
+    const val = f.secret ? '' : esc(f.value);
+    const ph = f.secret ? (f.value || 'belum diisi') : '';
+    input = `<input type="${tipe}" id="${id}" data-key="${f.key}" value="${val}" placeholder="${esc(ph)}">`;
+  }
+  return `
+    <div class="field">
+      <label for="${id}">${esc(f.label)} ${badgeTerisi}</label>
+      ${input}
+      ${f.help ? `<p class="sub">${esc(f.help)}</p>` : ''}
+    </div>`;
+}
+
+function groupHtml(g) {
+  const tes = (TES[g.name] || []).map(p =>
+    `<button type="button" class="btn ghost sm" data-test="${p}">Tes ${p}</button>`).join('');
+  return `
+    <section class="card group" data-group="${esc(g.name)}">
+      <h2>${esc(g.name)}</h2>
+      ${g.fields.map(fieldHtml).join('')}
+      <div class="actions">
+        <button type="button" class="btn sm" data-save="${esc(g.name)}">Simpan</button>
+        ${tes}
+      </div>
+      <div class="out"></div>
+    </section>`;
+}
+
+function render() {
+  document.getElementById('groups').innerHTML = data.groups.map(groupHtml).join('');
+  document.getElementById('ro').innerHTML =
+    `<h2>Infra</h2>
+     <p class="sub">Sengaja tidak bisa diubah dari sini: salah isi sekali, aplikasinya mati
+      dan halaman ini ikut tidak bisa dibuka. Sunting langsung di <code>${esc(data.env_path)}</code>.</p>` +
+    data.readonly.map(r => `<div class="ro-row"><b>${esc(r.key)}</b><code>${esc(r.value)}</code></div>`).join('');
+
+  document.querySelectorAll('[data-save]').forEach(b => b.onclick = () => simpan(b));
+  document.querySelectorAll('[data-test]').forEach(b => b.onclick = () => tes(b));
+}
+
+function pesan(el, ok, teks) {
+  el.querySelector('.out').innerHTML = `<div class="note ${ok ? 'ok' : 'err'}">${esc(teks)}</div>`;
+}
+
+async function simpan(btn) {
+  const sec = btn.closest('.group');
+  const values = {};
+  sec.querySelectorAll('[data-key]').forEach(i => { if (i.value !== '') values[i.dataset.key] = i.value; });
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ values })
+    });
+    const d = await r.json();
+    data = d;
+    const n = (d.changed || []).length;
+    render();
+    const s = document.querySelector(`[data-group="${sec.dataset.group}"]`);
+    pesan(s, true, n ? `${n} nilai disimpan ke .env. Job berikutnya otomatis memakainya.`
+                     : 'Tidak ada perubahan.');
+  } catch (e) {
+    pesan(sec, false, String(e));
+  } finally { btn.disabled = false; }
+}
+
+async function tes(btn) {
+  const sec = btn.closest('.group');
+  const p = btn.dataset.test;
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = 'Mengetes…';
+  try {
+    const d = await (await fetch(`/api/settings/test/${p}`, { method: 'POST' })).json();
+    pesan(sec, d.ok, `${p}: ${d.message}`);
+  } catch (e) {
+    pesan(sec, false, String(e));
+  } finally { btn.disabled = false; btn.textContent = label; }
+}
+
+fetch('/api/settings').then(r => r.json()).then(d => { data = d; render(); })
+  .catch(e => document.getElementById('groups').innerHTML = empty('Gagal memuat setting', esc(e)));
+</script>
+{% endblock %}

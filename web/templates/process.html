@@ -1,0 +1,57 @@
+{% extends "_layout.html" %}
+{% set page = 'process' %}
+{% block title %}Proses — Video Clipping Engine{% endblock %}
+{% block heading %}Proses{% endblock %}
+{% block lede %}Job yang sedang berjalan dan yang gagal. Halaman ini menyegar sendiri.{% endblock %}
+
+{% block content %}
+<div id="list"><div class="empty">Memuat…</div></div>
+{% endblock %}
+
+{% block script %}
+<script>
+function stepper(status, progress) {
+  const now = STAGES.findIndex(([k]) => k === status);
+  const langkah = STAGES.map(([k, label], i) => {
+    const state = now < 0 ? 'wait' : i < now ? 'done' : i === now ? 'now' : 'wait';
+    return `<div class="step ${state}"><i></i><span>${label}</span></div>`;
+  }).join('');
+  return `<div class="stepper">${langkah}</div>
+          <div class="bar"><i style="width:${progress}%"></i></div>`;
+}
+
+function jobHtml(j) {
+  const gagal = j.status === 'failed';
+  return `
+    <div class="job">
+      <div class="job-head">
+        ${badge(j.status)}
+        <a class="job-url" href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>
+        <span class="job-meta">${esc(waktu(j.created_at))} · target ${j.target_clips} klip</span>
+      </div>
+      ${gagal ? '' : `<div class="job-body">${stepper(j.status, j.progress)}</div>`}
+      ${j.error ? `<div class="error-box">${esc(j.error)}</div>` : ''}
+    </div>`;
+}
+
+async function tick() {
+  const el = document.getElementById('list');
+  try {
+    const semua = await getJobs();
+    // Halaman ini hanya untuk yang butuh perhatian: sedang jalan, atau gagal.
+    // Yang sudah selesai pindah ke halaman Hasil.
+    const jobs = semua.filter(j => isRunning(j) || j.status === 'failed');
+    el.innerHTML = jobs.length
+      ? jobs.map(jobHtml).join('')
+      : empty('Tidak ada proses berjalan',
+              '<a href="/">Submit video</a> atau lihat <a href="/results">hasil sebelumnya</a>.');
+    return semua.some(isRunning);
+  } catch (e) {
+    el.innerHTML = empty('API tidak bisa dihubungi', esc(e));
+    return true;
+  }
+}
+
+poll(tick);
+</script>
+{% endblock %}
