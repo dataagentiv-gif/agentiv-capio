@@ -230,3 +230,90 @@ def test_header_rusak_tidak_bikin_crash(berkunci):
 def test_default_tanpa_token_tetap_terbuka(client):
     assert settings.AUTH_TOKEN == ""
     assert client.get("/").status_code == 200
+
+
+# --- penghapusan ---
+#
+# Yang diuji bukan cuma barisnya hilang dari layar, tapi berkasnya benar-benar
+# lenyap dari disk. Kalau tidak, tombolnya justru menipu: daftar terlihat
+# bersih sementara disk tetap penuh.
+
+@pytest.fixture
+def job_berklip(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "CLIPS_DIR", tmp_path / "clips")
+    import storage
+    from db import jobs as db_jobs
+
+    j = client.post(
+        "/jobs", json={"url": "https://youtu.be/abc", "target_clips": 2}
+    ).json()["job_id"]
+
+    src = tmp_path / "x.mp4"
+    src.write_bytes(b"video" * 100)
+    klip = []
+    for cid in ("c1", "c2"):
+        url = storage.save_clip(j, cid, src)
+        klip.append({"id": cid, "url": url, "duration": 40.0, "score": 90,
+                     "hook": "h", "reason": "r", "title": "t",
+                     "caption": "", "hashtags": []})
+    db_jobs.finish(j, klip)
+    return j, tmp_path / "clips" / j
+
+
+def test_hapus_klip_membuang_berkas_dan_entrinya(client, job_berklip):
+    job_id, folder = job_berklip
+    assert client.delete(f"/jobs/{job_id}/clips/c1").status_code == 204
+
+    assert not (folder / "c1.mp4").exists(), "berkas masih ada di disk"
+    assert (folder / "c2.mp4").exists(), "klip lain ikut terhapus"
+    sisa = client.get(f"/jobs/{job_id}").json()["clips"]
+    assert [c["id"] for c in sisa] == ["c2"]
+
+
+def test_hapus_klip_terakhir_membuang_folder_kosong(client, job_berklip):
+    job_id, folder = job_berklip
+    client.delete(f"/jobs/{job_id}/clips/c1")
+    client.delete(f"/jobs/{job_id}/clips/c2")
+    assert not folder.exists(), "folder kosong ditinggal menumpuk"
+
+
+def test_hapus_job_membuang_row_dan_semua_berkas(client, job_berklip):
+    job_id, folder = job_berklip
+    assert client.delete(f"/jobs/{job_id}").status_code == 204
+    assert not folder.exists()
+    assert client.get(f"/jobs/{job_id}").status_code == 404
+
+
+def test_hapus_job_yang_sudah_hilang_balas_404(client):
+    assert client.delete("/jobs/00000000-0000-0000-0000-000000000000").status_code == 404
+
+
+def test_hapus_klip_yang_tidak_ada_balas_404(client, job_berklip):
+    job_id, _ = job_berklip
+    assert client.delete(f"/jobs/{job_id}/clips/c9").status_code == 404
+
+
+@pytest.mark.parametrize("job_id,clip_id", [
+    ("bukan-uuid", "c1"),
+    ("00000000-0000-0000-0000-000000000000", "../../etc/passwd"),
+    ("00000000-0000-0000-0000-000000000000", "cX"),
+])
+def test_id_rusak_ditolak_bukan_dieksekusi(client, job_id, clip_id):
+    """Keduanya menyusun path di disk — bentuknya wajib dikunci."""
+    r = client.delete(f"/jobs/{job_id}/clips/{clip_id}", follow_redirects=False)
+    assert r.status_code in (404, 307)
+
+
+def test_worker_tidak_ribut_saat_row_sudah_dihapus(client):
+    """Menghapus job yang sedang berjalan adalah cara satu-satunya membersihkan
+    job yang tersangkut. Worker yang masih menulis ke row itu harus berhenti
+    diam-diam, bukan melempar KeyError."""
+    from db import jobs as db_jobs
+
+    j = client.post(
+        "/jobs", json={"url": "https://youtu.be/abc", "target_clips": 1}
+    ).json()["job_id"]
+    assert client.delete(f"/jobs/{j}").status_code == 204
+
+    db_jobs.update_status(j, "rendering", progress=50)   # tidak boleh melempar
+    db_jobs.fail(j, "error apa pun")                     # juga tidak

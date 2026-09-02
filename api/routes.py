@@ -21,6 +21,7 @@ from config.settings import settings
 from db import jobs, models
 from jobqueue.client import enqueue
 import storage
+from utils.ffmpeg_helpers import rmtree_retry
 from utils.logging import get
 
 log = get(__name__)
@@ -204,6 +205,41 @@ def create_job(payload: JobCreate):
         jobs.fail(job["id"], f"Gagal push ke queue: {e}")
         raise HTTPException(503, f"Queue tidak bisa dihubungi: {e}") from e
     return JobCreated(job_id=job["id"], status=job["status"])
+
+
+@app.delete("/jobs/{job_id}", status_code=204)
+def delete_job(job_id: str):
+    """Hapus job beserta seluruh berkasnya.
+
+    Ikut membuang workdir-nya. Workdir job yang gagal sengaja ditinggal untuk
+    diperiksa, dan isinya video sumber mentah — justru itu yang paling cepat
+    memenuhi disk kalau tidak pernah dibersihkan.
+
+    Job yang sedang berjalan pun boleh dihapus. Itu disengaja: job yang
+    tersangkut karena worker-nya mati tidak punya cara lain untuk dihilangkan.
+    Worker yang masih menulis ke row yang sudah hilang akan berhenti sendiri
+    tanpa membuat keributan.
+    """
+    if not _UUID.match(job_id):
+        raise HTTPException(404, "Job tidak ditemukan")
+    if not jobs.delete(job_id):
+        raise HTTPException(404, "Job tidak ditemukan")
+    storage.delete_job(job_id)
+    rmtree_retry(settings.WORK_DIR / job_id[:8])
+    log.info("job %s dihapus beserta berkasnya", job_id)
+    return Response(status_code=204)
+
+
+@app.delete("/jobs/{job_id}/clips/{clip_id}", status_code=204)
+def delete_clip(job_id: str, clip_id: str):
+    """Hapus satu klip: berkasnya dan entrinya di daftar klip job."""
+    if not _UUID.match(job_id) or not _CLIP.match(clip_id):
+        raise HTTPException(404, "Klip tidak ditemukan")
+    if not jobs.remove_clip(job_id, clip_id):
+        raise HTTPException(404, "Klip tidak ditemukan")
+    storage.delete_clip(job_id, clip_id)
+    log.info("klip %s/%s dihapus", job_id, clip_id)
+    return Response(status_code=204)
 
 
 @app.get("/jobs", response_model=list[JobOut])

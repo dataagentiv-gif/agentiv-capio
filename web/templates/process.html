@@ -28,6 +28,7 @@ function jobHtml(j) {
         ${badge(j.status)}
         <a class="job-url" href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>
         <span class="job-meta">${esc(waktu(j.created_at))} · target ${j.target_clips} klip</span>
+        ${tombolHapus('Hapus', `job:${j.id}`)}
       </div>
       ${gagal ? '' : `<div class="job-body">${stepper(j.status, j.progress)}</div>`}
       ${j.error ? `<div class="error-box">${esc(j.error)}</div>` : ''}
@@ -51,6 +52,16 @@ async function tick() {
     return true;
   }
 }
+
+// Delegasi di container: isinya digambar ulang tiap polling, jadi handler yang
+// dipasang ke tombol satu per satu akan hilang di render berikutnya.
+document.getElementById('list').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-aksi]');
+  if (!b) return;
+  const id = b.dataset.aksi.split(':')[1];
+  if (await hapus(`/jobs/${id}`,
+      'Hapus job ini beserta seluruh berkasnya? Tindakan ini tidak bisa dibatalkan.')) tick();
+});
 
 poll(tick);
 </script>

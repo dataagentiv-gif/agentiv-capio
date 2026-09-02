@@ -19,7 +19,10 @@ function clipHtml(c, jobId) {
     <div class="clip">
       <div class="score"><b>${c.score}</b><span>SCORE</span></div>
       <div>
-        <h3><a href="${local}" target="_blank" rel="noopener">${esc(c.title || c.id)}</a></h3>
+        <h3>
+          <a href="${local}" target="_blank" rel="noopener">${esc(c.title || c.id)}</a>
+          ${tombolHapus('Hapus', `clip:${jobId}:${c.id}`)}
+        </h3>
         <div class="row reason"><b>Alasan LLM</b>${esc(c.reason)}</div>
         <div class="row"><b>Hook</b>${esc(c.hook)}</div>
         ${c.caption ? `<div class="row"><b>Caption</b>${esc(c.caption)}</div>` : ''}
@@ -40,6 +43,7 @@ function jobHtml(j) {
         ${badge(j.status)}
         <a class="job-url" href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>
         <span class="job-meta">${esc(waktu(j.created_at))} · ${(j.clips || []).length} klip</span>
+        ${tombolHapus('Hapus semua', `job:${j.id}`)}
       </div>
       <div class="clips">${(j.clips || []).map(c => clipHtml(c, j.id)).join('')}</div>
     </div>`;
@@ -59,6 +63,20 @@ async function tick() {
     return true;
   }
 }
+
+// Delegasi di container: isinya digambar ulang tiap polling, jadi handler yang
+// dipasang ke tombol satu per satu akan hilang di render berikutnya.
+document.getElementById('list').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-aksi]');
+  if (!b) return;
+  const [jenis, jobId, clipId] = b.dataset.aksi.split(':');
+  const ok = jenis === 'job'
+    ? await hapus(`/jobs/${jobId}`,
+        'Hapus job ini beserta SEMUA klipnya? Berkasnya ikut terhapus dari disk.')
+    : await hapus(`/jobs/${jobId}/clips/${clipId}`,
+        'Hapus klip ini? Berkasnya ikut terhapus dari disk.');
+  if (ok) tick();
+});
 
 poll(tick);
 </script>

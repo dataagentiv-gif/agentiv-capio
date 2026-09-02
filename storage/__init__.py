@@ -81,3 +81,12 @@ def open_clip(job_id: str, clip_id: str, byte_range: str | None = None):
 
 def delete_job(job_id: str) -> None:
     shutil.rmtree(Path(settings.CLIPS_DIR) / job_id, ignore_errors=True)
+
+
+def delete_clip(job_id: str, clip_id: str) -> None:
+    _path(job_id, clip_id).unlink(missing_ok=True)
+    folder = Path(settings.CLIPS_DIR) / job_id
+    # Folder job ikut dibuang begitu klip terakhirnya hilang, supaya tidak
+    # meninggalkan folder kosong yang menumpuk.
+    if folder.is_dir() and not any(folder.iterdir()):
+        folder.rmdir()

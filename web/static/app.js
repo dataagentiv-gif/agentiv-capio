@@ -48,3 +48,20 @@ function poll(fn, cepat = 3000, lambat = 15000) {
     }
   })();
 }
+
+/* Penghapusan selalu lewat konfirmasi bawaan browser. Ini tindakan yang tidak
+   bisa dibatalkan — berkasnya ikut hilang dari disk, bukan cuma barisnya di
+   layar. */
+async function hapus(url, tanya) {
+  if (!confirm(tanya)) return false;
+  const r = await fetch(url, { method: 'DELETE' });
+  if (!r.ok && r.status !== 404) {
+    alert(`Gagal menghapus: HTTP ${r.status}`);
+    return false;
+  }
+  return true;
+}
+
+function tombolHapus(label, aksi) {
+  return `<button type="button" class="btn-hapus" data-aksi="${aksi}" title="${label}">${label}</button>`;
+}

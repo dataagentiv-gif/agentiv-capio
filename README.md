@@ -87,12 +87,16 @@ venv/Scripts/python main.py worker
 | Halaman | Isi |
 |---|---|
 | **Submit** `/` | Link YouTube dan jumlah klip. Strip di atas menunjukkan provider aktif dan apakah konfigurasi sudah lengkap — jadi key yang bolong ketahuan *sebelum* submit, bukan belasan menit kemudian. |
-| **Proses** `/process` | Job berjalan dengan penanda 9 tahap, plus job gagal beserta error-nya. |
-| **Hasil** `/results` | Klip jadi, bisa diputar atau diunduh. Tiap klip menampilkan skor dan alasan LLM memilih momen itu. |
+| **Proses** `/process` | Job berjalan dengan penanda 9 tahap, plus job gagal beserta error-nya. Tiap job bisa dihapus. |
+| **Hasil** `/results` | Klip jadi, bisa diputar, diunduh, atau dihapus — satu per satu maupun sekaligus per job. |
 | **Setting** `/settings` | Semua konfigurasi, dengan tombol tes per provider. |
 
 Klip juga bisa diambil langsung dari folder `clips/<job-id>/` lewat file
 manager — tidak perlu lewat aplikasi.
+
+Tombol **Hapus** membuang berkasnya dari disk, bukan sekadar barisnya dari
+layar. Menghapus job juga membersihkan folder kerjanya, yang menyimpan video
+sumber mentah dan biasanya jadi penyebab utama disk penuh.
 
 ---
 
@@ -286,9 +290,9 @@ pipeline patah tanpa error.
 ## Batasan yang diketahui
 
 - **Job yatim.** Kalau proses worker mati di tengah job, row-nya tertinggal di
-  status berjalan. Belum ada reaper: menyapunya saat worker start akan salah
-  membunuh job milik worker lain begitu jumlah worker ditambah. Untuk sekarang:
-  submit ulang.
+  status berjalan dan tidak pulih sendiri — belum ada reaper, karena menyapunya
+  saat worker start akan salah membunuh job milik worker lain begitu jumlah
+  worker ditambah. Hapus job itu lewat halaman Proses, lalu submit ulang.
 - **Source lebih sempit dari 9:16** (misalnya video 1:1) akan ter-stretch
   vertikal. Perbaikannya mode `fit` dengan latar blur.
 - **Satu crop per klip, bukan per shot.** Memadai untuk talking-head; source
