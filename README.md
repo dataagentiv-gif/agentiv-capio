@@ -48,6 +48,10 @@ docker compose logs -f worker   # ikuti prosesnya
 docker compose down             # matikan; data tetap tersimpan
 ```
 
+Kalau port 8000 sudah dipakai proses lain, ubah `HOST_PORT` di `.env` lalu
+`docker compose up -d`. Port di dalam container tetap 8000 — yang berubah hanya
+sisi host.
+
 Ubah **kode** perlu `docker compose up -d --build`. Tanpa `--build`, compose
 memakai image lama dan perubahan tidak terpakai — tanpa error, cuma perilaku
 yang tidak berubah. Ubah **konfigurasi** lewat halaman Setting tidak perlu

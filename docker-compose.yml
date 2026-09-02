@@ -81,8 +81,12 @@ services:
       REDIS_URL: redis://redis:6379/0
       WORK_DIR: /work
       CLIPS_DIR: /app/clips
+    # Port di dalam container tetap 8000; yang bisa diubah pengguna adalah sisi
+    # host lewat HOST_PORT di .env — bentrokan port itu hal biasa.
+    # Awalan 127.0.0.1 membatasi ke laptop sendiri; jangan dihapus tanpa
+    # mengisi AUTH_TOKEN lebih dulu.
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${HOST_PORT:-8000}:8000"
 
   worker:
     <<: *app
