@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="format-detection" content="telephone=no">
   <title>{% block title %}Video Clipping Engine{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ v }}">
 </head>
 <body>
 {# Sprite ikon. Sekali didefinisikan, dipakai lewat <use> — jadi tidak ada
    markup SVG yang disalin berulang di tiap halaman. Semua stroke memakai
    currentColor supaya ikut warna teks induknya. #}
-<svg class="sprite" aria-hidden="true">
+<svg class="sprite" aria-hidden="true" hidden>
   <defs>
     <g id="i-submit" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       <path d="M8 10.5V2.5M8 2.5 5 5.5M8 2.5l3 3"/><path d="M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10"/>
@@ -60,10 +60,10 @@
       Video Clipping Engine
     </a>
     <div class="nav-links">
-      <a href="/"         class="{% if page == 'submit'   %}active{% endif %}"><svg class="ic"><use href="#i-submit"/></svg>Submit</a>
-      <a href="/process"  class="{% if page == 'process'  %}active{% endif %}"><svg class="ic"><use href="#i-process"/></svg>Proses</a>
-      <a href="/results"  class="{% if page == 'results'  %}active{% endif %}"><svg class="ic"><use href="#i-results"/></svg>Hasil</a>
-      <a href="/settings" class="{% if page == 'settings' %}active{% endif %}"><svg class="ic"><use href="#i-settings"/></svg>Setting</a>
+      <a href="/"         class="{% if page == 'submit'   %}active{% endif %}"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-submit"/></svg>Submit</a>
+      <a href="/process"  class="{% if page == 'process'  %}active{% endif %}"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-process"/></svg>Proses</a>
+      <a href="/results"  class="{% if page == 'results'  %}active{% endif %}"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-results"/></svg>Hasil</a>
+      <a href="/settings" class="{% if page == 'settings' %}active{% endif %}"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-settings"/></svg>Setting</a>
     </div>
   </div>
 </nav>
@@ -76,7 +76,7 @@
   {% block content %}{% endblock %}
 </main>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v={{ v }}"></script>
 {% block script %}{% endblock %}
 </body>
 </html>

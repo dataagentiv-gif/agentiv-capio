@@ -32,6 +32,23 @@ WEB = Path(__file__).resolve().parent.parent / "web"
 templates = Jinja2Templates(directory=str(WEB / "templates"))
 
 
+def _cap_aset() -> str:
+    """Cap versi berkas statis, dari waktu ubah terbaru css dan js.
+
+    Dipakai sebagai `?v=` pada tautan aset. Header Cache-Control saja tidak
+    cukup: ia hanya berlaku untuk pengambilan BERIKUTNYA, sedangkan salinan
+    yang sudah terlanjur tersimpan tidak pernah divalidasi ulang — browser
+    memakai HTML baru bersama CSS lama, dan hasilnya tata letak berantakan
+    tanpa satu pun pesan error. Mengubah URL-nya membuat salinan lama tidak
+    mungkin terpakai, berapa pun umur cache-nya.
+    """
+    stat = [(WEB / "static" / n).stat().st_mtime for n in ("style.css", "app.js")]
+    return format(int(max(stat)), "x")
+
+
+templates.env.globals["v"] = _cap_aset()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     models.init()

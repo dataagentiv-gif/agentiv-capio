@@ -35,7 +35,7 @@ async function getJobs() {
 
 function empty(judul, isi) {
   return `<div class="empty">
-            <svg class="ic-empty"><use href="#i-inbox"/></svg>
+            <svg class="ic-empty" width="40" height="40" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-inbox"/></svg>
             <strong>${judul}</strong>${isi}
           </div>`;
 }
@@ -67,5 +67,5 @@ async function hapus(url, tanya) {
 
 function tombolHapus(label, aksi) {
   return `<button type="button" class="btn-hapus" data-aksi="${aksi}" title="${label}"
-            aria-label="${label}"><svg class="ic"><use href="#i-trash"/></svg>${label}</button>`;
+            aria-label="${label}"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-trash"/></svg>${label}</button>`;
 }

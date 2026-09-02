@@ -38,7 +38,7 @@ const IKON = {
   'Transkrip': 'i-mic', 'LLM': 'i-llm', 'Penyimpanan': 'i-folder',
   'Guardrail': 'i-shield', 'Kalibrasi': 'i-settings', 'Infra': 'i-server',
 };
-const ikon = n => `<svg class="ic"><use href="#${IKON[n] || 'i-settings'}"/></svg>`;
+const ikon = n => `<svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#${IKON[n] || 'i-settings'}"/></svg>`;
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 let data = null;
 
