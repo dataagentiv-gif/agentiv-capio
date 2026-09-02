@@ -1,332 +1,300 @@
-# Video Clipping Engine — Validation Build
+# Video Clipping Engine
 
-Mengubah satu link YouTube panjang menjadi beberapa klip 9:16 siap posting,
-lengkap dengan caption karaoke burned-in, judul, caption, dan hashtag.
+Ubah satu link YouTube panjang jadi beberapa klip pendek 9:16 siap posting —
+lengkap dengan caption karaoke yang terbakar di video, judul, caption, dan
+hashtag.
 
-Build ini adalah **versi validasi**. Tujuannya membuktikan seluruh pipeline
-berjalan end-to-end, dan membuat kualitas seleksi momen bisa dinilai manusia:
-tiap klip di halaman History menampilkan `score` dan `reason` dari LLM.
+Semua pemrosesan berat berjalan di mesin sendiri. Klip jadi mendarat sebagai
+file mp4 biasa di folder `clips/`, bukan di storage cloud mana pun.
 
-Belum termasuk (sengaja, sesuai PRD): stage context-research, crop per-shot
-untuk b-roll, multi-tenant/auth/billing.
+**Layanan berbayar yang dibutuhkan cuma dua:** satu untuk transkrip, satu untuk
+LLM. Keduanya punya tingkat gratis yang cukup untuk pemakaian pribadi.
 
 ---
 
-## Setup
+## Daftar isi
 
-### Cara cepat — semua di Docker
+- [Cara pakai](#cara-pakai)
+- [Halaman](#halaman)
+- [Cara kerjanya](#cara-kerjanya)
+- [Konfigurasi](#konfigurasi)
+- [Kalibrasi](#kalibrasi)
+- [Keamanan](#keamanan)
+- [Arsitektur](#arsitektur)
+- [Pengembangan](#pengembangan)
+- [Batasan yang diketahui](#batasan-yang-diketahui)
 
-Cuma butuh **Docker**. Tidak perlu Python, ffmpeg, maupun akun Cloudflare.
+---
+
+## Cara pakai
+
+### Dengan Docker (disarankan)
+
+Cuma butuh **Docker**. Tidak perlu Python, ffmpeg, maupun database.
 
 ```bash
-copy .env.example .env      # cp di Linux/macOS
+git clone <repo-ini>
+cd video-clipper
+cp .env.example .env        # copy di Windows
 docker compose up -d
 ```
 
-Buka **http://localhost:8000**, lalu isi API key di halaman **Setting**
-(Groq untuk transkrip, Gemini untuk seleksi momen — dua-duanya punya free
-tier). Klik Simpan lalu Tes. Setelah itu langsung bisa submit video.
-
-Klip hasilnya mendarat di folder **`clips/`** di dalam folder project — file
-mp4 biasa yang bisa dibuka, dihapus, atau disalin lewat File Explorer. Tidak
-ada storage cloud yang perlu disiapkan.
+Buka **http://localhost:8000**, lalu ke halaman **Setting** untuk mengisi dua
+API key (petunjuknya ada di halaman itu). Klik **Simpan**, lalu **Tes** untuk
+memastikan key-nya benar. Setelah itu langsung bisa submit video.
 
 ```bash
-docker compose logs -f worker   # lihat prosesnya
-docker compose down             # matikan (data tetap tersimpan)
+docker compose logs -f worker   # ikuti prosesnya
+docker compose down             # matikan; data tetap tersimpan
 ```
 
-**Kalau mengubah kode, jalankan `docker compose up -d --build`.** Tanpa
-`--build`, compose memakai image lama dan perubahan kode tidak terpakai —
-tidak ada error, cuma perilaku yang tidak berubah. Mengubah **konfigurasi**
-lewat halaman Setting tidak perlu rebuild: worker membaca ulang `.env` di awal
-tiap job.
+Ubah **kode** perlu `docker compose up -d --build`. Tanpa `--build`, compose
+memakai image lama dan perubahan tidak terpakai — tanpa error, cuma perilaku
+yang tidak berubah. Ubah **konfigurasi** lewat halaman Setting tidak perlu
+rebuild: worker membaca ulang `.env` di awal tiap job.
 
-**Ini untuk dijalankan di laptop sendiri, bukan VPS.** Groq menolak IP
-datacenter dengan 403, dan yt-dlp kena bot-detection YouTube yang jauh lebih
-galak dari sana. Kalau memang harus di server, pindahkan ASR ke ElevenLabs dan
-siapkan cookies untuk yt-dlp.
-
-### Cara manual — tanpa Docker untuk app-nya
+### Tanpa Docker
 
 Butuh **Python 3.12** dan **ffmpeg** di PATH.
 
 ```bash
 python -m venv venv
-venv\Scripts\python.exe -m pip install -r requirements.txt
+venv/Scripts/python -m pip install -r requirements.txt   # bin/python di Linux
 docker compose up -d postgres redis
-copy .env.example .env
+cp .env.example .env
 ```
 
-Jalankan di **dua terminal terpisah**:
+Lalu di dua terminal terpisah:
 
 ```bash
-venv\Scripts\python.exe main.py api       # http://localhost:8000
-venv\Scripts\python.exe main.py worker
+venv/Scripts/python main.py api
+venv/Scripts/python main.py worker
 ```
 
-**API key diisi lewat halaman Setting di browser**, bukan dengan menyunting
-`.env` manual. Buka `http://localhost:8000/settings`, tempel key, klik Simpan
-lalu Tes. Semuanya ditulis ke `.env` di folder project.
+> **Dijalankan di laptop sendiri, bukan VPS.** Groq menolak IP datacenter
+> dengan 403, dan yt-dlp kena bot-detection YouTube yang jauh lebih galak dari
+> sana. Kalau memang harus di server: pakai ElevenLabs untuk transkrip, dan
+> siapkan cookies untuk yt-dlp.
 
-### Halaman
+---
+
+## Halaman
 
 | Halaman | Isi |
 |---|---|
-| `/` Submit | Masukkan link, pilih jumlah klip. Strip di atas menunjukkan provider aktif dan apakah konfigurasi sudah lengkap — kalau belum, ketahuan **sebelum** submit, bukan belasan menit kemudian. |
-| `/process` Proses | Job berjalan dengan penanda 9 tahap, plus job gagal beserta error-nya. |
-| `/results` Hasil | Klip jadi, lengkap dengan skor dan alasan LLM. |
-| `/settings` Setting | Semua isi `.env`, dengan tombol tes per provider. |
+| **Submit** `/` | Link YouTube dan jumlah klip. Strip di atas menunjukkan provider aktif dan apakah konfigurasi sudah lengkap — jadi key yang bolong ketahuan *sebelum* submit, bukan belasan menit kemudian. |
+| **Proses** `/process` | Job berjalan dengan penanda 9 tahap, plus job gagal beserta error-nya. |
+| **Hasil** `/results` | Klip jadi, bisa diputar atau diunduh. Tiap klip menampilkan skor dan alasan LLM memilih momen itu. |
+| **Setting** `/settings` | Semua konfigurasi, dengan tombol tes per provider. |
 
-### Keamanan halaman Setting
+Klip juga bisa diambil langsung dari folder `clips/<job-id>/` lewat file
+manager — tidak perlu lewat aplikasi.
 
-Halaman itu bisa menulis kredensial, jadi ada tiga pembatas yang **jangan
-dilonggarkan** tanpa memahami akibatnya:
+---
 
-- **Server hanya mendengar di `127.0.0.1`.** Mengubah `API_HOST` ke `0.0.0.0`
-  membuat siapa pun di jaringan yang sama bisa membuka `/settings`, melihat
-  provider mana yang terisi, dan menimpa key. Jangan lakukan itu di jaringan
-  yang tidak lo kendalikan, dan jangan pernah ekspos ke internet apa adanya —
-  tidak ada autentikasi sama sekali di build ini.
-- **Nilai rahasia tidak pernah dikirim utuh ke browser**, hanya bentuk ter-mask
-  (`gsk_ew••••••••3io8`) plus penanda terisi/kosong.
-- **Hanya key di allowlist yang bisa ditulis.** `DATABASE_URL`, `REDIS_URL`,
-  `API_HOST`, dan `API_PORT` sengaja read-only: salah isi sekali, aplikasinya
-  mati dan halaman setting-nya ikut tidak bisa dibuka.
+## Cara kerjanya
 
-`.env` berisi kredensial asli dan sudah masuk `.gitignore` — pastikan tetap
-begitu sebelum mem-push repo ini ke mana pun.
+Pipeline sekuensial sembilan tahap. Urutannya tetap dan ditentukan di kode; LLM
+dipanggil untuk dua tugas sempit saja dan tidak pernah memutuskan alur.
 
-### Kalau perlu diakses dari luar localhost
+| # | Tahap | Alat | Hasil |
+|---|---|---|---|
+| 1 | Unduh | yt-dlp + ffmpeg | `source.mp4`, `audio.ogg` (16kHz mono opus) |
+| 2 | Transkrip | Groq Whisper / ElevenLabs Scribe | kata + kalimat, bertimestamp |
+| 3 | Seleksi momen | LLM | kandidat klip + skor + alasan |
+| 4 | Geser batas | ffmpeg | batas dipindah ke jeda alami terdekat |
+| 5 | Caption | generator `.ass` | caption karaoke per kata |
+| 6 | Crop | MediaPipe | jendela 9:16 mengikuti posisi wajah |
+| 7 | Render | ffmpeg | mp4 1080×1920, caption terbakar |
+| 8 | Metadata | LLM | judul, caption, hashtag |
+| 9 | Simpan | — | file ke `clips/<job-id>/` |
 
-Isi `AUTH_TOKEN` di `.env` dengan string acak panjang. Begitu terisi, seluruh
-halaman dan endpoint meminta HTTP Basic (username diabaikan, password = token
-itu). Kosongkan hanya kalau server benar-benar cuma mendengar di loopback.
+Tiga hal yang membuat titik potongnya masuk akal:
 
-Server akan mencetak peringatan saat start kalau `API_HOST` bukan loopback
-sementara `AUTH_TOKEN` masih kosong.
+**Transkrip disajikan ke LLM per kalimat, bukan per kata**, memakai teks
+bertanda baca. Tanpa titik dan koma, kalimat yang menggantung terlihat persis
+sama dengan kalimat yang sudah selesai.
 
-### Port container sengaja diikat ke loopback
+**Durasi jeda bicara ikut ditandai** (`jeda 1.4s`), dihitung dari selisih
+timestamp antar kata. Tanpa itu, LLM tidak bisa membedakan orang yang selesai
+berpikir dari orang yang menarik napas di tengah argumen.
 
-`docker-compose.yml` mem-publish Postgres dan Redis sebagai
-`127.0.0.1:5432:5432` dan `127.0.0.1:6379:6379`. **Jangan hapus awalan
-`127.0.0.1` itu.** Tanpa awalan tersebut Docker membuka port ke semua
-interface, dan Redis di sini berjalan tanpa password.
+**Batas akhir digeser ke jeda paling panjang di sekitarnya**, bukan yang paling
+dekat. Hening 1,5 detik adalah penutup gagasan; hening 0,3 detik cuma tarikan
+napas.
 
-Akibatnya bukan sekadar data terbaca. RQ menyimpan nama fungsi sebagai string
-dotted-path yang di-import worker apa adanya, jadi siapa pun yang bisa
-menjangkau Redis dapat mengantre job berisi fungsi apa saja — itu eksekusi kode
-jarak jauh di mesin yang menjalankan worker.
+---
 
-Buka `http://localhost:8000`, paste link YouTube, tentukan jumlah klip, submit.
-Pantau progresnya di `/history`.
+## Konfigurasi
 
-Worker sengaja tidak punya supervisor sendiri. Crash native dari MediaPipe/tflite
-mematikan seluruh proses worker karena tidak ada work horse yang memisahkannya —
-kalau perlu tahan banting, bungkus dengan `.bat` loop atau NSSM.
+Semua lewat halaman **Setting**. Yang ditulis di sana masuk ke `.env` di folder
+project, jadi bisa juga disunting manual kalau lebih suka.
+
+### Transkrip
+
+| Provider | Biaya | Catatan |
+|---|---|---|
+| **Groq** Whisper | free tier 8 jam audio/hari | Sangat cepat — 15 menit audio selesai dalam ~4 detik. Meleset di campuran Indonesia-Inggris. Menolak IP datacenter/VPN dengan 403. |
+| **ElevenLabs** Scribe | berbayar per pemakaian | Jauh lebih akurat untuk Bahasa Indonesia. Tanpa blokir IP. |
+
+Ini pilihan yang paling terasa hasilnya, karena **caption terbakar permanen di
+video**. Transkrip yang meleset kelihatan oleh penonton dan tidak bisa
+diperbaiki setelah render.
+
+### LLM
+
+| Provider | Catatan |
+|---|---|
+| **Gemini** | Ada free tier. Boleh diisi beberapa key dipisah koma — dipakai bergiliran, karena kuota gratisnya dibatasi per key dan panggilan yang kena 429 otomatis lanjut ke key berikutnya. |
+| **OpenRouter** | Satu key untuk banyak model. |
+
+Pipeline memakai **dua panggilan LLM per video**, jadi kuota gratis Gemini
+(1.000 permintaan/hari) setara sekitar 500 video per hari.
+
+---
+
+## Kalibrasi
+
+Semua ada di halaman Setting. Ini yang benar-benar perlu diputar kalau hasilnya
+belum pas:
+
+| Pengaturan | Default | Putar kalau |
+|---|---|---|
+| Ambang hening | `-30` dB | Source ber-musik latar atau berisik → `-35` |
+| Durasi hening minimum | `0.25` s | Terlalu banyak kandidat batas → `0.5` |
+| Pergeseran batas maksimum | `1.2` s | Batas klip terasa meleset dari maksud LLM → kecilkan |
+| Durasi klip | `30`–`90` s | Menyesuaikan platform tujuan |
+| Model LLM | flash-lite | Seleksi momen terasa dangkal → model lebih besar |
+
+Kalau tidak ada hening terdeteksi sama sekali, batas klip **tidak** digeser.
+Itu perilaku yang disengaja: batas yang tidak digeser masih menghasilkan klip
+yang layak, sedangkan batas yang digeser ke hening palsu justru merusak.
+
+---
+
+## Keamanan
+
+Halaman Setting bisa menulis API key, jadi ada beberapa pembatas yang sebaiknya
+dipahami sebelum diubah.
+
+**Server hanya mendengar di localhost.** Di Docker, port dipublikasikan sebagai
+`127.0.0.1:8000:8000` — bukan ke seluruh jaringan.
+
+**Isi `AUTH_TOKEN` kalau perlu diakses dari luar localhost.** Begitu terisi,
+semua halaman meminta HTTP Basic (username diabaikan, password = token itu).
+Tanpa itu, siapa pun yang bisa menjangkau server dapat melihat provider mana
+yang terisi dan menimpa key-nya — tidak ada autentikasi bawaan.
+
+**Nilai rahasia tidak pernah dikirim utuh ke browser**, hanya bentuk ter-mask
+plus penanda terisi/kosong.
+
+**Port Postgres dan Redis diikat ke `127.0.0.1` di compose. Jangan hapus awalan
+itu.** Tanpa awalan alamat, Docker membuka port ke semua interface, dan Redis
+di sini berjalan tanpa password. Akibatnya bukan sekadar data terbaca: RQ
+menyimpan nama fungsi sebagai string dotted-path yang di-import worker apa
+adanya, jadi siapa pun yang bisa menjangkau Redis dapat mengantre job berisi
+fungsi apa saja — eksekusi kode jarak jauh di mesin yang menjalankan worker.
+
+`.env` berisi kredensial dan sudah masuk `.gitignore`. Pastikan tetap begitu.
 
 ---
 
 ## Arsitektur
 
 ```
-POST /jobs -> row Postgres (queued) -> job_id ke Redis (RQ)
-           -> worker: orchestrator.run(job_id)
-              download -> transcribe -> segment -> refine
-                       -> caption -> crop -> render -> metadata
-              -> upload R2 -> status done
+POST /jobs → row Postgres (queued) → job_id ke Redis (RQ)
+           → worker: orchestrator.run(job_id)
+              unduh → transkrip → seleksi → batas
+                    → caption → crop → render → metadata
+              → simpan ke clips/ → status done
 ```
 
-Ini pipeline sekuensial berbasis workflow, **bukan agentic loop**. Urutan stage
-ditentukan di kode; LLM hanya dipanggil untuk tugas sempit di Stage 3 (seleksi
-momen) dan Stage 8 (metadata), tidak pernah memutuskan urutan eksekusi.
+```
+main.py               entry point tunggal: api | worker
+config/               settings + baca-tulis .env
+api/                  REST + penyaji halaman
+web/                  template Jinja2 + aset
+worker/               orchestrator (satu-satunya pemanggil stage)
+pipeline/stages/      sembilan tahap, masing-masing satu file
+asr/                  provider transkrip (groq, elevenlabs)
+llm/                  provider LLM (openrouter, gemini)
+storage/              penyimpanan klip lokal
+db/                   skema + CRUD
+jobqueue/             adapter Redis + RQ
+utils/                logging, retry, helper ffmpeg
+tests/
+```
 
-**Aturan dependency yang dipegang:**
+Aturan yang dipegang konsisten dan sebaiknya dijaga:
 
-- `pipeline/stages/*` tidak mengimpor `api/`, `web/`, `jobqueue/`, atau `db/`.
-  Tiap stage bertanda tangan `run(ctx) -> dict`: baca yang dibutuhkan dari ctx,
-  kembalikan field yang di-merge. Stage tidak tahu-menahu soal HTTP atau queue.
-- `worker/orchestrator.py` satu-satunya yang memanggil stage berurutan dan
+- **`pipeline/stages/*` tidak mengimpor `api/`, `web/`, `jobqueue/`, atau
+  `db/`.** Tiap stage bertanda tangan `run(ctx) -> dict`: baca yang dibutuhkan
+  dari ctx, kembalikan field yang di-merge. Stage tidak tahu-menahu soal HTTP
+  atau antrean.
+- **`worker/orchestrator.py` satu-satunya** yang memanggil stage berurutan dan
   menulis progress.
-- `db/` murni schema + CRUD, nol logic AI.
-- `utils/` dan `config/` foundational, tidak mengimpor folder lain.
-- `api/routes.py` tidak pernah menjalankan pipeline secara sinkron.
+- **`db/` murni skema + CRUD**, nol logika AI.
+- **`utils/` dan `config/` foundational** — tidak mengimpor folder lain.
+- **`api/routes.py` tidak pernah menjalankan pipeline secara sinkron.**
 
-### Penyimpanan klip
+Folder `asr/` dan `llm/` berbentuk paket berisi beberapa provider karena memang
+punya lebih dari satu implementasi; `storage/` sengaja satu file, karena
+lapisan pemilih untuk satu implementasi hanyalah indirection.
 
-`STORAGE_PROVIDER` menentukan ke mana klip jadi disimpan:
-
-| | |
-|---|---|
-| **`local`** (default) | File mp4 di folder `clips/`. Tidak butuh akun apa pun. Di Docker, folder itu di-bind-mount ke host jadi filenya terlihat langsung dari laptop. |
-| `r2` | Diunggah ke Cloudflare R2. Butuh bucket dan API token. |
-
-Halaman Hasil memutar klip lewat route `/clips/{job}/{id}` untuk **kedua**
-provider, jadi tidak ada perbedaan di sisi tampilan. Untuk R2 itu juga
-menghindari satu masalah nyata: banyak ISP Indonesia memblokir domain `r2.dev`
-di level DNS, sementara endpoint S3 yang dipakai route ini tidak kena.
-
-### Provider LLM
-
-Stage 3 dan 8 sama-sama lewat `llm/`, jadi ganti provider atau model cukup ubah
-`.env` — kode stage tidak disentuh.
-
-```
-llm/
-├── __init__.py            call_llm() -> memilih provider dari LLM_PROVIDER
-├── _engine.py             logika bersama (request, parsing, retry)
-├── client_openrouter.py   satu key
-└── client_gemini.py       banyak key, dirotasi
-```
-
-Keduanya bicara protokol OpenAI `chat/completions` — Gemini punya endpoint
-OpenAI-compatible di `generativelanguage.googleapis.com/v1beta/openai` — jadi
-yang benar-benar berbeda cuma tiga: URL, sumber API key, dan dukungan
-`json_schema`. Sisanya dipakai bersama di `_engine.py`.
-
-**Rotasi key Gemini.** Isi `GEMINI_API_KEYS` dipisah koma:
-
-```
-GEMINI_API_KEYS=key1,key2,key3
-```
-
-Key dipakai bergiliran (x+1) tiap panggilan. Gunanya bukan kecepatan, tapi
-kuota: free tier Gemini dibatasi **per key** (flash-lite: 15 request/menit,
-1.000/hari). `_engine` memanggil `get_key()` ulang di **tiap percobaan**, jadi
-panggilan yang kena 429 otomatis lanjut ke key berikutnya alih-alih mengulang ke
-key yang kuotanya sedang habis.
-
-Satu key sudah cukup untuk testing: pipeline cuma memakai **2 panggilan LLM per
-video**, jadi 1.000/hari setara ~500 video/hari.
-
-Catatan: `gemini-2.5-flash-lite` (langsung) dan `google/gemini-2.5-flash-lite`
-(via OpenRouter) adalah **model yang sama**. Pindah provider mengubah biaya dan
-rate limit, bukan kualitas seleksi momen.
-
-Gemini dikirimi `response_format: json_object`, bukan `json_schema` — dukungan
-`json_schema` di layer OpenAI-compatible Google belum terverifikasi. Bentuk
-output tetap terjaga karena prompt menyebut tiap field, stage memvalidasi
-sendiri, dan error parsing disuntikkan balik ke prompt. Kalau nanti terbukti
-`json_schema` diterima, ubah `use_schema=True` di `client_gemini.py`.
+> Folder antrean bernama `jobqueue/`, bukan `queue/`. `queue` adalah nama modul
+> stdlib Python, dan root project berada di `sys.path[0]` saat `main.py`
+> dijalankan — `import queue` dari dependency mana pun akan nyasar ke folder
+> project dan memecahkan pipeline diam-diam.
 
 ---
 
-## Deviasi dari PRD
-
-| PRD | Dipakai | Alasan |
-|---|---|---|
-| folder `queue/` | `jobqueue/` | `queue` menimpa modul stdlib. `python main.py` menaruh root project di `sys.path[0]`, jadi `import queue` dari `logging.handlers`, `concurrent.futures`, atau dependency mana pun akan nyasar ke folder kita — pipeline patah diam-diam. Scope commit untuk folder ini `jobqueue`. |
-| Silero VAD | ffmpeg `silencedetect` | Silero menarik torch + torchaudio (~2.4GB wheel Windows) hanya untuk mencari batas hening. ffmpeg sudah jadi prasyarat dan menghasilkan daftar batas yang sama. |
-| PySceneDetect | ffmpeg `select='gt(scene,..)'` | Alasan sama. PySceneDetect men-decode seluruh file satu jam; yang dibutuhkan cuma jendela ±1.5 detik di sekitar tiap batas (~3 detik decode per klip). |
-| status `rendering -> done` | +`metadata`, +`uploading` | Stage 8 dan upload R2 memakan waktu nyata. Tanpa keduanya History menampilkan "rendering" padahal render sudah selesai. |
-| — | +folder `assets/` | Model MediaPipe `.tflite` di-vendor, bukan diunduh saat runtime, supaya job tidak gagal gara-gara jaringan. |
-
-Dua deviasi pertama disetujui sebelum implementasi; sisanya mengikuti alasan
-yang sama.
-
----
-
-## Kalibrasi
-
-Semua ada di `.env` (default di `config/settings.py`). Ini knob yang benar-benar
-perlu diputar saat hasilnya belum pas:
-
-| Var | Default | Putar kalau |
-|---|---|---|
-| `SILENCE_NOISE_DB` | `-30` | Source ber-musik latar atau berisik → `-35`. |
-| `SILENCE_MIN_DUR` | `0.25` | Terlalu banyak kandidat batas → `0.5`. |
-| `SNAP_MAX_DRIFT` | `1.2` | Batas klip terasa meleset dari maksud LLM → kecilkan. |
-| `MIN/MAX_CLIP_SEC` | `30` / `90` | Menyesuaikan platform tujuan. |
-| `OPENROUTER_MODEL` | `google/gemini-2.5-flash-lite` | Seleksi momen terasa dangkal → model yang lebih besar. |
-
-Kalau daftar silence kembali kosong, refine **tidak** menggeser batas sama
-sekali. Itu perilaku yang benar dan disengaja: batas yang tidak di-snap masih
-menghasilkan klip yang layak, sedangkan batas yang di-snap ke hening palsu
-justru lebih buruk. Jangan melonggarkan threshold secara otomatis.
-
-Bitrate audio 24kbps opus (`pipeline/stages/download.py`) menghasilkan ~10.8
-MB/jam, jadi limit 25MB Groq baru tersentuh di sekitar 2.3 jam audio. Naikkan
-ke `32k` kalau timestamp per kata terasa meleset.
-
----
-
-## Test
+## Pengembangan
 
 ```bash
-venv\Scripts\python.exe -m pytest              # semua kecuali integration
-venv\Scripts\python.exe -m pytest -m integration
+venv/Scripts/python -m pytest          # semua kecuali integration
+venv/Scripts/python -m pytest -m integration
 ```
 
-Stage deterministik (`caption`, `segment`, `refine`) diuji dengan JSON sintetis,
-tanpa perlu video. Stage yang butuh media (`crop`, `render`) memakai fixture
-yang di-generate ffmpeg lewat `tests/fixtures/make_fixture.py` — tidak ada
-binary video yang ikut masuk git.
-
-Test `render` sengaja menjalankan ffmpeg sungguhan. Yang paling mungkin patah di
-stage itu bukan logika Python-nya melainkan urutan argumen ffmpeg, dan salah
-urut `-ss` tetap menghasilkan exit code 0 dengan caption yang lenyap.
-
-End-to-end penuh butuh:
+Test yang butuh Postgres/Redis akan di-skip sendiri kalau infra tidak jalan.
+End-to-end penuh butuh video nyata:
 
 ```bash
 set TEST_YOUTUBE_URL=https://www.youtube.com/watch?v=...
-venv\Scripts\python.exe -m pytest -m integration
+venv/Scripts/python -m pytest -m integration
 ```
 
----
+Stage deterministik diuji dengan data sintetis. Stage yang butuh media memakai
+fixture yang di-generate ffmpeg, jadi tidak ada file video besar di repo.
 
-## Catatan Windows
+Test render sengaja menjalankan ffmpeg sungguhan: yang paling mungkin patah di
+sana bukan logika Python-nya melainkan urutan argumen ffmpeg, dan salah urut
+`-ss` tetap menghasilkan exit code 0 dengan caption yang lenyap.
 
-Hal-hal yang sudah ditangani di kode, dicatat di sini supaya tidak "diperbaiki"
-balik oleh orang berikutnya:
+### Konvensi commit
 
-- **RQ pakai `SimpleWorker`.** `rq.Worker` default memanggil `os.fork()` yang
-  tidak ada di Windows. `SpawnWorker` juga tidak bisa meski docs menyebutnya
-  Windows-friendly — ia mewarisi `os.wait4`/`os.killpg` dari `Worker`.
-- **`job_timeout` diisi angka nyata, bukan `-1`.** `SimpleWorker` menjalankan
-  job di thread dequeue sehingga tidak bisa heartbeat di tengah job, dan
-  `get_heartbeat_ttl()` jatuh ke 420 detik saat timeout `-1`. Job 30 menit akan
-  ditandai abandoned di menit ke-7.
-- **Deadline ditegakkan sendiri** lewat `time.monotonic()` yang disuntikkan ke
-  tiap `subprocess(timeout=...)`. `TimerDeathPenalty` milik RQ tidak bisa
-  membunuh ffmpeg yang hang.
-- **`silencedetect` butuh `-v info`.** Filter itu menulis hasilnya ke log level
-  info; dengan `-v error` output-nya tertelan habis dan yang kembali adalah list
-  kosong dengan exit code 0.
-- **`-ss` sebelum `-i` saat render**, supaya pts filtergraph ter-rebase ke nol
-  dan timestamp `.ass` yang relatif klip menjadi benar.
-- **File `.ass` dirujuk dengan nama relatif + `cwd=workdir`.** Filter
-  `subtitles` mem-parse argumennya sendiri, jadi path absolut Windows menuntut
-  escape berlapis; nama relatif menghindarinya sama sekali.
-- **`WORK_DIR` sengaja pendek** (`C:/work/<8 char job_id>`) karena MAX_PATH 260.
-- Helper ffmpeg di stage di-import sebagai `ff`, bukan `run` — tiap stage
-  mengekspor `run(ctx)` sendiri dan nama itu akan menimpa helper.
+Conventional Commits dengan scope berbasis folder (`feat(pipeline/render): …`).
+Commit yang mengubah kontrak data antar stage wajib punya body yang menjelaskan
+apa yang berubah dan stage mana saja yang terdampak — itu titik paling rawan
+pipeline patah tanpa error.
 
 ---
 
 ## Batasan yang diketahui
 
-- **Job yatim.** Kalau proses worker mati di tengah job (crash native, terminal
-  ditutup), row-nya tertinggal di status berjalan selamanya — halaman History
-  akan terus menampilkan "downloading". Belum ada reaper: menyapunya saat worker
-  start akan salah membunuh job milik worker lain begitu jumlah worker
-  ditambah. Untuk sekarang: submit ulang.
-- **Source lebih sempit dari 9:16** (mis. video 1:1) akan ter-stretch vertikal.
-  Perbaikannya mode `fit` dengan blur background, yang oleh PRD memang ditunda
-  ke versi berikutnya.
-- **Satu crop per klip**, bukan per shot. Untuk video talking-head sederhana
-  sudah memadai; source dengan banyak b-roll belum tertangani.
+- **Job yatim.** Kalau proses worker mati di tengah job, row-nya tertinggal di
+  status berjalan. Belum ada reaper: menyapunya saat worker start akan salah
+  membunuh job milik worker lain begitu jumlah worker ditambah. Untuk sekarang:
+  submit ulang.
+- **Source lebih sempit dari 9:16** (misalnya video 1:1) akan ter-stretch
+  vertikal. Perbaikannya mode `fit` dengan latar blur.
+- **Satu crop per klip, bukan per shot.** Memadai untuk talking-head; source
+  dengan banyak b-roll belum tertangani.
 - **Chunking transkrip** memotong tepat di menit ke-20 tanpa menyesuaikan ke
-  jeda bicara, jadi satu kata bisa terpotong di batas chunk. Cabang itu baru
-  aktif di atas ~2.3 jam audio.
+  jeda bicara. Cabang itu baru aktif di atas ~2,3 jam audio.
+- **Tidak ada autentikasi bawaan** selain `AUTH_TOKEN` opsional.
 
 ---
 
-## Commit
+## Lisensi
 
-Conventional Commits, scope = nama folder, deskripsi Bahasa Indonesia. Untuk
-`pipeline/stages/`, scope-nya `pipeline/<nama-stage>`.
-
-Commit yang mengubah kontrak data antar stage **wajib** punya body yang
-menjelaskan apa yang berubah dan stage mana saja yang terdampak — itu titik
-paling rawan pipeline patah diam-diam.
+Belum ditentukan.
