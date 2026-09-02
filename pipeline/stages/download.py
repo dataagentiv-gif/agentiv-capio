@@ -64,21 +64,51 @@ def _ytdlp(url: str, workdir: Path, deadline) -> None:
     )
 
 
+# Penyebab gagal unduh yang lazim, dan pesan yang benar untuk masing-masing.
+# Membedakannya penting: gagal jaringan dan ditolak YouTube minta tindakan yang
+# sama sekali berbeda, dan pesan yang salah menuduh membuat orang mengoprek
+# cookie berjam-jam padahal yang putus cuma koneksinya. Terjadi sungguhan di uji
+# beban — DNS host mati sesaat, dua job pulang membawa tuduhan "video private".
+SEBAB = [
+    (("name or service not known", "temporary failure in name resolution",
+      "getaddrinfo", "nodename nor servname"),
+     "Download gagal: nama domain tidak bisa di-resolve. Koneksi internet atau "
+     "DNS sedang putus — videonya sendiri kemungkinan tidak bermasalah."),
+    (("timed out", "timeout", "connection reset", "connection refused",
+      "network is unreachable", "unable to download webpage"),
+     "Download gagal: koneksi ke YouTube terputus atau terlalu lambat. "
+     "Coba ulang setelah jaringan stabil."),
+    (("sign in to confirm", "not a bot", "captcha"),
+     "Download gagal: YouTube meminta verifikasi bot untuk IP ini. "
+     "Jalankan dari koneksi rumahan, atau pasang cookies browser di yt-dlp."),
+    (("private video", "members-only", "login required"),
+     "Download gagal: video ini private atau khusus member."),
+    (("not available in your country", "geo", "blocked"),
+     "Download gagal: video diblokir untuk wilayah ini."),
+    (("video unavailable", "has been removed", "does not exist"),
+     "Download gagal: video tidak tersedia atau sudah dihapus."),
+]
+
+
+def _sebab(teks: str) -> str:
+    rendah = teks.lower()
+    for penanda, pesan in SEBAB:
+        if any(p in rendah for p in penanda):
+            return pesan
+    return "Download gagal."
+
+
 def run(ctx: dict) -> dict:
     workdir: Path = ctx["workdir"]
     deadline = ctx["deadline"]
     source = workdir / "source.mp4"
     audio = workdir / "audio.ogg"
 
-    # Retry 2x backoff 30s (PRD Bagian 6). Penyebab gagal permanen yang lazim:
-    # video private, geo-block, atau bot-detection YouTube.
+    # Retry 2x backoff 30s (PRD Bagian 6).
     try:
         retry(attempts=3, backoff=30.0)(_ytdlp)(ctx["url"], workdir, deadline)
     except Exception as e:
-        raise RuntimeError(
-            f"Download gagal. Kemungkinan video private, geo-block, atau "
-            f"bot-detection YouTube. Detail: {e}"
-        ) from e
+        raise RuntimeError(f"{_sebab(str(e))} Detail: {e}") from e
 
     if not source.exists():
         found = list(workdir.glob("source.*"))
