@@ -112,7 +112,22 @@ def run(ctx: dict) -> dict:
             frames = _sample(source, seg["start"], seg["end"] - seg["start"], deadline)
             frac = _face_center(frames)
         except Exception as e:  # noqa: BLE001 — fallback center crop, jangan gagalkan job
-            log.warning("deteksi wajah %s gagal (%s) — pakai center crop", seg["id"], e)
+            # Dua kegagalan yang sangat berbeda lewat jalur ini. Satu klip yang
+            # wajahnya tidak terbaca itu wajar, dan center crop memang jawaban
+            # yang benar. Tapi detector yang TIDAK BISA DIBUAT sama sekali
+            # adalah salah pasang, dan sifatnya permanen: seluruh klip di
+            # seluruh job jadi center crop sementara pipeline tetap melapor
+            # sukses. Persis itu yang terjadi di sini karena libegl1 tidak ada
+            # di image — pelacakan wajah mati total, dan satu-satunya tanda
+            # adalah baris WARNING yang terlihat wajar.
+            if isinstance(e, (OSError, ImportError)):
+                log.error(
+                    "PELACAKAN WAJAH MATI (%s). Semua klip akan center crop. "
+                    "Ini salah pasang, bukan video tanpa wajah — periksa "
+                    "dependency sistem MediaPipe di image.", e,
+                )
+            else:
+                log.warning("deteksi wajah %s gagal (%s) — pakai center crop", seg["id"], e)
             frac = None
 
         if frac is None:

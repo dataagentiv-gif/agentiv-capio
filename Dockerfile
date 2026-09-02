@@ -6,8 +6,16 @@ FROM python:3.12-slim
 # ffmpeg wajib ada di dalam image: hampir semua stage memanggilnya, dan versi
 # distro sudah membawa libx264, libopus, dan libass yang dibutuhkan.
 # libgl1 + libglib2.0-0 dibutuhkan OpenCV yang ikut terbawa MediaPipe.
+#
+# libegl1 WAJIB, dan ketiadaannya tidak menjatuhkan job — itulah bahayanya.
+# MediaPipe menautkan libEGL.so.1 saat FaceDetector dibuat, dan Stage 6 sengaja
+# menangkap kegagalan deteksi lalu jatuh ke center crop supaya satu wajah yang
+# tidak terdeteksi tidak menggagalkan seluruh job. Tanpa paket ini, kegagalannya
+# permanen dan senyap: seluruh klip keluar center crop, pipeline melaporkan
+# sukses, dan pelacakan wajah — fitur inti 9:16 — tidak pernah benar-benar
+# berjalan. Terjadi sungguhan; baru ketahuan saat log crop dihitung satu per satu.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ffmpeg libgl1 libglib2.0-0 \
+        ffmpeg libgl1 libglib2.0-0 libegl1 libgles2 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1 \
