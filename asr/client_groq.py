@@ -10,6 +10,7 @@ jadi masalah kalau worker ini nanti dijalankan di VPS.
 """
 from pathlib import Path
 
+import keypool
 from config.settings import settings
 from utils.retry import retry
 
@@ -19,21 +20,29 @@ MODEL = "whisper-large-v3-turbo"
 SIZE_LIMIT = 24 * 1024 * 1024
 
 
-def _client():
-    from groq import Groq
-
-    return Groq(api_key=settings.GROQ_API_KEY)
-
-
 def check_config() -> None:
-    if not settings.GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY kosong — isi di .env")
+    if not settings.groq_keys:
+        raise RuntimeError("Groq API key kosong — isi di halaman Setting")
 
 
 @retry(attempts=3, backoff=5.0)
 def transcribe(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
+    from groq import Groq
+
+    # Key diambil ulang di TIAP percobaan, bukan sekali di awal: percobaan yang
+    # gagal karena kena batas kuota otomatis memakai key berikutnya, bukan
+    # mengulang ke key yang sedang habis.
+    idx, key = keypool.ambil("groq")
+    try:
+        return _panggil(Groq(api_key=key), path, offset, idx)
+    except Exception as e:
+        keypool.lapor("groq", idx, False, f"{type(e).__name__}: {e}")
+        raise
+
+
+def _panggil(klien, path: Path, offset: float, idx: int) -> tuple[list[dict], list[dict]]:
     with open(path, "rb") as f:
-        resp = _client().audio.transcriptions.create(
+        resp = klien.audio.transcriptions.create(
             file=(path.name, f.read()),
             model=MODEL,
             response_format="verbose_json",
@@ -52,4 +61,5 @@ def transcribe(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
         for s in (data.get("segments") or [])
         if s.get("text", "").strip()
     ]
+    keypool.lapor("groq", idx, True, f"{len(words)} kata")
     return words, sentences

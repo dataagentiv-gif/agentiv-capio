@@ -98,7 +98,7 @@ E2E_URL = os.getenv("TEST_YOUTUBE_URL", "")
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not (E2E_URL and settings.GROQ_API_KEY),
+    not (E2E_URL and settings.groq_keys),
     reason="butuh TEST_YOUTUBE_URL + GROQ_API_KEY",
 )
 def test_end_to_end_sampai_done(client):
@@ -167,7 +167,7 @@ def test_api_settings_tidak_membocorkan_rahasia(client):
     r = client.get("/api/settings")
     assert r.status_code == 200
     isi = r.text
-    for key in ("GROQ_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEYS"):
+    for key in ("GROQ_API_KEYS", "OPENROUTER_API_KEY", "GEMINI_API_KEYS"):
         nilai = getattr(settings, key, "")
         if nilai:
             assert nilai not in isi, f"{key} terkirim utuh ke browser"

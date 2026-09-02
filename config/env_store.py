@@ -19,10 +19,10 @@ log = get(__name__)
 ENV_PATH = ROOT / ".env"
 
 
-def _f(key, label, group, secret=False, kind="text", help="", options=None):
+def _f(key, label, group, secret=False, kind="text", help="", options=None, pool=""):
     return {
         "key": key, "label": label, "group": group, "secret": secret,
-        "kind": kind, "help": help, "options": options or [],
+        "kind": kind, "help": help, "options": options or [], "pool": pool,
     }
 
 
@@ -32,8 +32,9 @@ FIELDS = [
        options=["groq", "elevenlabs"],
        help="groq: murah & cepat, tapi meleset di campuran Indonesia-Inggris dan menolak IP datacenter. "
             "elevenlabs: jauh lebih akurat untuk Bahasa Indonesia, berbayar per pemakaian."),
-    _f("GROQ_API_KEY", "Groq API key", "Transkrip", secret=True,
-       help="console.groq.com/keys — free tier 28.800 detik audio per hari."),
+    _f("GROQ_API_KEYS", "Groq API key", "Transkrip", secret=True, pool="groq",
+       help="console.groq.com/keys — boleh lebih dari satu dipisah koma; "
+            "dipakai bergiliran karena free tier dibatasi per key."),
     _f("ELEVENLABS_API_KEY", "ElevenLabs API key", "Transkrip", secret=True,
        help="elevenlabs.io/app/settings/api-keys — dipakai hanya kalau provider di atas elevenlabs."),
     _f("ELEVENLABS_MODEL", "Model ElevenLabs", "Transkrip"),
@@ -41,7 +42,7 @@ FIELDS = [
     _f("LLM_PROVIDER", "Provider LLM", "LLM", kind="select",
        options=["openrouter", "gemini"],
        help="Dipakai untuk memilih momen dan menulis judul/caption/hashtag."),
-    _f("GEMINI_API_KEYS", "Gemini API key", "LLM", secret=True,
+    _f("GEMINI_API_KEYS", "Gemini API key", "LLM", secret=True, pool="gemini",
        help="aistudio.google.com/apikey — boleh lebih dari satu dipisah koma; "
             "dipakai bergiliran karena free tier dibatasi per key."),
     _f("GEMINI_MODEL", "Model Gemini", "LLM"),

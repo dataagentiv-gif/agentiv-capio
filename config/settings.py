@@ -23,7 +23,12 @@ class Settings(BaseSettings):
     #              $0.22/jam, tanpa blokir IP.
     ASR_PROVIDER: str = "groq"  # groq | elevenlabs
 
+    # Boleh lebih dari satu key dipisah koma, sama seperti Gemini — free tier
+    # Groq dibatasi per key, jadi key yang dirotasi menaikkan atap tanpa biaya.
+    GROQ_API_KEYS: str = ""
+    # Nama lama, dipertahankan supaya .env yang sudah ada tetap jalan.
     GROQ_API_KEY: str = ""
+
     ELEVENLABS_API_KEY: str = ""
     ELEVENLABS_MODEL: str = "scribe_v2"
 
@@ -93,13 +98,21 @@ class Settings(BaseSettings):
     # C:\Users\<nama>\AppData\Local\Temp\<uuid>\... sudah makan separuh jatah.
     WORK_DIR: Path = Path("C:/work")
 
+    @staticmethod
+    def _pecah(mentah: str) -> list[str]:
+        """Entri kosong dan spasi sisa copy-paste dibuang, supaya "key1, key2,"
+        tidak menghasilkan key kosong yang dikirim ke API dan balik 400."""
+        return [k.strip() for k in mentah.split(",") if k.strip()]
+
     @property
     def gemini_keys(self) -> list[str]:
-        """Key Gemini sebagai list. Entri kosong dan spasi sisa copy-paste
-        dibuang, supaya "key1, key2," tidak menghasilkan key kosong yang
-        dikirim ke API dan balik 400.
-        """
-        return [k.strip() for k in self.GEMINI_API_KEYS.split(",") if k.strip()]
+        return self._pecah(self.GEMINI_API_KEYS)
+
+    @property
+    def groq_keys(self) -> list[str]:
+        # GROQ_API_KEY (tunggal) dibaca sebagai cadangan supaya .env lama tetap
+        # jalan tanpa harus disunting.
+        return self._pecah(self.GROQ_API_KEYS) or self._pecah(self.GROQ_API_KEY)
 
 
 settings = Settings()

@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 
 from api import checks
 from api.schemas import JobCreate, JobCreated, JobOut
+import keypool
 from config import env_store
 from config.settings import settings
 from db import jobs, models
@@ -168,6 +169,14 @@ def save_settings(payload: dict):
     return {"changed": changed, **env_store.read_public()}
 
 
+@app.get("/api/keys/{pool}")
+def status_key(pool: str):
+    """Status tiap API key: mana yang berikutnya dipakai, hasil pemakaian terakhir."""
+    if pool not in keypool.POOLS:
+        raise HTTPException(404, f"Pool '{pool}' tidak dikenal")
+    return keypool.status(pool)
+
+
 @app.post("/api/settings/test/{provider}")
 def test_provider(provider: str):
     return {"provider": provider, **checks.run(provider)}
@@ -177,7 +186,7 @@ def test_provider(provider: str):
 def config_status():
     """Ringkasan singkat untuk strip status di halaman Submit."""
     asr_ok = bool(
-        settings.GROQ_API_KEY if settings.ASR_PROVIDER == "groq"
+        settings.groq_keys if settings.ASR_PROVIDER == "groq"
         else settings.ELEVENLABS_API_KEY
     )
     llm_ok = bool(

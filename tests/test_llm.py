@@ -42,32 +42,28 @@ def test_kosong_menghasilkan_list_kosong(keys):
 
 
 # --- rotasi ---
+#
+# Mekanisme rotasinya sendiri diuji di tests/test_keypool.py. Di sini yang
+# diuji adalah sambungannya: client Gemini benar-benar memakai keypool, dan
+# indeks yang diambil dilaporkan balik supaya panel status terisi.
 
-def test_key_berputar_x_plus_1(keys):
-    from llm.client_gemini import _next_key
+def test_client_mengambil_key_lewat_keypool(keys, monkeypatch):
+    import keypool
+    from llm.client_gemini import _Pemakai
 
     keys("a,b,c")
-    urutan = [_next_key() for _ in range(6)]
-    # Penghitungnya global dan bisa mulai dari posisi mana saja, jadi yang
-    # diuji adalah polanya: maju satu tiap panggilan, dan berulang tiap 3.
-    assert urutan[3:] == urutan[:3]
-    assert set(urutan) == {"a", "b", "c"}
-    assert urutan[0] != urutan[1] != urutan[2]
-
-
-def test_satu_key_selalu_mengembalikan_key_itu(keys):
-    from llm.client_gemini import _next_key
-
-    keys("tunggal")
-    assert [_next_key() for _ in range(3)] == ["tunggal"] * 3
+    monkeypatch.setattr(keypool, "ambil", lambda pool: (1, "b"))
+    pemakai = _Pemakai()
+    assert pemakai() == "b"
+    assert pemakai.idx == 1
 
 
 def test_key_kosong_ditolak_dengan_pesan_jelas(keys):
-    from llm.client_gemini import _next_key
+    from llm.client_gemini import _Pemakai
 
     keys("")
-    with pytest.raises(LLMError, match="GEMINI_API_KEYS"):
-        _next_key()
+    with pytest.raises(LLMError, match="Gemini API key"):
+        _Pemakai()()
 
 
 # --- pemilihan provider ---
@@ -83,7 +79,7 @@ def test_nama_provider_tidak_peduli_huruf_besar_kecil(monkeypatch, keys, nama):
     monkeypatch.setattr(settings, "LLM_PROVIDER", nama)
     keys("")
     # Sampai ke client Gemini (gagal karena key kosong), bukan ditolak dispatcher.
-    with pytest.raises(LLMError, match="GEMINI_API_KEYS"):
+    with pytest.raises(LLMError, match="Gemini API key"):
         call_llm("halo")
 
 

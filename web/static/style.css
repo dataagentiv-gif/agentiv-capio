@@ -671,6 +671,73 @@ select:focus {
 
 .mini.on { background: var(--success-bg); color: var(--success-fg); }
 
+/* ---------- Daftar API key ---------- */
+
+.keylist:empty { display: none; }
+
+.keylist {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-inputs);
+}
+
+.keylist-head {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-muted);
+  margin-bottom: 8px;
+}
+
+.keyrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.keyrow code {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--color-body);
+}
+
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--color-ash);
+}
+
+.dot.ok { background: var(--success-fg); }
+.dot.gagal { background: var(--danger-fg); }
+
+/* Titik berdenyut hanya pada key yang akan dipakai berikutnya — itu satu-satunya
+   keadaan yang benar-benar bergerak, jadi tidak ada gerakan yang sia-sia. */
+.keyrow.next .dot { box-shadow: 0 0 0 3px rgba(24, 104, 219, .18); }
+.keyrow.next .dot.diam { background: var(--color-action); }
+
+.tag-next {
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-tinted);
+  color: var(--color-action);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.keymsg {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-muted);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 46%;
+}
+
 .note.warn { background: #fff7e6; color: #974f0c; }
 .note.warn b { display: block; margin-bottom: 2px; }
 .note code, .lede code, .sub code {

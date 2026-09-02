@@ -153,7 +153,7 @@ diperbaiki setelah render.
 
 | Provider | Catatan |
 |---|---|
-| **Gemini** | Ada free tier. Boleh diisi beberapa key dipisah koma — dipakai bergiliran, karena kuota gratisnya dibatasi per key dan panggilan yang kena 429 otomatis lanjut ke key berikutnya. |
+| **Gemini** | Ada free tier. Boleh diisi beberapa key dipisah koma. |
 | **OpenRouter** | Satu key untuk banyak model. |
 
 Pipeline memakai **dua panggilan LLM per video**, jadi kuota gratis Gemini

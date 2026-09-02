@@ -78,8 +78,9 @@ def test_provider_tidak_dikenal_ditolak(monkeypatch):
 @pytest.mark.parametrize("nama", ["groq", "GROQ", " Groq "])
 def test_nama_provider_tidak_peduli_huruf_besar_kecil(monkeypatch, nama):
     monkeypatch.setattr(settings, "ASR_PROVIDER", nama)
+    monkeypatch.setattr(settings, "GROQ_API_KEYS", "")
     monkeypatch.setattr(settings, "GROQ_API_KEY", "")
-    with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
+    with pytest.raises(RuntimeError, match="Groq API key"):
         asr.check_config()
 
 

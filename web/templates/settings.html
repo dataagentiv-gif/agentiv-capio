@@ -65,6 +65,7 @@ function fieldHtml(f) {
       <label for="${id}">${esc(f.label)} ${badgeTerisi}</label>
       ${input}
       ${f.help ? `<p class="sub">${esc(f.help)}</p>` : ''}
+      ${f.pool ? `<div class="keylist" data-pool="${f.pool}"></div>` : ''}
     </div>`;
 }
 
@@ -101,6 +102,7 @@ function render() {
       `<div class="ro-row"><b>${esc(r.key)}</b><code>${esc(r.value)}</code></div>`).join('')));
 
   document.getElementById('panels').innerHTML = panels.join('');
+  document.querySelectorAll('.keylist').forEach(muatKey);
   document.querySelectorAll('[data-save]').forEach(b => b.onclick = () => simpan(b));
   document.querySelectorAll('[data-test]').forEach(b => b.onclick = () => tes(b));
   pilih();
@@ -123,6 +125,31 @@ function pilih() {
   if (!ketemu) {
     const p = document.querySelector('.panel');
     if (p) { p.hidden = false; document.querySelector('[data-tab]').classList.add('on'); }
+  }
+}
+
+// Daftar key per provider: mana yang berikutnya dipakai, dan hasil pemakaian
+// terakhir tiap key. Datanya dari Redis, jadi ikut mencerminkan pemakaian oleh
+// proses worker — bukan cuma apa yang terjadi di proses API ini.
+async function muatKey(el) {
+  const pool = el.dataset.pool;
+  try {
+    const d = await (await fetch(`/api/keys/${pool}`)).json();
+    if (!d.jumlah) { el.innerHTML = ''; return; }
+    el.innerHTML = `
+      <div class="keylist-head">${d.jumlah} key, dipakai bergiliran</div>` +
+      d.keys.map(k => {
+        const kelas = k.ok === true ? 'ok' : k.ok === false ? 'gagal' : 'diam';
+        return `
+        <div class="keyrow ${k.berikutnya ? 'next' : ''}">
+          <span class="dot ${kelas}"></span>
+          <code>#${k.index + 1} ${esc(k.mask)}</code>
+          ${k.berikutnya ? '<span class="tag-next">berikutnya</span>' : ''}
+          <span class="keymsg">${esc(k.pesan || 'belum dipakai')}</span>
+        </div>`;
+      }).join('');
+  } catch (e) {
+    el.innerHTML = '';
   }
 }
 
@@ -160,6 +187,7 @@ async function tes(btn) {
   try {
     const d = await (await fetch(`/api/settings/test/${p}`, { method: 'POST' })).json();
     pesan(sec, d.ok, `${p}: ${d.message}`);
+    sec.querySelectorAll('.keylist').forEach(muatKey);
   } catch (e) {
     pesan(sec, false, String(e));
   } finally { btn.disabled = false; btn.textContent = label; }

@@ -29,7 +29,7 @@ def test_key_di_luar_allowlist_ditolak(env_tmp):
 
 
 def test_key_yang_diizinkan_ditulis(env_tmp):
-    assert env_store.write({"GROQ_API_KEY": "gsk_baru"}) == ["GROQ_API_KEY"]
+    assert env_store.write({"GROQ_API_KEYS": "gsk_baru"}) == ["GROQ_API_KEYS"]
     assert "gsk_baru" in env_tmp.read_text(encoding="utf-8")
 
 
@@ -45,21 +45,21 @@ def test_nilai_ter_mask_diabaikan(env_tmp):
     """Halaman mengirim balik bentuk ter-mask untuk field yang tidak disentuh.
     Tanpa penjaga ini, menyimpan satu field akan menimpa key lain dengan
     titik-titik dan mematikan seluruh provider."""
-    assert env_store.write({"GROQ_API_KEY": "gsk_ab••••••••3io8"}) == []
+    assert env_store.write({"GROQ_API_KEYS": "gsk_ab••••••••3io8"}) == []
     assert env_tmp.read_text(encoding="utf-8").strip() == ""
 
 
 def test_nilai_kosong_diabaikan(env_tmp):
     """Field rahasia sengaja dirender kosong; kosong berarti 'jangan diubah',
     bukan 'hapus key-nya'."""
-    assert env_store.write({"GROQ_API_KEY": "", "GEMINI_MODEL": "   "}) == []
+    assert env_store.write({"GROQ_API_KEYS": "", "GEMINI_MODEL": "   "}) == []
 
 
 # --- pembacaan tidak boleh membocorkan rahasia ---
 
 def test_rahasia_tidak_pernah_dikirim_utuh(monkeypatch):
     rahasia = "gsk_rahasiaSekaliJanganBocor123"
-    monkeypatch.setattr(settings, "GROQ_API_KEY", rahasia)
+    monkeypatch.setattr(settings, "GROQ_API_KEYS", rahasia)
     teks = str(env_store.read_public())
     assert rahasia not in teks
     assert "••••" in teks
@@ -73,10 +73,10 @@ def test_nilai_non_rahasia_tampil_apa_adanya(monkeypatch):
 
 def test_penanda_terisi_ikut_dikirim(monkeypatch):
     """UI perlu tahu key sudah ada atau belum tanpa melihat isinya."""
-    monkeypatch.setattr(settings, "GROQ_API_KEY", "gsk_ada")
+    monkeypatch.setattr(settings, "GROQ_API_KEYS", "gsk_ada")
     monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
     f = {x["key"]: x for g in env_store.read_public()["groups"] for x in g["fields"]}
-    assert f["GROQ_API_KEY"]["filled"] is True
+    assert f["GROQ_API_KEYS"]["filled"] is True
     assert f["ELEVENLABS_API_KEY"]["filled"] is False
 
 
@@ -137,11 +137,11 @@ def test_field_teks_tidak_ikut_dinormalkan(env_tmp):
 # yang paling disarankan.
 
 def test_komentar_dan_urutan_baris_dipertahankan(env_tmp):
-    env_tmp.write_text("# catatan penting\nGROQ_API_KEY=lama\n# ekor\n", encoding="utf-8")
-    env_store.write({"GROQ_API_KEY": "baru"})
+    env_tmp.write_text("# catatan penting\nGROQ_API_KEYS=lama\n# ekor\n", encoding="utf-8")
+    env_store.write({"GROQ_API_KEYS": "baru"})
     isi = env_tmp.read_text(encoding="utf-8")
     assert "# catatan penting" in isi and "# ekor" in isi
-    assert "GROQ_API_KEY=baru" in isi and "lama" not in isi
+    assert "GROQ_API_KEYS=baru" in isi and "lama" not in isi
 
 
 def test_key_baru_ditambahkan_di_akhir(env_tmp):
@@ -176,13 +176,13 @@ def test_hasil_tulisan_masih_terbaca_pydantic(env_tmp, monkeypatch):
     from dotenv import dotenv_values
 
     env_store.write({
-        "GROQ_API_KEY": "gsk_abc123",
+        "GROQ_API_KEYS": "gsk_abc123",
         "WORK_DIR": "C:/ada spasi",
         "SILENCE_MIN_DUR": "0,45",
         "GEMINI_API_KEYS": "k1,k2",
     })
     v = dotenv_values(env_tmp)
-    assert v["GROQ_API_KEY"] == "gsk_abc123"
+    assert v["GROQ_API_KEYS"] == "gsk_abc123"
     assert v["WORK_DIR"] == "C:/ada spasi"
     assert v["SILENCE_MIN_DUR"] == "0.45"
     assert v["GEMINI_API_KEYS"] == "k1,k2"

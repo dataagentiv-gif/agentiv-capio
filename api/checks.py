@@ -9,6 +9,7 @@ bukan transkrip atau upload sungguhan.
 """
 import httpx
 
+import keypool
 from config.settings import settings
 from utils.logging import get
 
@@ -16,19 +17,33 @@ log = get(__name__)
 TIMEOUT = 25.0
 
 
+def _pesan_groq(kode: int, teks: str) -> str:
+    if kode == 200:
+        return "Terhubung"
+    if kode == 403:
+        return "Ditolak (403). Groq memblokir IP datacenter — matikan VPN kalau menyala."
+    if kode == 429:
+        return "Kuota habis (429)"
+    return f"HTTP {kode}: {teks[:100]}"
+
+
 def _groq() -> tuple[bool, str]:
-    if not settings.GROQ_API_KEY:
+    """Tiap key diuji sendiri. Satu key mati di antara beberapa key harus
+    ketahuan, bukan tertutup oleh key lain yang kebetulan jalan."""
+    keys = settings.groq_keys
+    if not keys:
         return False, "Key belum diisi"
-    r = httpx.get(
-        "https://api.groq.com/openai/v1/models",
-        headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
-        timeout=TIMEOUT,
-    )
-    if r.status_code == 200:
-        return True, "Terhubung"
-    if r.status_code == 403:
-        return False, "Ditolak (403). Groq memblokir IP datacenter — matikan VPN kalau menyala."
-    return False, f"HTTP {r.status_code}: {r.text[:120]}"
+    hasil = []
+    for i, k in enumerate(keys):
+        r = httpx.get(
+            "https://api.groq.com/openai/v1/models",
+            headers={"Authorization": f"Bearer {k}"},
+            timeout=TIMEOUT,
+        )
+        pesan = _pesan_groq(r.status_code, r.text)
+        keypool.lapor("groq", i, r.status_code == 200, pesan)
+        hasil.append(f"#{i + 1} {'OK' if r.status_code == 200 else pesan}")
+    return all("OK" in h for h in hasil), f"{len(keys)} key: " + ", ".join(hasil)
 
 
 def _elevenlabs() -> tuple[bool, str]:
@@ -64,7 +79,7 @@ def _gemini() -> tuple[bool, str]:
     # Tiap key diuji sendiri — satu key mati di antara beberapa key tetap harus
     # ketahuan, bukan tertutup oleh key lain yang kebetulan jalan.
     hasil = []
-    for i, k in enumerate(keys, 1):
+    for i, k in enumerate(keys):
         r = httpx.post(
             "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
             headers={"Authorization": f"Bearer {k}"},
@@ -73,9 +88,12 @@ def _gemini() -> tuple[bool, str]:
                   "max_tokens": 1},
             timeout=TIMEOUT,
         )
-        hasil.append(f"#{i} OK" if r.status_code == 200 else f"#{i} HTTP {r.status_code}")
-    ok = all("OK" in h for h in hasil)
-    return ok, f"{len(keys)} key: " + ", ".join(hasil)
+        ok_i = r.status_code == 200
+        pesan = "Terhubung" if ok_i else (
+            "Kuota habis (429)" if r.status_code == 429 else f"HTTP {r.status_code}")
+        keypool.lapor("gemini", i, ok_i, pesan)
+        hasil.append(f"#{i + 1} {'OK' if ok_i else pesan}")
+    return all("OK" in h for h in hasil), f"{len(keys)} key: " + ", ".join(hasil)
 
 
 PROBES = {
