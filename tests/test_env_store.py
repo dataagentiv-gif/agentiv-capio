@@ -186,3 +186,40 @@ def test_hasil_tulisan_masih_terbaca_pydantic(env_tmp, monkeypatch):
     assert v["WORK_DIR"] == "C:/ada spasi"
     assert v["SILENCE_MIN_DUR"] == "0.45"
     assert v["GEMINI_API_KEYS"] == "k1,k2"
+
+
+# --- environment variable vs isi file ---
+#
+# pydantic-settings memberi prioritas pada env var di atas file .env, dan di
+# Docker compose memuat .env ke environment container saat start. Tanpa
+# penanganan khusus, setiap setelan yang sudah terisi saat container menyala
+# tidak akan pernah bisa diubah dari halaman Setting: file berubah, aplikasi
+# tetap memakai nilai lama, dan tidak ada error apa pun yang muncul.
+
+@pytest.fixture
+def env_asli(tmp_path, monkeypatch):
+    """Seperti env_tmp, tapi reload TIDAK dinon-aktifkan — reload itulah yang
+    justru diuji di sini."""
+    p = tmp_path / ".env"
+    p.write_text("", encoding="utf-8")
+    monkeypatch.setattr(env_store, "ENV_PATH", p)
+    return p
+
+
+def test_file_menang_atas_env_var_untuk_key_yang_bisa_ditulis(env_asli, monkeypatch):
+    monkeypatch.setenv("GEMINI_MODEL", "model-lama-dari-env")
+    env_asli.write_text("GEMINI_MODEL=model-baru-dari-file\n", encoding="utf-8")
+
+    env_store.reload()
+    assert settings.GEMINI_MODEL == "model-baru-dari-file"
+
+
+def test_infra_tidak_ikut_ditimpa_dari_file(env_asli, monkeypatch):
+    """compose mengarahkan DATABASE_URL ke nama service; .env berisi localhost.
+    Menimpanya dari file akan memutus koneksi database di dalam container."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://x@postgres:5432/db")
+    env_asli.write_text(
+        "DATABASE_URL=postgresql+psycopg://x@localhost:5432/db\n", encoding="utf-8")
+
+    env_store.reload()
+    assert "postgres:5432" in settings.DATABASE_URL

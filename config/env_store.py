@@ -10,6 +10,7 @@ Tiga aturan yang menentukan bentuk modul ini, semuanya soal keamanan:
    mengubahnya dari UI yang justru bergantung padanya adalah jebakan: salah isi
    sekali, aplikasinya mati dan halaman settings-nya ikut tidak bisa dibuka.
 """
+import os
 from pathlib import Path
 
 from config.settings import ROOT, Settings, settings
@@ -33,8 +34,8 @@ FIELDS = [
        help="groq: murah & cepat, tapi meleset di campuran Indonesia-Inggris dan menolak IP datacenter. "
             "elevenlabs: jauh lebih akurat untuk Bahasa Indonesia, berbayar per pemakaian."),
     _f("GROQ_API_KEYS", "Groq API key", "Transkrip", secret=True, pool="groq",
-       help="console.groq.com/keys — boleh lebih dari satu dipisah koma; "
-            "dipakai bergiliran karena free tier dibatasi per key."),
+       help="console.groq.com/keys — free tier dibatasi per key, jadi beberapa "
+            "key dipakai bergiliran untuk menaikkan atapnya."),
     _f("ELEVENLABS_API_KEY", "ElevenLabs API key", "Transkrip", secret=True,
        help="elevenlabs.io/app/settings/api-keys — dipakai hanya kalau provider di atas elevenlabs."),
     _f("ELEVENLABS_MODEL", "Model ElevenLabs", "Transkrip"),
@@ -43,8 +44,8 @@ FIELDS = [
        options=["openrouter", "gemini"],
        help="Dipakai untuk memilih momen dan menulis judul/caption/hashtag."),
     _f("GEMINI_API_KEYS", "Gemini API key", "LLM", secret=True, pool="gemini",
-       help="aistudio.google.com/apikey — boleh lebih dari satu dipisah koma; "
-            "dipakai bergiliran karena free tier dibatasi per key."),
+       help="aistudio.google.com/apikey — free tier dibatasi per key, jadi "
+            "beberapa key dipakai bergiliran untuk menaikkan atapnya."),
     _f("GEMINI_MODEL", "Model Gemini", "LLM"),
     _f("OPENROUTER_API_KEY", "OpenRouter API key", "LLM", secret=True,
        help="openrouter.ai/keys"),
@@ -134,10 +135,31 @@ def read_public() -> dict:
 def reload() -> None:
     """Baca ulang .env ke objek settings yang sudah beredar.
 
+    Nilai dari file ditimpakan lebih dulu ke os.environ, dan itu WAJIB:
+    pydantic-settings memberi prioritas pada environment variable di atas isi
+    file .env. Di Docker, compose memuat .env ke environment container saat
+    start (`env_file: .env`), jadi tanpa langkah ini setiap setelan yang sudah
+    terisi saat container menyala TIDAK AKAN PERNAH bisa diubah dari halaman
+    Setting — tulisannya masuk ke file, aplikasinya tetap memakai nilai lama,
+    dan tidak ada satu pun pesan error yang muncul.
+
+    Hanya key yang boleh ditulis UI yang ditimpa. DATABASE_URL, REDIS_URL, dan
+    kawan-kawannya sengaja dibiarkan: compose mengarahkannya ke nama service di
+    dalam jaringan container, sementara .env berisi alamat localhost untuk
+    pemakaian tanpa Docker. Menimpanya akan memutus koneksi database.
+
     Semua modul memegang referensi ke instance `settings` yang sama, jadi
     field-nya ditimpa di tempat — mengganti objeknya tidak akan terlihat oleh
     modul yang sudah mengimpornya.
     """
+    from dotenv import dotenv_values
+
+    berkas = dotenv_values(ENV_PATH)
+    for k in WRITABLE:
+        v = berkas.get(k)
+        if v is not None:
+            os.environ[k] = v
+
     fresh = Settings()
     for name in Settings.model_fields:
         setattr(settings, name, getattr(fresh, name))
