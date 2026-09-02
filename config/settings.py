@@ -43,7 +43,14 @@ class Settings(BaseSettings):
     # lewat OpenRouter. Boleh diisi lebih dari satu key dipisah koma: free tier
     # Gemini dibatasi PER KEY, jadi key yang dirotasi menaikkan atap tanpa biaya.
     GEMINI_API_KEYS: str = ""  # "key1,key2,key3"
-    GEMINI_MODEL: str = "gemini-2.5-flash-lite"
+    # Alias "-latest", BUKAN nomor versi. Google memensiunkan model untuk
+    # pengguna baru tanpa menyentuh yang lama: key dari project lama tetap bisa
+    # memanggil gemini-2.5-flash-lite, sementara key yang baru dibuat dapat
+    # HTTP 404 "no longer available to new users" untuk model yang sama persis.
+    # Nomor versi yang di-hardcode artinya default repo ini akan berhenti jalan
+    # untuk setiap orang yang baru mencobanya, dan gejalanya menyesatkan —
+    # kelihatan seperti key yang salah, padahal modelnya yang sudah ditutup.
+    GEMINI_MODEL: str = "gemini-flash-lite-latest"
 
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"
