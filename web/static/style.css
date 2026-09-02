@@ -529,9 +529,56 @@ input.chip-num { width: 96px; cursor: text; text-align: center; }
 
 /* ---------- Setting ---------- */
 
-.group { margin-bottom: 20px; }
+.settings-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 32px;
+  align-items: start;
+}
 
-.group h2, .readonly-card h2 {
+/* Sticky supaya berpindah sub-halaman tidak menuntut scroll ke atas dulu. */
+.settings-nav {
+  position: sticky;
+  top: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-nav a {
+  padding: 8px 14px;
+  border-radius: var(--radius-inputs);
+  font-size: 14px;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.settings-nav a:hover { background: var(--surface-soft); color: var(--color-ink); }
+
+.settings-nav a.on {
+  background: var(--surface-tinted);
+  color: var(--color-action);
+  font-weight: 500;
+}
+
+.settings-body { min-width: 0; }
+
+.nav-note {
+  margin: 20px 14px 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+.panel-intro {
+  margin: -8px 0 22px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-muted);
+  max-width: 62ch;
+}
+
+.panel h2, .readonly-card h2 {
   font-family: var(--font-display);
   font-size: 20px;
   font-weight: 700;
@@ -581,10 +628,8 @@ select:focus {
   font-size: .92em;
 }
 
-.group .out:empty { display: none; }
-.group .out .note { margin-top: 16px; }
-
-.readonly-card { background: var(--surface-soft); border-color: transparent; }
+.panel .out:empty { display: none; }
+.panel .out .note { margin-top: 16px; }
 
 .ro-row {
   display: flex;
@@ -597,6 +642,21 @@ select:focus {
 
 .ro-row b { flex: 0 0 130px; font-weight: 500; color: var(--color-muted); }
 .ro-row code { word-break: break-all; color: var(--color-body); }
+
+@media (max-width: 860px) {
+  /* Sidebar jadi baris gulir mendatar; di layar sempit, kolom 200px memakan
+     lebar yang justru dibutuhkan formulirnya. */
+  .settings-layout { grid-template-columns: 1fr; gap: 16px; }
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--color-fog);
+  }
+  .settings-nav a { white-space: nowrap; }
+  .nav-note { margin: 12px 0 0; }
+}
 
 @media (max-width: 640px) {
   main { padding: 40px 16px 64px; }

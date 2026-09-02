@@ -1,26 +1,40 @@
 {% extends "_layout.html" %}
 {% set page = 'settings' %}
 {% block title %}Setting — Video Clipping Engine{% endblock %}
-{% block main_class %}narrow{% endblock %}
 {% block heading %}Setting{% endblock %}
 {% block lede %}Semua konfigurasi ditulis ke file <code>.env</code> di folder project. Tidak perlu menyunting file secara manual.{% endblock %}
 
 {% block content %}
-<div class="note warn" id="secnote">
-  <b>Key tersimpan di mesin ini, tidak dikirim ke mana pun.</b>
-  Nilai rahasia ditampilkan ter-mask dan tidak pernah dikembalikan utuh ke browser.
-  Server sengaja hanya mendengar di <code>127.0.0.1</code> — jangan buka ke jaringan
-  luar selama halaman ini aktif.
+<div class="settings-layout">
+  <div>
+    <nav class="settings-nav" id="nav"></nav>
+    <p class="nav-note">
+      Key tersimpan di mesin ini dan tidak dikirim ke mana pun. Nilai rahasia
+      ditampilkan ter-mask, tidak pernah dikembalikan utuh ke browser.
+    </p>
+  </div>
+  <div class="settings-body" id="panels">
+    <div class="empty">Memuat…</div>
+  </div>
 </div>
-
-<div id="groups"><div class="empty">Memuat…</div></div>
-
-<div class="card readonly-card" id="ro"></div>
 {% endblock %}
 
 {% block script %}
 <script>
-const TES = { 'Transkrip': ['groq', 'elevenlabs'], 'Seleksi momen': ['openrouter', 'gemini'] };
+const TES = { 'Transkrip': ['groq', 'elevenlabs'], 'LLM': ['openrouter', 'gemini'] };
+
+// Penjelasan singkat di kepala tiap sub-halaman. Tanpa ini, orang yang baru
+// membuka repo ini melihat daftar field tanpa tahu mana yang wajib diisi.
+const INTRO = {
+  'Transkrip': 'Mengubah suara jadi teks. Menentukan kualitas caption yang terbakar di video, jadi ini pilihan yang paling terasa hasilnya.',
+  'LLM': 'Memilih momen mana yang dijadikan klip, lalu menulis judul, caption, dan hashtag. Dipakai dua kali per video.',
+  'Penyimpanan': 'Klip jadi disimpan sebagai file mp4 biasa. Tidak ada storage cloud di project ini.',
+  'Guardrail': 'Batas keras yang tidak boleh dilanggar pipeline. Segmen di luar rentang durasi dibuang sebelum dirender.',
+  'Kalibrasi': 'Angka yang diputar kalau titik potong klip terasa belum pas. Penjelasan lengkapnya ada di README.',
+  'Infra': 'Alamat database dan antrean. Sengaja tidak bisa diubah dari sini.',
+};
+
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 let data = null;
 
 function fieldHtml(f) {
@@ -33,8 +47,8 @@ function fieldHtml(f) {
       f.options.map(o => `<option value="${o}" ${o === f.value ? 'selected' : ''}>${esc(o)}</option>`).join('') +
       `</select>`;
   } else {
-    // Rahasia dibiarkan kosong dengan placeholder ter-mask. Mengisi ulang
-    // nilai ter-mask ke dalam input membuat orang tidak sadar sedang menyimpan
+    // Rahasia dibiarkan kosong dengan placeholder ter-mask. Mengisi ulang nilai
+    // ter-mask ke dalam input membuat orang tidak sadar sedang menyimpan
     // titik-titik itu sebagai key baru.
     const tipe = f.kind === 'number' ? 'number' : 'text';
     const val = f.secret ? '' : esc(f.value);
@@ -49,39 +63,73 @@ function fieldHtml(f) {
     </div>`;
 }
 
-function groupHtml(g) {
-  const tes = (TES[g.name] || []).map(p =>
-    `<button type="button" class="btn ghost sm" data-test="${p}">Tes ${p}</button>`).join('');
+function panelHtml(nama, isi, aksi = '') {
   return `
-    <section class="card group" data-group="${esc(g.name)}">
-      <h2>${esc(g.name)}</h2>
-      ${g.fields.map(fieldHtml).join('')}
-      <div class="actions">
-        <button type="button" class="btn sm" data-save="${esc(g.name)}">Simpan</button>
-        ${tes}
-      </div>
+    <section class="card panel" id="p-${slug(nama)}" data-group="${esc(nama)}" hidden>
+      <h2>${esc(nama)}</h2>
+      ${INTRO[nama] ? `<p class="panel-intro">${esc(INTRO[nama])}</p>` : ''}
+      ${isi}
+      ${aksi}
       <div class="out"></div>
     </section>`;
 }
 
 function render() {
-  document.getElementById('groups').innerHTML = data.groups.map(groupHtml).join('');
-  document.getElementById('ro').innerHTML =
-    `<h2>Infra</h2>
-     <p class="sub">Sengaja tidak bisa diubah dari sini: salah isi sekali, aplikasinya mati
-      dan halaman ini ikut tidak bisa dibuka. Sunting langsung di <code>${esc(data.env_path)}</code>.</p>` +
-    data.readonly.map(r => `<div class="ro-row"><b>${esc(r.key)}</b><code>${esc(r.value)}</code></div>`).join('');
+  const nama = data.groups.map(g => g.name).concat('Infra');
 
+  document.getElementById('nav').innerHTML = nama.map(n =>
+    `<a href="#${slug(n)}" data-tab="${slug(n)}">${esc(n)}</a>`).join('');
+
+  const panels = data.groups.map(g => {
+    const tes = (TES[g.name] || []).map(p =>
+      `<button type="button" class="btn ghost sm" data-test="${p}">Tes ${p}</button>`).join('');
+    return panelHtml(g.name, g.fields.map(fieldHtml).join(''),
+      `<div class="actions">
+         <button type="button" class="btn sm" data-save="1">Simpan</button>${tes}
+       </div>`);
+  });
+
+  panels.push(panelHtml('Infra',
+    `<p class="sub">Salah isi sekali, aplikasinya mati dan halaman ini ikut tidak
+      bisa dibuka. Sunting langsung di <code>${esc(data.env_path)}</code>.</p>` +
+    data.readonly.map(r =>
+      `<div class="ro-row"><b>${esc(r.key)}</b><code>${esc(r.value)}</code></div>`).join('')));
+
+  document.getElementById('panels').innerHTML = panels.join('');
   document.querySelectorAll('[data-save]').forEach(b => b.onclick = () => simpan(b));
   document.querySelectorAll('[data-test]').forEach(b => b.onclick = () => tes(b));
+  pilih();
 }
+
+// Sub-halaman dipilih lewat hash, bukan state di memori: tombol back browser
+// tetap bekerja dan tautannya bisa disimpan.
+function pilih() {
+  const target = location.hash.slice(1) || slug(data.groups[0].name);
+  let ketemu = false;
+  document.querySelectorAll('.panel').forEach(p => {
+    const aktif = p.id === `p-${target}`;
+    p.hidden = !aktif;
+    if (aktif) ketemu = true;
+  });
+  document.querySelectorAll('[data-tab]').forEach(a =>
+    a.classList.toggle('on', a.dataset.tab === target));
+  // Hash yang tidak dikenal (misalnya tautan lama) jangan menghasilkan halaman
+  // kosong — jatuh ke sub-halaman pertama.
+  if (!ketemu) {
+    const p = document.querySelector('.panel');
+    if (p) { p.hidden = false; document.querySelector('[data-tab]').classList.add('on'); }
+  }
+}
+
+window.addEventListener('hashchange', pilih);
 
 function pesan(el, ok, teks) {
   el.querySelector('.out').innerHTML = `<div class="note ${ok ? 'ok' : 'err'}">${esc(teks)}</div>`;
 }
 
 async function simpan(btn) {
-  const sec = btn.closest('.group');
+  const sec = btn.closest('.panel');
+  const grup = sec.dataset.group;
   const values = {};
   sec.querySelectorAll('[data-key]').forEach(i => { if (i.value !== '') values[i.dataset.key] = i.value; });
   btn.disabled = true;
@@ -89,24 +137,21 @@ async function simpan(btn) {
     const r = await fetch('/api/settings', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ values })
     });
-    const d = await r.json();
-    data = d;
-    const n = (d.changed || []).length;
+    data = await r.json();
+    const n = (data.changed || []).length;
     render();
-    const s = document.querySelector(`[data-group="${sec.dataset.group}"]`);
-    pesan(s, true, n ? `${n} nilai disimpan ke .env. Job berikutnya otomatis memakainya.`
-                     : 'Tidak ada perubahan.');
+    pesan(document.querySelector(`[data-group="${grup}"]`), true,
+      n ? `${n} nilai disimpan ke .env. Job berikutnya otomatis memakainya.` : 'Tidak ada perubahan.');
   } catch (e) {
     pesan(sec, false, String(e));
   } finally { btn.disabled = false; }
 }
 
 async function tes(btn) {
-  const sec = btn.closest('.group');
+  const sec = btn.closest('.panel');
   const p = btn.dataset.test;
-  btn.disabled = true;
   const label = btn.textContent;
-  btn.textContent = 'Mengetes…';
+  btn.disabled = true; btn.textContent = 'Mengetes…';
   try {
     const d = await (await fetch(`/api/settings/test/${p}`, { method: 'POST' })).json();
     pesan(sec, d.ok, `${p}: ${d.message}`);
@@ -116,6 +161,6 @@ async function tes(btn) {
 }
 
 fetch('/api/settings').then(r => r.json()).then(d => { data = d; render(); })
-  .catch(e => document.getElementById('groups').innerHTML = empty('Gagal memuat setting', esc(e)));
+  .catch(e => document.getElementById('panels').innerHTML = empty('Gagal memuat setting', esc(e)));
 </script>
 {% endblock %}
