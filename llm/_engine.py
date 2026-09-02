@@ -8,6 +8,7 @@ bertipe json_schema.
 """
 import json
 import re
+import time
 
 import httpx
 
@@ -20,6 +21,22 @@ _FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$")
 
 class LLMError(RuntimeError):
     pass
+
+
+# Jeda sebelum percobaan berikutnya, untuk kegagalan yang sifatnya sementara.
+# Terukur di pemakaian: tanpa jeda, tiga percobaan terhadap Gemini yang sedang
+# 503 habis dalam 4 DETIK dan seluruh job gagal — padahal gangguannya biasanya
+# berlangsung lebih lama dari itu. Menggempur server yang sedang penuh secepat
+# itu bukan cuma sia-sia, tapi memperparah keadaannya.
+JEDA = (3, 8, 20, 30, 30)
+
+
+def _tunggu(sementara: bool, attempt: int, label: str) -> None:
+    if not sementara:
+        return
+    detik = JEDA[min(attempt, len(JEDA) - 1)]
+    log.info("%s: gangguan sementara, tunggu %ds sebelum coba lagi", label, detik)
+    time.sleep(detik)
 
 
 def _extract_json(text: str):
@@ -112,11 +129,13 @@ def call(
             )
             if attempt == attempts - 1:
                 raise LLMError(f"{label} gagal setelah {attempts}x: HTTP {code}") from e
+            _tunggu(code >= 500 or code == 429, attempt, label)
 
         except httpx.HTTPError as e:
             last_err, last_raw = f"koneksi: {e}", ""
             if attempt == attempts - 1:
                 raise LLMError(f"{label} gagal setelah {attempts}x: {e}") from e
+            _tunggu(True, attempt, label)
 
         except (json.JSONDecodeError, KeyError, TypeError) as e:
             last_err = f"{type(e).__name__}: {e}"
@@ -125,3 +144,6 @@ def call(
                 raise LLMError(
                     f"{label}: JSON invalid setelah {attempts}x. Terakhir: {last_err}"
                 ) from e
+            # Tanpa jeda: kegagalan ini soal ISI balasan, bukan kondisi server.
+            # Percobaan ulangnya membawa pesan error sebagai umpan balik, dan
+            # menundanya tidak menambah peluang berhasil sama sekali.

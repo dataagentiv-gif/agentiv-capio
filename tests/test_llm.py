@@ -151,3 +151,56 @@ def test_bukan_json_sama_sekali_melempar_error():
 
     with pytest.raises(json.JSONDecodeError):
         _extract_json("maaf saya tidak bisa membantu")
+
+
+# --- jeda pada gangguan sementara ---
+#
+# Terukur di uji beban: tanpa jeda, tiga percobaan terhadap Gemini yang sedang
+# 503 habis dalam 4 DETIK dan seluruh job gagal — padahal gangguan seperti itu
+# biasanya berlangsung lebih lama.
+
+def test_503_ditunggu_sebelum_dicoba_lagi(monkeypatch, keys):
+    import httpx
+
+    from llm import _engine, client_gemini
+
+    keys("k1,k2")
+    tidur = []
+    monkeypatch.setattr(_engine.time, "sleep", lambda d: tidur.append(d))
+
+    panggilan = []
+
+    class R503:
+        status_code = 503
+        text = "overloaded"
+        def raise_for_status(self):
+            raise httpx.HTTPStatusError("503", request=None, response=self)
+
+    def post(url, headers=None, json=None, timeout=None):
+        panggilan.append(1)
+        return R503()
+
+    monkeypatch.setattr(httpx, "post", post)
+    with pytest.raises(_engine.LLMError):
+        client_gemini.call_llm("halo")
+
+    assert len(panggilan) >= 3, "harus mencoba ulang"
+    assert tidur, "tidak ada jeda sama sekali di antara percobaan"
+    assert tidur == sorted(tidur), "jeda harus makin panjang, bukan tetap"
+
+
+def test_json_rusak_tidak_perlu_ditunggu(monkeypatch, keys):
+    """Kegagalan ini soal ISI balasan, bukan kondisi server — menunda tidak
+    menambah peluang berhasil, cuma memperlambat."""
+    import httpx
+
+    from llm import _engine, client_gemini
+
+    keys("k1")
+    tidur = []
+    monkeypatch.setattr(_engine.time, "sleep", lambda d: tidur.append(d))
+    monkeypatch.setattr(httpx, "post", _fake_post({}, content="bukan json sama sekali"))
+
+    with pytest.raises(_engine.LLMError):
+        client_gemini.call_llm("halo")
+    assert tidur == []
