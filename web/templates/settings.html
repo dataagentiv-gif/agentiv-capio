@@ -14,7 +14,7 @@
     </p>
   </div>
   <div class="settings-body" id="panels">
-    <div class="empty">Memuat…</div>
+    <div class="empty"><span class="spin"></span>Memuat…</div>
   </div>
 </div>
 {% endblock %}
@@ -34,6 +34,11 @@ const INTRO = {
   'Infra': 'Alamat database dan antrean. Sengaja tidak bisa diubah dari sini.',
 };
 
+const IKON = {
+  'Transkrip': 'i-mic', 'LLM': 'i-llm', 'Penyimpanan': 'i-folder',
+  'Guardrail': 'i-shield', 'Kalibrasi': 'i-settings', 'Infra': 'i-server',
+};
+const ikon = n => `<svg class="ic"><use href="#${IKON[n] || 'i-settings'}"/></svg>`;
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 let data = null;
 
@@ -66,7 +71,7 @@ function fieldHtml(f) {
 function panelHtml(nama, isi, aksi = '') {
   return `
     <section class="card panel" id="p-${slug(nama)}" data-group="${esc(nama)}" hidden>
-      <h2>${esc(nama)}</h2>
+      <h2>${ikon(nama)}${esc(nama)}</h2>
       ${INTRO[nama] ? `<p class="panel-intro">${esc(INTRO[nama])}</p>` : ''}
       ${isi}
       ${aksi}
@@ -78,7 +83,7 @@ function render() {
   const nama = data.groups.map(g => g.name).concat('Infra');
 
   document.getElementById('nav').innerHTML = nama.map(n =>
-    `<a href="#${slug(n)}" data-tab="${slug(n)}">${esc(n)}</a>`).join('');
+    `<a href="#${slug(n)}" data-tab="${slug(n)}">${ikon(n)}${esc(n)}</a>`).join('');
 
   const panels = data.groups.map(g => {
     const tes = (TES[g.name] || []).map(p =>

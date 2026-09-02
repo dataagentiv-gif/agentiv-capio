@@ -45,6 +45,15 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Sprite ikon disembunyikan; yang tampil hanya <use> yang merujuknya. */
+.sprite { display: none; }
+
+.ic {
+  width: 16px; height: 16px;
+  flex: none;
+  vertical-align: -2px;
+}
+
 body {
   margin: 0;
   background: var(--surface-canvas);
@@ -94,12 +103,18 @@ a { color: var(--color-action); }
 .nav-links { margin-left: auto; display: flex; gap: 24px; }
 
 .nav-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 14px;
   font-weight: 400;
   color: var(--color-ink);
   text-decoration: none;
   padding: 4px 0;
 }
+
+.nav-links .ic { color: var(--color-ash); transition: color .15s; }
+.nav-links a:hover .ic, .nav-links a.active .ic { color: var(--color-action); }
 
 .nav-links a:hover { color: var(--color-action); }
 
@@ -371,7 +386,10 @@ input:focus {
 /* ---------- Tombol hapus ---------- */
 
 .btn-hapus {
-  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
   font-family: inherit;
   font-size: 12.5px;
   font-weight: 500;
@@ -399,7 +417,8 @@ input:focus {
   justify-content: space-between;
 }
 
-.clip h3 .btn-hapus { font-size: 12px; }
+.clip h3 .btn-hapus { font-size: 12px; font-weight: 500; }
+.btn-hapus .ic { width: 14px; height: 14px; }
 
 /* ---------- Kosong ---------- */
 
@@ -410,6 +429,25 @@ input:focus {
   text-align: center;
   color: var(--color-muted);
 }
+
+.ic-empty {
+  width: 40px; height: 40px;
+  color: var(--color-ash);
+  margin-bottom: 14px;
+}
+
+.empty .spin {
+  display: inline-block;
+  width: 16px; height: 16px;
+  margin-right: 8px;
+  vertical-align: -3px;
+  border: 2px solid var(--color-fog);
+  border-top-color: var(--color-action);
+  border-radius: 50%;
+  animation: putar .7s linear infinite;
+}
+
+@keyframes putar { to { transform: rotate(360deg); } }
 
 .empty strong {
   display: block;
@@ -478,12 +516,17 @@ input.chip-num { width: 96px; cursor: text; text-align: center; }
 .btn.ghost {
   background: transparent;
   color: var(--color-ink);
-  border: 1px solid var(--color-slate-current, #1c2b42);
+  /* Border abu, bukan tinta gelap: tombol sekunder tidak boleh menyaingi
+     tombol utama di sebelahnya. */
+  border: 1px solid var(--color-ash);
   text-decoration: none;
   display: inline-block;
 }
 
-.btn.ghost:hover:not(:disabled) { background: var(--surface-soft); }
+.btn.ghost:hover:not(:disabled) {
+  background: var(--surface-soft);
+  border-color: var(--color-muted);
+}
 .btn.sm { padding: 7px 16px; font-size: 14px; }
 
 /* ---------- Penanda tahap (halaman Proses) ---------- */
@@ -546,6 +589,9 @@ input.chip-num { width: 96px; cursor: text; text-align: center; }
 }
 
 .settings-nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 8px 14px;
   border-radius: var(--radius-inputs);
   font-size: 14px;
@@ -554,6 +600,9 @@ input.chip-num { width: 96px; cursor: text; text-align: center; }
 }
 
 .settings-nav a:hover { background: var(--surface-soft); color: var(--color-ink); }
+.settings-nav .ic { color: var(--color-ash); }
+.settings-nav a:hover .ic { color: var(--color-muted); }
+.settings-nav a.on .ic { color: var(--color-action); }
 
 .settings-nav a.on {
   background: var(--surface-tinted);
@@ -577,6 +626,9 @@ input.chip-num { width: 96px; cursor: text; text-align: center; }
   color: var(--color-muted);
   max-width: 62ch;
 }
+
+.panel h2 { display: flex; align-items: center; gap: 10px; }
+.panel h2 .ic { width: 18px; height: 18px; color: var(--color-action); }
 
 .panel h2, .readonly-card h2 {
   font-family: var(--font-display);

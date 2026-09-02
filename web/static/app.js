@@ -34,7 +34,10 @@ async function getJobs() {
 }
 
 function empty(judul, isi) {
-  return `<div class="empty"><strong>${judul}</strong>${isi}</div>`;
+  return `<div class="empty">
+            <svg class="ic-empty"><use href="#i-inbox"/></svg>
+            <strong>${judul}</strong>${isi}
+          </div>`;
 }
 
 /* Polling melambat saat tidak ada yang berjalan — halaman yang dibiarkan
@@ -63,5 +66,6 @@ async function hapus(url, tanya) {
 }
 
 function tombolHapus(label, aksi) {
-  return `<button type="button" class="btn-hapus" data-aksi="${aksi}" title="${label}">${label}</button>`;
+  return `<button type="button" class="btn-hapus" data-aksi="${aksi}" title="${label}"
+            aria-label="${label}"><svg class="ic"><use href="#i-trash"/></svg>${label}</button>`;
 }
