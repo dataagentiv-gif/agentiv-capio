@@ -100,3 +100,62 @@ def status(pool: str) -> dict:
             for i, k in enumerate(daftar)
         ],
     }
+
+
+# Nama env var penyimpan tiap pool. Dipisahkan dari kode pemakainya supaya
+# menambah provider baru cukup menambah satu baris di sini.
+ENV_FIELD = {"groq": "GROQ_API_KEYS", "gemini": "GEMINI_API_KEYS"}
+
+
+def _simpan(pool: str, daftar: list[str]) -> None:
+    from config import env_store
+
+    # Nilai kosong diabaikan env_store.write ("kosong = jangan diubah"), jadi
+    # menghapus key TERAKHIR ditangani terpisah lewat penulisan langsung.
+    if daftar:
+        env_store.write({ENV_FIELD[pool]: ",".join(daftar)})
+    else:
+        env_store._tulis_env(env_store.ENV_PATH, {ENV_FIELD[pool]: ""})
+        env_store.reload()
+
+
+def tambah(pool: str, mentah: str) -> tuple[int, str]:
+    """Tambah satu key atau lebih. Kembalikan (jumlah ditambah, pesan).
+
+    Koma tetap diterima dan dipecah: menempel beberapa key sekaligus itu wajar,
+    dan menolaknya hanya memaksa orang menambah satu per satu tanpa alasan.
+    """
+    ada = keys(pool)
+    baru, lewat = [], 0
+    for k in str(mentah).replace("\n", ",").split(","):
+        k = k.strip()
+        if not k:
+            continue
+        if k in ada or k in baru:
+            lewat += 1
+            continue
+        baru.append(k)
+
+    if not baru:
+        return 0, "Key itu sudah ada" if lewat else "Tidak ada key yang bisa ditambahkan"
+
+    _simpan(pool, ada + baru)
+    pesan = f"{len(baru)} key ditambahkan"
+    return len(baru), pesan + (f", {lewat} dilewati karena sudah ada" if lewat else "")
+
+
+def hapus(pool: str, index: int) -> tuple[bool, str]:
+    ada = keys(pool)
+    if not 0 <= index < len(ada):
+        return False, "Key tidak ditemukan"
+    sisa = ada[:index] + ada[index + 1:]
+    _simpan(pool, sisa)
+    # Status per key disimpan per INDEKS, jadi setelah daftar bergeser catatan
+    # lama akan menempel pada key yang salah. Lebih baik dikosongkan.
+    try:
+        r = _redis()
+        for i in range(len(ada)):
+            r.delete(f"keypool:{pool}:{i}")
+    except Exception:  # noqa: BLE001
+        pass
+    return True, f"Key #{index + 1} dihapus"

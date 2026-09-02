@@ -673,10 +673,8 @@ select:focus {
 
 /* ---------- Daftar API key ---------- */
 
-.keylist:empty { display: none; }
-
 .keylist {
-  margin-top: 12px;
+  margin-top: 4px;
   padding: 12px 14px;
   background: var(--surface-soft);
   border-radius: var(--radius-inputs);
@@ -735,8 +733,46 @@ select:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 46%;
+  max-width: 40%;
 }
+
+/* Tombol hapus per key: ikon saja, tanpa teks — barisnya sudah padat. */
+.mini-hapus {
+  padding: 4px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.keyrow .mini-hapus { opacity: 0; transition: opacity .15s; }
+.keyrow:hover .mini-hapus, .mini-hapus:focus-visible { opacity: 1; }
+
+.keyadd {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(9, 30, 66, .08);
+}
+
+.keyadd input {
+  flex: 1;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--surface-canvas);
+  border: 1px solid var(--color-ash);
+  border-radius: var(--radius-inputs);
+}
+
+.keyadd input:focus {
+  outline: none;
+  border-color: var(--color-action);
+  box-shadow: 0 0 0 3px rgba(24, 104, 219, .2);
+}
+
+.keyadd .btn { margin-top: 0; flex: none; }
+.keyout:empty { display: none; }
+.keyout .note { margin-top: 10px; margin-bottom: 0; }
 
 .note.warn { background: #fff7e6; color: #974f0c; }
 .note.warn b { display: block; margin-bottom: 2px; }

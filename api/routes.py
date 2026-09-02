@@ -177,6 +177,29 @@ def status_key(pool: str):
     return keypool.status(pool)
 
 
+@app.post("/api/keys/{pool}")
+def tambah_key(pool: str, payload: dict):
+    """Tambah satu key atau lebih ke pool."""
+    if pool not in keypool.POOLS:
+        raise HTTPException(404, f"Pool '{pool}' tidak dikenal")
+    jumlah, pesan = keypool.tambah(pool, payload.get("key", ""))
+    if not jumlah:
+        raise HTTPException(400, pesan)
+    log.info("key %s ditambah: %s", pool, pesan)
+    return {"pesan": pesan, **keypool.status(pool)}
+
+
+@app.delete("/api/keys/{pool}/{index}")
+def hapus_key(pool: str, index: int):
+    if pool not in keypool.POOLS:
+        raise HTTPException(404, f"Pool '{pool}' tidak dikenal")
+    ok, pesan = keypool.hapus(pool, index)
+    if not ok:
+        raise HTTPException(404, pesan)
+    log.info("key %s dihapus: %s", pool, pesan)
+    return {"pesan": pesan, **keypool.status(pool)}
+
+
 @app.post("/api/settings/test/{provider}")
 def test_provider(provider: str):
     return {"provider": provider, **checks.run(provider)}

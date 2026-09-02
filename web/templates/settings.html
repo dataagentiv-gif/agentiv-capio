@@ -51,6 +51,11 @@ function fieldHtml(f) {
     input = `<select id="${id}" data-key="${f.key}">` +
       f.options.map(o => `<option value="${o}" ${o === f.value ? 'selected' : ''}>${esc(o)}</option>`).join('') +
       `</select>`;
+  } else if (f.pool) {
+    // Field ber-pool tidak punya input teks sendiri. Dua cara menyunting hal
+    // yang sama hanya membingungkan, dan mengetik ulang seluruh key cuma untuk
+    // menambah satu adalah persis masalah yang mau dihilangkan.
+    input = `<div class="keylist" data-pool="${f.pool}"></div>`;
   } else {
     // Rahasia dibiarkan kosong dengan placeholder ter-mask. Mengisi ulang nilai
     // ter-mask ke dalam input membuat orang tidak sadar sedang menyimpan
@@ -62,10 +67,9 @@ function fieldHtml(f) {
   }
   return `
     <div class="field">
-      <label for="${id}">${esc(f.label)} ${badgeTerisi}</label>
+      <label for="${id}">${esc(f.label)} ${f.pool ? '' : badgeTerisi}</label>
       ${input}
       ${f.help ? `<p class="sub">${esc(f.help)}</p>` : ''}
-      ${f.pool ? `<div class="keylist" data-pool="${f.pool}"></div>` : ''}
     </div>`;
 }
 
@@ -131,25 +135,76 @@ function pilih() {
 // Daftar key per provider: mana yang berikutnya dipakai, dan hasil pemakaian
 // terakhir tiap key. Datanya dari Redis, jadi ikut mencerminkan pemakaian oleh
 // proses worker — bukan cuma apa yang terjadi di proses API ini.
+function gambarKey(el, d) {
+  const baris = d.keys.map(k => {
+    const kelas = k.ok === true ? 'ok' : k.ok === false ? 'gagal' : 'diam';
+    return `
+      <div class="keyrow ${k.berikutnya ? 'next' : ''}">
+        <span class="dot ${kelas}"></span>
+        <code>#${k.index + 1} ${esc(k.mask)}</code>
+        ${k.berikutnya ? '<span class="tag-next">berikutnya</span>' : ''}
+        <span class="keymsg">${esc(k.pesan || 'belum dipakai')}</span>
+        <button type="button" class="btn-hapus mini-hapus" data-hapus="${k.index}"
+                title="Hapus key ini" aria-label="Hapus key ${k.index + 1}">
+          <svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-trash"/></svg>
+        </button>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="keylist-head">${d.jumlah
+      ? `${d.jumlah} key, dipakai bergiliran`
+      : 'Belum ada key'}</div>
+    ${baris}
+    <div class="keyadd">
+      <input type="password" placeholder="Tempel API key baru" autocomplete="off" spellcheck="false">
+      <button type="button" class="btn sm">Tambah</button>
+    </div>
+    <div class="keyout"></div>`;
+
+  const inp = el.querySelector('.keyadd input');
+  const tbl = el.querySelector('.keyadd button');
+  const kabar = (ok, teks) =>
+    el.querySelector('.keyout').innerHTML = `<div class="note ${ok ? 'ok' : 'err'}">${esc(teks)}</div>`;
+
+  const kirim = async () => {
+    const nilai = inp.value.trim();
+    if (!nilai) return;
+    tbl.disabled = true;
+    try {
+      const r = await fetch(`/api/keys/${el.dataset.pool}`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ key: nilai }),
+      });
+      const d = await r.json();
+      if (!r.ok) { kabar(false, d.detail || 'Gagal menambah key'); return; }
+      inp.value = '';
+      gambarKey(el, d);
+      kabar(true, d.pesan);
+    } catch (e) {
+      kabar(false, String(e));
+    } finally { tbl.disabled = false; }
+  };
+
+  tbl.onclick = kirim;
+  // Enter di dalam form pengaturan akan men-submit form induknya kalau tidak
+  // dicegah; di sini Enter berarti "tambah key".
+  inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); kirim(); } };
+
+  el.querySelectorAll('[data-hapus]').forEach(b => b.onclick = async () => {
+    if (!confirm('Hapus key ini? Key yang tersisa tetap dipakai bergiliran.')) return;
+    const r = await fetch(`/api/keys/${el.dataset.pool}/${b.dataset.hapus}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (r.ok) { gambarKey(el, d); kabar(true, d.pesan); }
+    else kabar(false, d.detail || 'Gagal menghapus');
+  });
+}
+
 async function muatKey(el) {
-  const pool = el.dataset.pool;
   try {
-    const d = await (await fetch(`/api/keys/${pool}`)).json();
-    if (!d.jumlah) { el.innerHTML = ''; return; }
-    el.innerHTML = `
-      <div class="keylist-head">${d.jumlah} key, dipakai bergiliran</div>` +
-      d.keys.map(k => {
-        const kelas = k.ok === true ? 'ok' : k.ok === false ? 'gagal' : 'diam';
-        return `
-        <div class="keyrow ${k.berikutnya ? 'next' : ''}">
-          <span class="dot ${kelas}"></span>
-          <code>#${k.index + 1} ${esc(k.mask)}</code>
-          ${k.berikutnya ? '<span class="tag-next">berikutnya</span>' : ''}
-          <span class="keymsg">${esc(k.pesan || 'belum dipakai')}</span>
-        </div>`;
-      }).join('');
+    gambarKey(el, await (await fetch(`/api/keys/${el.dataset.pool}`)).json());
   } catch (e) {
-    el.innerHTML = '';
+    el.innerHTML = `<div class="note err">Gagal memuat daftar key: ${esc(e)}</div>`;
   }
 }
 
