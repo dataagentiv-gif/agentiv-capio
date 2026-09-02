@@ -38,6 +38,39 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(autouse=True)
+def jangan_antre(monkeypatch):
+    """Cegah test mengantre job ke worker SUNGGUHAN.
+
+    Test di sini mem-POST /jobs ke Redis yang sama dengan yang dipakai worker
+    produksi, jadi tanpa ini setiap kali `pytest` dijalankan worker benar-benar
+    mengunduh video, memanggil Groq, dan merender klip — membuang kuota, disk,
+    dan waktu, sekaligus menaruh job sampah di halaman Proses.
+
+    Yang diuji route ini memang cuma "row tertulis lalu enqueue dipanggil",
+    bukan pipeline-nya. Jadi enqueue cukup dijadikan no-op.
+    """
+    from api import routes
+
+    monkeypatch.setattr(routes, "enqueue", lambda job_id: None)
+
+
+@pytest.fixture(autouse=True)
+def bersihkan_job():
+    """Hapus row yang dibuat test, supaya riwayat asli tidak tercemar."""
+    from sqlalchemy import select
+
+    from db.models import Job, session_scope
+
+    with session_scope() as s:
+        sebelum = {str(x) for x in s.scalars(select(Job.id)).all()}
+    yield
+    with session_scope() as s:
+        for j in s.scalars(select(Job)).all():
+            if str(j.id) not in sebelum:
+                s.delete(j)
+
+
 @pytest.fixture(scope="module")
 def client():
     from fastapi.testclient import TestClient
