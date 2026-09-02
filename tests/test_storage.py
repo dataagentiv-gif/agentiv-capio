@@ -1,4 +1,4 @@
-"""Penyimpanan klip lokal.
+"""Penyimpanan klip.
 
 Penanganan Range diuji ketat karena kalau salah, gejalanya bukan error:
 videonya tetap terbuka, cuma tidak bisa digeser posisinya — dan itu baru
@@ -8,12 +8,11 @@ import pytest
 
 import storage
 from config.settings import settings
-from storage import client_local
+
 
 
 @pytest.fixture
 def lokal(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "STORAGE_PROVIDER", "local")
     monkeypatch.setattr(settings, "CLIPS_DIR", tmp_path / "clips")
     return tmp_path
 
@@ -97,21 +96,6 @@ def test_klip_tidak_ada_melempar(lokal):
         storage.open_clip("job-x", "c9")
 
 
-# --- pemilihan provider ---
-
-def test_provider_tidak_dikenal_ditolak(monkeypatch):
-    monkeypatch.setattr(settings, "STORAGE_PROVIDER", "s3")
-    with pytest.raises(RuntimeError, match="tidak dikenal"):
-        storage.check_config()
-
-
-def test_default_adalah_lokal():
-    """Supaya project ini bisa dicoba tanpa akun Cloudflare sama sekali."""
-    from config.settings import Settings
-
-    assert Settings.model_fields["STORAGE_PROVIDER"].default == "local"
-
-
 def test_hapus_job_membuang_seluruh_foldernya(klip, lokal):
-    client_local.delete_job("job-1")
+    storage.delete_job("job-1")
     assert not (lokal / "clips" / "job-1").exists()

@@ -47,21 +47,9 @@ FIELDS = [
        help="openrouter.ai/keys"),
     _f("OPENROUTER_MODEL", "Model OpenRouter", "Seleksi momen"),
 
-    _f("STORAGE_PROVIDER", "Penyimpanan klip", "Storage", kind="select",
-       options=["local", "r2"],
-       help="local: klip jadi file mp4 biasa di folder clips/ — bisa dibuka, dihapus, "
-            "dan disalin langsung tanpa akun apa pun. r2: diunggah ke Cloudflare R2."),
-    _f("CLIPS_DIR", "Folder klip", "Storage",
-       help="Hanya dipakai kalau penyimpanan di atas local."),
-    _f("R2_ACCOUNT_ID", "Account ID", "Storage", secret=True,
-       help="Ada di URL dashboard Cloudflare."),
-    _f("R2_ACCESS_KEY_ID", "Access Key ID", "Storage", secret=True,
-       help="R2 > API > Manage API Tokens > Object Read & Write."),
-    _f("R2_SECRET_ACCESS_KEY", "Secret Access Key", "Storage", secret=True,
-       help="Hanya ditampilkan sekali oleh Cloudflare saat token dibuat."),
-    _f("R2_BUCKET", "Nama bucket", "Storage"),
-    _f("R2_PUBLIC_BASE_URL", "URL publik bucket", "Storage",
-       help="Custom domain atau r2.dev, tanpa slash di akhir."),
+    _f("CLIPS_DIR", "Folder klip", "Penyimpanan",
+       help="Klip jadi disimpan di sini sebagai file mp4 biasa — bisa dibuka, "
+            "dihapus, dan disalin lewat file manager. Tidak ada storage cloud."),
 
     _f("TARGET_CLIPS_DEFAULT", "Jumlah klip default", "Guardrail", kind="number"),
     _f("MIN_CLIP_SEC", "Durasi klip minimum (detik)", "Guardrail", kind="number"),

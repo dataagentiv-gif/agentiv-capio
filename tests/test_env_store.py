@@ -52,7 +52,7 @@ def test_nilai_ter_mask_diabaikan(env_tmp):
 def test_nilai_kosong_diabaikan(env_tmp):
     """Field rahasia sengaja dirender kosong; kosong berarti 'jangan diubah',
     bukan 'hapus key-nya'."""
-    assert env_store.write({"GROQ_API_KEY": "", "R2_BUCKET": "   "}) == []
+    assert env_store.write({"GROQ_API_KEY": "", "GEMINI_MODEL": "   "}) == []
 
 
 # --- pembacaan tidak boleh membocorkan rahasia ---
@@ -66,9 +66,9 @@ def test_rahasia_tidak_pernah_dikirim_utuh(monkeypatch):
 
 
 def test_nilai_non_rahasia_tampil_apa_adanya(monkeypatch):
-    monkeypatch.setattr(settings, "R2_BUCKET", "bucket-saya")
+    monkeypatch.setattr(settings, "GEMINI_MODEL", "gemini-x")
     f = [x for g in env_store.read_public()["groups"] for x in g["fields"]]
-    assert next(x for x in f if x["key"] == "R2_BUCKET")["value"] == "bucket-saya"
+    assert next(x for x in f if x["key"] == "GEMINI_MODEL")["value"] == "gemini-x"
 
 
 def test_penanda_terisi_ikut_dikirim(monkeypatch):

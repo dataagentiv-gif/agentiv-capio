@@ -98,8 +98,8 @@ E2E_URL = os.getenv("TEST_YOUTUBE_URL", "")
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not (E2E_URL and settings.GROQ_API_KEY and settings.OPENROUTER_API_KEY),
-    reason="butuh TEST_YOUTUBE_URL + GROQ_API_KEY + OPENROUTER_API_KEY",
+    not (E2E_URL and settings.GROQ_API_KEY),
+    reason="butuh TEST_YOUTUBE_URL + GROQ_API_KEY",
 )
 def test_end_to_end_sampai_done(client):
     """Jalankan `python main.py worker` di terminal lain sebelum test ini."""
@@ -119,16 +119,13 @@ def test_end_to_end_sampai_done(client):
     for c in job["clips"]:
         # Kriteria "berhasil" nomor 2 di PRD Bagian 10: score dan reason wajib
         # sampai ke hasil akhir, supaya seleksi LLM bisa dinilai manusia.
-        assert c["url"].startswith("http")
+        assert c["url"].startswith("/clips/")
         assert 0 <= c["score"] <= 100
         assert c["reason"].strip()
         assert settings.MIN_CLIP_SEC <= c["duration"] <= settings.MAX_CLIP_SEC
 
 
-# --- pemutar klip lokal ---
-#
-# Route ini ada karena banyak ISP Indonesia memblokir r2.dev di level DNS,
-# sementara menyalakan VPN membuat Groq menolak request dengan 403.
+# --- pemutar klip ---
 
 @pytest.mark.parametrize(
     "job_id,clip_id",
@@ -141,7 +138,7 @@ def test_end_to_end_sampai_done(client):
     ],
 )
 def test_id_tidak_valid_ditolak_404(client, job_id, clip_id):
-    """job_id dan clip_id masuk ke key objek R2 — bentuknya wajib dikunci."""
+    """Keduanya menyusun path file di disk — bentuknya wajib dikunci."""
     r = client.get(f"/clips/{job_id}/{clip_id}", follow_redirects=False)
     assert r.status_code in (404, 307), r.status_code
 
@@ -170,7 +167,7 @@ def test_api_settings_tidak_membocorkan_rahasia(client):
     r = client.get("/api/settings")
     assert r.status_code == 200
     isi = r.text
-    for key in ("GROQ_API_KEY", "OPENROUTER_API_KEY", "R2_SECRET_ACCESS_KEY"):
+    for key in ("GROQ_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEYS"):
         nilai = getattr(settings, key, "")
         if nilai:
             assert nilai not in isi, f"{key} terkirim utuh ke browser"

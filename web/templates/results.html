@@ -27,11 +27,6 @@ function clipHtml(c, jobId) {
           <b>Durasi</b>${c.duration}s
           <span class="sep">·</span><a href="${local}" target="_blank" rel="noopener">putar</a>
           <span class="sep">·</span><a href="${local}" download="${esc(c.id)}.mp4">unduh</a>
-          ${/^https?:/.test(c.url)
-            // Tautan langsung ke storage cloud hanya relevan kalau memang ada.
-            // Pada mode lokal, c.url berupa path relatif dan menampilkannya
-            // sebagai tautan "R2" cuma menyesatkan.
-            ? `<span class="sep">·</span><a href="${esc(c.url)}" target="_blank" rel="noopener">R2</a>` : ''}
         </div>
         <div class="tags">${tags}</div>
       </div>

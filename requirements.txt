@@ -17,11 +17,6 @@ redis>=5.0
 # rq.Worker default pakai os.fork() yang tidak eksis di Windows.
 rq>=2.0
 
-# --- Storage ---
-# R2 itu S3-compatible, jadi boto3 apa adanya sudah cukup; tidak ada SDK khusus
-# Cloudflare yang perlu ditambah.
-boto3>=1.35
-
 # --- Pipeline ---
 yt-dlp>=2024.8
 groq>=0.11

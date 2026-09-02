@@ -21,7 +21,6 @@ from config.settings import settings
 from db import jobs, models
 from jobqueue.client import enqueue
 import storage
-from storage.client_r2 import REQUIRED as r2_required
 from utils.logging import get
 
 log = get(__name__)
@@ -139,8 +138,6 @@ def test_provider(provider: str):
 @app.get("/api/status")
 def config_status():
     """Ringkasan singkat untuk strip status di halaman Submit."""
-    lokal = settings.STORAGE_PROVIDER == "local"
-    r2_kurang = [] if lokal else [k for k in r2_required if not getattr(settings, k, "")]
     asr_ok = bool(
         settings.GROQ_API_KEY if settings.ASR_PROVIDER == "groq"
         else settings.ELEVENLABS_API_KEY
@@ -152,8 +149,11 @@ def config_status():
     return {
         "asr": {"provider": settings.ASR_PROVIDER, "ok": asr_ok},
         "llm": {"provider": settings.LLM_PROVIDER, "ok": llm_ok},
-        "storage": {"provider": settings.STORAGE_PROVIDER, "ok": not r2_kurang},
-        "ready": asr_ok and llm_ok and not r2_kurang,
+        # Penyimpanan lokal tidak pernah "belum dikonfigurasi" — foldernya
+        # dibuat sendiri. Tetap dilaporkan supaya strip status di halaman
+        # Submit menampilkan ketiga bagian pipeline secara utuh.
+        "storage": {"provider": "local", "ok": True},
+        "ready": asr_ok and llm_ok,
         "default_clips": settings.TARGET_CLIPS_DEFAULT,
         "min_sec": settings.MIN_CLIP_SEC,
         "max_sec": settings.MAX_CLIP_SEC,
@@ -162,15 +162,13 @@ def config_status():
 
 @app.get("/clips/{job_id}/{clip_id}")
 def play_clip(job_id: str, clip_id: str, range: str | None = Header(default=None)):
-    """Putar klip lewat server ini, bukan lewat URL publik r2.dev.
+    """Putar klip.
 
-    Banyak ISP Indonesia memblokir r2.dev di level DNS, jadi link R2 langsung
-    tidak kebuka tanpa VPN — sementara menyalakan VPN membuat Groq menolak
-    request dengan 403. Route ini memutus lingkaran itu: file diambil dari R2
-    lewat endpoint S3 yang tidak diblokir, lalu disalurkan dari localhost.
+    Melayani file dari CLIPS_DIR dengan dukungan header Range, sehingga video
+    bisa digeser posisinya, bukan cuma diputar dari awal.
     """
-    # Batas kepercayaan: dua nilai ini masuk ke key objek R2, jadi bentuknya
-    # dikunci ketat supaya tidak bisa dipakai menjangkau objek lain.
+    # Batas kepercayaan: dua nilai ini menyusun path file di disk, jadi
+    # bentuknya dikunci ketat supaya tidak bisa dipakai keluar dari CLIPS_DIR.
     if not _UUID.match(job_id) or not _CLIP.match(clip_id):
         raise HTTPException(404, "Klip tidak ditemukan")
 

@@ -9,7 +9,7 @@ __pycache__/
 .pytest_cache/
 
 # Working directory per job. Isinya source.mp4 mentah (bisa ratusan MB) plus
-# artefak antar-stage; semuanya sekali pakai dan dihapus setelah upload ke R2.
+# artefak antar-stage; semuanya sekali pakai dan dihapus setelah job sukses.
 work/
 *.mp4
 *.ogg

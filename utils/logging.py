@@ -17,7 +17,7 @@ def setup(level: int = logging.INFO) -> None:
         # akan meledak UnicodeEncodeError tanpa ini.
         stream=sys.stdout,
     )
-    for noisy in ("httpx", "botocore", "boto3", "urllib3", "s3transfer"):
+    for noisy in ("httpx", "urllib3"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 

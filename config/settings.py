@@ -71,18 +71,9 @@ class Settings(BaseSettings):
             return False
         return self.API_HOST not in ("127.0.0.1", "localhost", "::1")
 
-    # local = klip disimpan sebagai file mp4 biasa di CLIPS_DIR. Jadi default
-    # supaya project ini bisa dicoba tanpa akun Cloudflare sama sekali.
-    STORAGE_PROVIDER: str = "local"  # local | r2
+    # Klip disimpan sebagai file mp4 biasa di sini. Tidak ada storage cloud di
+    # project ini sama sekali.
     CLIPS_DIR: Path = ROOT / "clips"
-
-    R2_ACCOUNT_ID: str = ""
-    R2_ACCESS_KEY_ID: str = ""
-    R2_SECRET_ACCESS_KEY: str = ""
-    R2_BUCKET: str = ""
-    # Domain publik bucket (custom domain atau r2.dev). Dipakai menyusun url klip
-    # yang disimpan ke Postgres dan ditampilkan di history.html.
-    R2_PUBLIC_BASE_URL: str = ""
 
     # --- Guardrail (PRD Bagian 6) ---
     JOB_TIMEOUT_SEC: int = 1800  # 30 menit untuk video referensi 1 jam
@@ -109,10 +100,6 @@ class Settings(BaseSettings):
         dikirim ke API dan balik 400.
         """
         return [k.strip() for k in self.GEMINI_API_KEYS.split(",") if k.strip()]
-
-    @property
-    def r2_endpoint(self) -> str:
-        return f"https://{self.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
 
 settings = Settings()

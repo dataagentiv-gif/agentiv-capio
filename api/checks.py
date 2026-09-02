@@ -78,23 +78,11 @@ def _gemini() -> tuple[bool, str]:
     return ok, f"{len(keys)} key: " + ", ".join(hasil)
 
 
-def _r2() -> tuple[bool, str]:
-    from storage.client_r2 import REQUIRED, _client
-
-    kosong = [k for k in REQUIRED if not getattr(settings, k, "")]
-    if kosong:
-        return False, "Belum lengkap: " + ", ".join(kosong)
-    _client.cache_clear()  # pakai kredensial terbaru, bukan yang ter-cache
-    _client().head_bucket(Bucket=settings.R2_BUCKET)
-    return True, f"Bucket '{settings.R2_BUCKET}' terbaca"
-
-
 PROBES = {
     "groq": _groq,
     "elevenlabs": _elevenlabs,
     "openrouter": _openrouter,
     "gemini": _gemini,
-    "r2": _r2,
 }
 
 

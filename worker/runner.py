@@ -15,10 +15,10 @@ log = get(__name__)
 
 def main() -> None:
     setup()
-    # Diperiksa SEBELUM worker menerima job. Upload adalah langkah terakhir
-    # pipeline, jadi tanpa ini satu env var R2 yang kosong baru ketahuan setelah
-    # download, transkrip, dan render selesai — belasan menit terbuang untuk job
-    # yang sejak awal pasti gagal.
+    # Diperiksa SEBELUM worker menerima job: folder klip dibuat sekarang, dan
+    # key transkrip yang bolong ketahuan di detik pertama — bukan setelah
+    # download dan render selesai, yang berarti belasan menit terbuang untuk
+    # job yang sejak awal pasti gagal.
     storage.check_config()
     asr.check_config()
 
