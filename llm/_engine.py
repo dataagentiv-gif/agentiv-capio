@@ -39,6 +39,37 @@ def _tunggu(sementara: bool, attempt: int, label: str) -> None:
     time.sleep(detik)
 
 
+def _kuota_habis(code: int, badan: str) -> bool:
+    """Bedakan kuota yang benar-benar habis dari rate limit sesaat.
+
+    Dua-duanya HTTP 429, tapi artinya berlawanan. Rate limit per menit pulih
+    sendiri dalam hitungan detik — itu justru alasan JEDA ada. Kuota harian
+    baru pulih besok, dan seluruh key sudah dicoba di percobaan sebelumnya,
+    jadi menunggu untuk itu cuma menahan job satu menit sebelum gagal sama saja.
+    """
+    return code == 429 and "exceeded your current quota" in badan.lower()
+
+
+def _pesan(code: int, badan: str) -> str:
+    """Terjemahkan HTTP error jadi kalimat yang menyebut tindakan yang benar.
+
+    "HTTP 429" saja tidak memberitahu apa pun yang bisa ditindaklanjuti: orang
+    tidak tahu apakah harus menunggu semenit, menambah key, atau membayar.
+    """
+    if _kuota_habis(code, badan):
+        return (
+            "kuota API habis. Free tier dibatasi per hari per key — tunggu "
+            "resetnya, tambah key di halaman Setting, atau naikkan plan."
+        )
+    if code == 429:
+        return "kena rate limit dan belum pulih setelah beberapa kali dicoba."
+    if code in (401, 403):
+        return "API key ditolak. Periksa kembali key di halaman Setting."
+    if code >= 500:
+        return f"server provider bermasalah (HTTP {code}). Coba lagi nanti."
+    return f"HTTP {code}"
+
+
 def _extract_json(text: str):
     """Model kadang membungkus JSON dalam code fence walau diminta raw."""
     cleaned = _FENCE.sub("", text.strip())
@@ -122,14 +153,24 @@ def call(
 
         except httpx.HTTPStatusError as e:
             code = e.response.status_code
+            badan = e.response.text
             last_err, last_raw = f"HTTP {code}", ""
             log.warning(
                 "%s percobaan %d/%d gagal: HTTP %d %s",
-                label, attempt + 1, attempts, code, e.response.text[:200],
+                label, attempt + 1, attempts, code, badan[:200],
             )
             if attempt == attempts - 1:
-                raise LLMError(f"{label} gagal setelah {attempts}x: HTTP {code}") from e
-            _tunggu(code >= 500 or code == 429, attempt, label)
+                raise LLMError(
+                    f"{label} gagal setelah {attempts}x: {_pesan(code, badan)}"
+                ) from e
+            # Kuota harian yang habis tidak pulih dalam hitungan detik, dan
+            # semua key sudah dicoba di percobaan sebelumnya. Menunggu di sini
+            # cuma menahan job selama satu menit sebelum gagal dengan cara yang
+            # persis sama.
+            _tunggu(
+                (code >= 500 or code == 429) and not _kuota_habis(code, badan),
+                attempt, label,
+            )
 
         except httpx.HTTPError as e:
             last_err, last_raw = f"koneksi: {e}", ""

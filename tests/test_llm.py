@@ -189,6 +189,70 @@ def test_503_ditunggu_sebelum_dicoba_lagi(monkeypatch, keys):
     assert tidur == sorted(tidur), "jeda harus makin panjang, bukan tetap"
 
 
+# --- kuota habis vs rate limit sesaat ---
+#
+# Dua-duanya HTTP 429, tapi tindakannya berlawanan. Terjadi sungguhan di uji
+# beban: dua key free tier kehabisan kuota harian dan job pulang membawa pesan
+# "HTTP 429" — yang tidak memberitahu apakah harus menunggu semenit, menambah
+# key, atau membayar.
+
+KUOTA = ('{"error":{"code":429,"message":"You exceeded your current quota, '
+         'please check your plan and billing details."}}')
+
+
+def _r429(badan):
+    import httpx
+
+    class R:
+        status_code = 429
+        text = badan
+        def raise_for_status(self):
+            raise httpx.HTTPStatusError("429", request=None, response=self)
+    return R
+
+
+def _jalankan_429(monkeypatch, badan):
+    import httpx
+
+    from llm import _engine, client_gemini
+
+    tidur = []
+    monkeypatch.setattr(_engine.time, "sleep", lambda d: tidur.append(d))
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: _r429(badan)())
+    with pytest.raises(_engine.LLMError) as exc:
+        client_gemini.call_llm("halo")
+    return str(exc.value), tidur
+
+
+def test_kuota_habis_menyebut_tindakan_yang_benar(monkeypatch, keys):
+    keys("k1,k2")
+    pesan, _ = _jalankan_429(monkeypatch, KUOTA)
+    assert "kuota" in pesan.lower()
+    assert "tambah key" in pesan.lower()
+
+
+def test_kuota_habis_tidak_ditunggu(monkeypatch, keys):
+    """Kuota harian tidak pulih dalam hitungan detik, dan semua key sudah
+    dicoba — menunggu cuma menahan job semenit sebelum gagal dengan cara sama."""
+    keys("k1,k2")
+    _, tidur = _jalankan_429(monkeypatch, KUOTA)
+    assert tidur == []
+
+
+def test_rate_limit_sesaat_tetap_ditunggu(monkeypatch, keys):
+    """429 biasa justru penyebab utama JEDA ada — jangan ikut dimatikan."""
+    keys("k1,k2")
+    pesan, tidur = _jalankan_429(monkeypatch, '{"error":{"message":"rate limit"}}')
+    assert tidur, "429 sesaat harus tetap dijeda"
+    assert "kuota" not in pesan.lower()
+
+
+def test_key_ditolak_disebut_apa_adanya():
+    from llm._engine import _pesan
+
+    assert "key ditolak" in _pesan(401, "invalid api key").lower()
+
+
 def test_json_rusak_tidak_perlu_ditunggu(monkeypatch, keys):
     """Kegagalan ini soal ISI balasan, bukan kondisi server — menunda tidak
     menambah peluang berhasil, cuma memperlambat."""
