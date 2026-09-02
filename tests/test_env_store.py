@@ -97,3 +97,92 @@ def test_infra_tidak_bisa_ditulis_dari_ui(env_tmp, key):
     """Salah isi sekali, aplikasinya mati DAN halaman setting-nya ikut mati."""
     assert key not in env_store.WRITABLE
     assert env_store.write({key: "rusak"}) == []
+
+
+# --- angka desimal ---
+#
+# Locale Indonesia menampilkan 0.25 sebagai "0,25" di input number. Koma yang
+# lolos ke .env membuat pydantic gagal mem-parse float, dan yang rusak bukan
+# cuma field itu — SELURUH konfigurasi gagal dimuat dan aplikasinya tidak start.
+
+def test_koma_desimal_dinormalkan(env_tmp):
+    assert env_store.write({"SILENCE_MIN_DUR": "0,25"}) == ["SILENCE_MIN_DUR"]
+    assert "0.25" in env_tmp.read_text(encoding="utf-8")
+
+
+def test_koma_desimal_pada_nilai_negatif(env_tmp):
+    env_store.write({"SNAP_MAX_DRIFT": "1,2"})
+    assert "1.2" in env_tmp.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("sampah", ["abc", "1.2.3", "--5", "1 2"])
+def test_angka_ngawur_dilewati_bukan_ditulis(env_tmp, sampah):
+    """Menulisnya mentah akan membuat aplikasi gagal start di jalankan berikutnya."""
+    assert env_store.write({"MIN_CLIP_SEC": sampah}) == []
+    assert env_tmp.read_text(encoding="utf-8").strip() == ""
+
+
+def test_field_teks_tidak_ikut_dinormalkan(env_tmp):
+    """Koma di GEMINI_API_KEYS memisahkan beberapa key — jangan diubah."""
+    env_store.write({"GEMINI_API_KEYS": "key1,key2"})
+    assert "key1,key2" in env_tmp.read_text(encoding="utf-8")
+
+
+# --- penulisan .env di tempat ---
+#
+# python-dotenv.set_key menulis ke file sementara lalu os.replace, dan itu
+# GAGAL di Docker: .env di-bind-mount sebagai satu file, jadi menggantinya
+# berarti mengganti inode — kernel menolak dengan "Device or resource busy".
+# Halaman Setting jadi tidak bisa menyimpan apa pun justru pada cara pemasangan
+# yang paling disarankan.
+
+def test_komentar_dan_urutan_baris_dipertahankan(env_tmp):
+    env_tmp.write_text("# catatan penting\nGROQ_API_KEY=lama\n# ekor\n", encoding="utf-8")
+    env_store.write({"GROQ_API_KEY": "baru"})
+    isi = env_tmp.read_text(encoding="utf-8")
+    assert "# catatan penting" in isi and "# ekor" in isi
+    assert "GROQ_API_KEY=baru" in isi and "lama" not in isi
+
+
+def test_key_baru_ditambahkan_di_akhir(env_tmp):
+    env_tmp.write_text("GROQ_API_KEY=a\n", encoding="utf-8")
+    env_store.write({"GEMINI_MODEL": "gemini-x"})
+    assert "GEMINI_MODEL=gemini-x" in env_tmp.read_text(encoding="utf-8")
+
+
+def test_key_yang_dikomentari_tidak_ditimpa(env_tmp):
+    """`# MIN_CLIP_SEC=30` adalah dokumentasi, bukan nilai aktif."""
+    env_tmp.write_text("# MIN_CLIP_SEC=30\n", encoding="utf-8")
+    env_store.write({"MIN_CLIP_SEC": "45"})
+    isi = env_tmp.read_text(encoding="utf-8")
+    assert "# MIN_CLIP_SEC=30" in isi
+    assert "\nMIN_CLIP_SEC=45" in isi
+
+
+def test_nilai_berspasi_dikutip(env_tmp):
+    env_store.write({"WORK_DIR": "C:/folder ada spasi"})
+    assert 'WORK_DIR="C:/folder ada spasi"' in env_tmp.read_text(encoding="utf-8")
+
+
+def test_baris_baru_ditolak(env_tmp):
+    """Jalan pintas menulis variabel apa pun tanpa lewat allowlist."""
+    assert env_store.write({"GEMINI_MODEL": "x\nADMIN=1"}) == []
+    assert "ADMIN" not in env_tmp.read_text(encoding="utf-8")
+
+
+def test_hasil_tulisan_masih_terbaca_pydantic(env_tmp, monkeypatch):
+    """Penjaga sesungguhnya: apa pun yang ditulis harus tetap bisa dimuat.
+    Satu nilai yang tidak terbaca membuat SELURUH konfigurasi gagal."""
+    from dotenv import dotenv_values
+
+    env_store.write({
+        "GROQ_API_KEY": "gsk_abc123",
+        "WORK_DIR": "C:/ada spasi",
+        "SILENCE_MIN_DUR": "0,45",
+        "GEMINI_API_KEYS": "k1,k2",
+    })
+    v = dotenv_values(env_tmp)
+    assert v["GROQ_API_KEY"] == "gsk_abc123"
+    assert v["WORK_DIR"] == "C:/ada spasi"
+    assert v["SILENCE_MIN_DUR"] == "0.45"
+    assert v["GEMINI_API_KEYS"] == "k1,k2"
