@@ -174,6 +174,46 @@ def _snap_idx(i: int, anchors: list[int], last: int, edge: str) -> int:
     return min(cand, key=lambda c: abs(c - i))
 
 
+def _lebarkan(a: int, b: int, words: list[dict], anchors: list[int]) -> tuple[int, int]:
+    """Lebarkan segmen yang kependekan sampai mencapai durasi minimum.
+
+    Terukur di uji beban: dari 20 kandidat yang dibuang, SEMUANYA kependekan —
+    nol yang kepanjangan, nol karena tumpang tindih. Beberapa cuma 2-7 detik
+    padahal batas bawahnya 30. Membuangnya adalah keputusan yang salah: LLM
+    sudah menemukan momen yang menarik, dia cuma kurang lebar membingkainya.
+    Satu video kehilangan 11 momen bagus dan pulang dengan 1 klip dari target 5.
+
+    Yang dilebarkan lebih dulu adalah UJUNGnya, bukan awalnya. Di format
+    pendek, tiga detik pertama adalah kail yang menahan orang berhenti scroll —
+    memundurkan awal berarti menimpanya dengan kalimat lain. Awal baru digeser
+    kalau memajukan ujung saja tidak cukup, misalnya saat momennya dekat akhir
+    video.
+    """
+    maks = settings.MAX_CLIP_SEC
+    minim = settings.MIN_CLIP_SEC
+    akhir = [x - 1 for x in anchors[1:]] + [len(words) - 1]
+
+    for e in akhir:
+        if e <= b:
+            continue
+        if words[e]["e"] - words[a]["s"] > maks:
+            break
+        b = e
+        if words[b]["e"] - words[a]["s"] >= minim:
+            return a, b
+
+    for s in reversed(anchors):
+        if s >= a:
+            continue
+        if words[b]["e"] - words[s]["s"] > maks:
+            break
+        a = s
+        if words[b]["e"] - words[a]["s"] >= minim:
+            return a, b
+
+    return a, b
+
+
 def _validate(
     raw: list[dict], words: list[dict], target: int, anchors: list[int] | None = None
 ) -> list[dict]:
@@ -200,6 +240,11 @@ def _validate(
             log.warning("segmen dibuang (end_idx <= start_idx): %s-%s", a, b)
             continue
         dur = words[b]["e"] - words[a]["s"]
+        if dur < settings.MIN_CLIP_SEC and anchors:
+            a, b = _lebarkan(a, b, words, anchors)
+            baru = words[b]["e"] - words[a]["s"]
+            log.info("segmen %.1fs dilebarkan jadi %.1fs", dur, baru)
+            dur = baru
         if not (settings.MIN_CLIP_SEC <= dur <= settings.MAX_CLIP_SEC):
             log.warning("segmen dibuang (durasi %.1fs di luar rentang): %s-%s", dur, a, b)
             continue

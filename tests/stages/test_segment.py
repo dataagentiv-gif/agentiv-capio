@@ -177,3 +177,53 @@ def test_tiap_baris_mencantumkan_jam_mulai():
     lines = _indexed_transcript(SENT_WORDS, SENTENCES).splitlines()
     assert lines[0].startswith("[0 @ 00:00]")
     assert lines[1].startswith("[3 @ 00:03]")
+
+
+# --- melebarkan kandidat yang kependekan ---
+#
+# Terukur di uji beban 8 video: dari 20 kandidat yang dibuang, SEMUANYA
+# kependekan — nol yang kepanjangan, nol karena tumpang tindih. Membuangnya
+# salah keputusan: LLM sudah menemukan momennya, cuma kurang lebar
+# membingkainya. Satu video kehilangan 11 momen dan pulang dengan 1 klip.
+
+# 400 kata, 2 kata/detik. Batas kalimat tiap 20 kata (= 10 detik).
+ANCHORS = list(range(0, 400, 20))
+
+
+def test_segmen_kependekan_dilebarkan_bukan_dibuang():
+    """18 detik dulu dibuang; sekarang harus jadi klip yang layak."""
+    out = _validate([seg(100, 136)], WORDS, target=8, anchors=ANCHORS)
+    assert out, "kandidat kependekan masih dibuang"
+    d = WORDS[out[0]["end_idx"]]["e"] - WORDS[out[0]["start_idx"]]["s"]
+    assert 30 <= d <= 90
+
+
+def test_pelebaran_mempertahankan_awal():
+    """Tiga detik pertama adalah kail; memundurkan awal berarti menimpanya."""
+    out = _validate([seg(100, 120)], WORDS, target=8, anchors=ANCHORS)
+    assert out[0]["start_idx"] == 100
+    assert out[0]["end_idx"] > 120
+
+
+def test_awal_digeser_hanya_kalau_ujung_mentok():
+    """Momen di ujung video tidak punya ruang maju, jadi awalnya yang mundur."""
+    out = _validate([seg(392, 398)], WORDS, target=8, anchors=ANCHORS)
+    assert out, "segmen di akhir video tidak berhasil dilebarkan"
+    assert out[0]["start_idx"] < 392
+
+
+def test_pelebaran_tidak_melewati_batas_atas():
+    kandidat = [seg(0, 10), seg(200, 208)]
+    for s in _validate(kandidat, WORDS, target=8, anchors=ANCHORS):
+        d = WORDS[s["end_idx"]]["e"] - WORDS[s["start_idx"]]["s"]
+        assert d <= 90, f"hasil pelebaran {d:.1f}s melewati batas"
+
+
+def test_yang_kepanjangan_tetap_dibuang():
+    """Pelebaran cuma untuk yang kurang; yang kelewat panjang tidak disentuh."""
+    assert _validate([seg(0, 399)], WORDS, target=8, anchors=ANCHORS) == []
+
+
+def test_tanpa_anchors_perilaku_lama_dipertahankan():
+    """Tanpa daftar kalimat tidak ada acuan untuk melebarkan."""
+    assert _validate([seg(100, 136)], WORDS, target=8) == []
