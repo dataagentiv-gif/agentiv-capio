@@ -54,8 +54,28 @@ async def lifespan(app: FastAPI):
     yield
 
 
+class StaticSegar(StaticFiles):
+    """StaticFiles yang selalu memvalidasi ulang sebelum memakai cache.
+
+    Starlette mengirim etag dan last-modified tapi tidak mengirim
+    Cache-Control, dan tanpa itu browser memakai caching heuristik: file lama
+    disajikan tanpa bertanya ke server. Akibatnya, setelah repo di-update,
+    halaman tampil rusak — CSS lama tanpa aturan baru, JS lama tanpa fungsi
+    baru — dan yang muncul bukan pesan error yang jelas melainkan tata letak
+    berantakan plus ReferenceError.
+
+    `no-cache` bukan berarti tidak boleh disimpan, melainkan wajib divalidasi
+    dulu. Balasan 304 tetap terjadi, jadi tidak ada beban tambahan.
+    """
+
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
 app = FastAPI(title="Video Clipping Engine", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory=str(WEB / "static")), name="static")
+app.mount("/static", StaticSegar(directory=str(WEB / "static")), name="static")
 
 
 @app.middleware("http")
