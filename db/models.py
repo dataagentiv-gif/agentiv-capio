@@ -35,6 +35,14 @@ class Status:
     DONE = "done"
     FAILED = "failed"
 
+    #: Status yang berarti "ada worker yang sedang mengerjakannya sekarang".
+    #: QUEUED sengaja TIDAK termasuk — job itu belum disentuh siapa pun dan
+    #: masih sah dikerjakan setelah worker menyala lagi.
+    BERJALAN = (
+        DOWNLOADING, TRANSCRIBING, SEGMENTING, REFINING,
+        CAPTIONING, CROPPING, RENDERING, METADATA, UPLOADING,
+    )
+
 
 class Base(DeclarativeBase):
     pass

@@ -72,6 +72,38 @@ def fail(job_id, error: str) -> None:
     _update(job_id, status=Status.FAILED, error=error[-2000:])
 
 
+def bereskan_gantung() -> int:
+    """Tandai job yang tertinggal di status berjalan sebagai gagal.
+
+    SimpleWorker menjalankan job DI DALAM prosesnya sendiri, jadi kalau
+    prosesnya mati di tengah jalan — container di-restart, mesin dimatikan,
+    OOM — baris database berhenti di status tengah dan tidak pernah berubah
+    lagi. RQ membereskan registry-nya sendiri tapi tidak tahu-menahu soal
+    tabel ini, jadi job itu terlihat masih berjalan SELAMANYA di UI.
+
+    Dipanggil saat worker start: satu-satunya saat kita tahu pasti tidak ada
+    job yang sedang dikerjakan.
+
+    ponytail: benar selama worker cuma satu. Dengan dua worker, yang baru
+    menyala akan menggagalkan job milik worker lain yang masih sehat —
+    perbaikannya menyimpan identitas worker di baris job dan hanya
+    membereskan milik sendiri.
+    """
+    with session_scope() as s:
+        rows = s.scalars(select(Job).where(Job.status.in_(Status.BERJALAN))).all()
+        for job in rows:
+            tahap = job.status
+            log.warning("job %s tertinggal di status '%s' — ditandai gagal",
+                        job.id, tahap)
+            job.status = Status.FAILED
+            job.error = (
+                f"Worker berhenti saat job masih di tahap '{tahap}'. "
+                "Job tidak dilanjutkan otomatis — kirim ulang link-nya "
+                "kalau masih dibutuhkan."
+            )
+        return len(rows)
+
+
 def delete(job_id: str | uuid.UUID) -> bool:
     """Hapus satu job. False kalau memang sudah tidak ada."""
     try:
