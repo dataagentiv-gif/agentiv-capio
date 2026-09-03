@@ -92,7 +92,7 @@ class StaticSegar(StaticFiles):
         return resp
 
 
-app = FastAPI(title="Video Clipping Engine", lifespan=lifespan)
+app = FastAPI(title="CAPIO", lifespan=lifespan)
 app.mount("/static", StaticSegar(directory=str(WEB / "static")), name="static")
 
 
@@ -120,7 +120,7 @@ async def basic_auth(request: Request, call_next):
         if not ok:
             return Response(
                 status_code=401,
-                headers={"WWW-Authenticate": 'Basic realm="Video Clipping Engine"'},
+                headers={"WWW-Authenticate": 'Basic realm="CAPIO"'},
             )
     return await call_next(request)
 

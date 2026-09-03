@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Versi app icon: simbol putih di atas bidang biru, seperti pada panduan
+       brand. Dibuat SVG supaya tetap tajam di tab retina tanpa perlu beberapa
+       ukuran PNG. -->
+  <rect width="32" height="32" rx="7.5" fill="#1868db"/>
+  <g fill="none" stroke="#ffffff" stroke-width="3.9"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 18V13a4 4 0 0 1 4-4h5"/>
+    <path d="M23 14v5a4 4 0 0 1-4 4h-5"/>
+  </g>
+  <rect x="14.1" y="10.5" width="3.8" height="11" rx="1.9" fill="#ff564d"/>
+</svg>

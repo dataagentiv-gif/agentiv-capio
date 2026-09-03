@@ -4,8 +4,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Manrope:wght@400;500;700;800&display=swap');
 
 :root {
+  /* Warna brand CAPIO. Biru dan hitamnya kebetulan sudah sama persis dengan
+     token Atlassian yang dipakai sejak awal (#1868DB, #001214 vs #101214),
+     jadi yang benar-benar baru cuma jingganya. */
   --color-action: #1868db;
   --color-action-hover: #1257bd;
+
+  /* Aksen brand. Dipakai HEMAT dan hanya untuk satu makna: ada yang sedang
+     berjalan sekarang. Kalau dipakai untuk hiasan, ia berhenti berarti apa-apa
+     — dan biru sudah memegang seluruh peran aksi. */
+  --color-accent: #ff564d;
+  --color-accent-soft: #fff0ef;
+
   --color-ink: #101214;
   --color-body: #292a2e;
   --color-muted: #42526e;
@@ -89,16 +99,21 @@ a { color: var(--color-action); }
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 800;
-  letter-spacing: -0.01em;
+  /* Wordmark brand ditulis rapat dan berjarak antarhuruf, mengikuti logonya. */
+  letter-spacing: 0.02em;
   color: var(--color-ink);
   text-decoration: none;
 }
 
 .brand svg { display: block; }
+
+/* Simbolnya diberi ruang napas sendiri: pada logo aslinya ia berdiri di atas
+   bidang gelap, jadi tanpa ini ia terlihat menempel ke wordmark. */
+.brand .mark { margin-right: 1px; }
 
 .nav-links { margin-left: auto; display: flex; gap: 24px; }
 
@@ -295,7 +310,11 @@ input:focus {
 }
 
 .bar { height: 2px; background: var(--color-fog); }
-.bar > i { display: block; height: 100%; background: var(--color-action); transition: width .4s ease; }
+
+/* Sewarna dengan titik tahap berjalan — dua-duanya menjawab pertanyaan yang
+   sama ("sampai mana sekarang"), jadi memberi mereka warna berbeda membuat
+   mata mencari dua kali. */
+.bar > i { display: block; height: 100%; background: var(--color-accent); transition: width .4s ease; }
 
 .error-box {
   margin: 0 24px 20px;
@@ -558,11 +577,16 @@ input.chip-num { width: 96px; cursor: text; text-align: center; }
 
 .step.done { color: var(--color-muted); }
 .step.done i { background: var(--success-fg); }
-.step.now { color: var(--color-action); font-weight: 500; }
+
+/* Tahap yang SEDANG berjalan memakai aksen brand, bukan biru aksi. Biru sudah
+   dipakai untuk segala hal yang bisa diklik, jadi di halaman penuh biru titik
+   yang berdenyut itu tenggelam — padahal justru itu satu-satunya yang perlu
+   dicari mata saat membuka halaman Proses. */
+.step.now { color: var(--color-accent); font-weight: 500; }
 
 .step.now i {
-  background: var(--color-action);
-  box-shadow: 0 0 0 3px rgba(24, 104, 219, .2);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(255, 86, 77, .22);
   animation: denyut 1.4s ease-in-out infinite;
 }
 

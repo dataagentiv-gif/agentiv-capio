@@ -1,4 +1,4 @@
-# Video Clipping Engine
+# CAPIO
 
 Ubah satu link YouTube panjang jadi beberapa klip pendek 9:16 siap posting —
 lengkap dengan caption karaoke yang terbakar di video, judul, caption, dan
