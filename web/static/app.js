@@ -69,3 +69,33 @@ function tombolHapus(label, aksi) {
   return `<button type="button" class="btn-hapus" data-aksi="${aksi}" title="${label}"
             aria-label="${label}"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-trash"/></svg>${label}</button>`;
 }
+
+// Delapan karakter pertama job id — bentuk yang sama muncul di log worker dan
+// jadi nama folder di clips/. Tanpa ini, satu-satunya pembeda antar job adalah
+// URL dan jam, sehingga dua job dari video YANG SAMA praktis tidak bisa dirujuk:
+// tidak saat membaca log, tidak saat membicarakannya dengan orang lain.
+function idJob(id) {
+  return `<button type="button" class="job-id" data-salin="${esc(id)}"
+            title="Klik untuk menyalin id lengkap — dipakai di log worker dan nama folder"
+          >${esc(String(id).slice(0, 8))}</button>`;
+}
+
+// Menyalin id dipasang sekali di sini, bukan per halaman: dua halaman memakai
+// tombol yang sama, dan dua salinan penanganan klik akan lambat laun berbeda.
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-salin]');
+  if (!b) return;
+  // Umpan balik ditempel di tombolnya sendiri, bukan lewat alert: id biasanya
+  // disalin berturut-turut, dan dialog yang harus ditutup tiap kali lebih
+  // mengganggu daripada membantu.
+  const semula = b.textContent;
+  try {
+    await navigator.clipboard.writeText(b.dataset.salin);
+    b.textContent = 'tersalin';
+  } catch {
+    // Clipboard ditolak browser (bukan HTTPS, izin dicabut). Tampilkan id
+    // lengkapnya supaya masih bisa diblok dan disalin manual.
+    b.textContent = b.dataset.salin;
+  }
+  setTimeout(() => { b.textContent = semula; }, 1400);
+});

@@ -43,6 +43,7 @@ function jobHtml(j) {
         ${badge(j.status)}
         <a class="job-url" href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>
         <span class="job-meta">${esc(waktu(j.created_at))} · ${(j.clips || []).length} klip</span>
+        ${idJob(j.id)}
         ${tombolHapus('Hapus semua', `job:${j.id}`)}
       </div>
       <div class="clips">${(j.clips || []).map(c => clipHtml(c, j.id)).join('')}</div>

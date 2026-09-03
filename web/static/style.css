@@ -309,6 +309,27 @@ input:focus {
   white-space: nowrap;
 }
 
+/* Id job, sengaja monospace: bentuk yang sama muncul di log worker dan sebagai
+   nama folder di clips/, jadi mata perlu mengenalinya sebagai hal yang sama.
+   Dibuat redup karena bukan yang dicari saat menelusuri hasil — tapi begitu
+   dibutuhkan, tidak ada penggantinya. */
+.job-id {
+  font: 12px/1 'Cascadia Mono', Consolas, ui-monospace, monospace;
+  color: var(--color-ash);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-inputs);
+  padding: 4px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.job-id:hover {
+  color: var(--color-body);
+  border-color: var(--color-fog);
+  background: var(--surface-soft);
+}
+
 .bar { height: 2px; background: var(--color-fog); }
 
 /* Sewarna dengan titik tahap berjalan — dua-duanya menjawab pertanyaan yang
