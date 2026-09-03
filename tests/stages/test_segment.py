@@ -264,3 +264,69 @@ def test_prompt_menyebut_patokan_nilai():
 
     assert "90-100" in PROMPT and "30-49" in PROMPT
     assert "SELURUH RENTANG" in PROMPT
+
+
+# --- hook menang atas index ---
+#
+# LLM mengembalikan dua hal yang menunjuk momen yang sama: `hook` (kalimat
+# pembukanya) dan `start_idx` (angkanya). Pada transkrip panjang keduanya bisa
+# bertentangan. Terjadi sungguhan pada podcast 2,4 jam — 3.528 kalimat jadi satu
+# prompt, dan klip yang keluar berisi kalimat yang sama sekali lain dari hook
+# yang dikutip; video pendek tidak pernah bermasalah. Kegagalannya senyap:
+# klipnya tetap terlihat wajar, cuma diambil dari menit yang salah.
+
+# 400 kata "k0..k399", batas kalimat tiap 20 kata.
+KATA_UNIK = [
+    {"i": i, "w": f"k{i}", "s": i * 0.5, "e": i * 0.5 + 0.4} for i in range(400)
+]
+ANCH = list(range(0, 400, 20))
+
+
+def seg_hook(a, b, hook, score=90):
+    return {"start_idx": a, "end_idx": b, "hook": hook, "reason": "r", "score": score}
+
+
+def test_index_salah_dipindah_ke_posisi_hook():
+    """Inti perbaikannya: isi menang atas aritmetika."""
+    kandidat = [seg_hook(0, 100, "k200 k201 k202 k203 k204")]
+    out = _validate(kandidat, KATA_UNIK, target=8, anchors=ANCH)
+    assert out and out[0]["start_idx"] == 200, "klip tidak dipindah ke posisi hook"
+
+
+def test_durasi_dipertahankan_saat_dipindah():
+    """Ujung ikut bergeser bersama awalnya. Kalau tidak, memindahkan awal ke
+    depan akan memanjangkan klip — dan yang jadi kepanjangan langsung dibuang,
+    jadi perbaikan ini malah menghilangkan klip yang tadinya lolos.
+
+    Selisih satu kata dimaklumi: ujungnya masih ditarik ke akhir kalimat
+    setelah dipindah."""
+    out = _validate([seg_hook(0, 100, "k200 k201 k202 k203 k204")],
+                    KATA_UNIK, target=8, anchors=ANCH)
+    assert abs((out[0]["end_idx"] - out[0]["start_idx"]) - 100) <= 1
+
+
+def test_index_yang_sudah_cocok_tidak_diganggu():
+    """Video pendek tidak pernah bermasalah; jangan sampai jadi bermasalah."""
+    out = _validate([seg_hook(100, 200, "k100 k101 k102 k103")],
+                    KATA_UNIK, target=8, anchors=ANCH)
+    assert out[0]["start_idx"] == 100
+
+
+def test_hook_yang_tidak_ditemukan_membiarkan_index_apa_adanya():
+    """Kalau hook tidak ada di transkrip sama sekali, menebak posisinya lebih
+    berbahaya daripada mempercayai index."""
+    out = _validate([seg_hook(100, 200, "kalimat yang tidak pernah diucapkan sama sekali")],
+                    KATA_UNIK, target=8, anchors=ANCH)
+    assert out[0]["start_idx"] == 100
+
+
+def test_hook_terlalu_pendek_tidak_dipakai_menggeser():
+    """Dua kata bisa cocok di banyak tempat secara kebetulan."""
+    out = _validate([seg_hook(100, 200, "k380")], KATA_UNIK, target=8, anchors=ANCH)
+    assert out[0]["start_idx"] == 100
+
+
+def test_tanpa_anchors_tidak_ada_pemindahan():
+    """Tanpa daftar kalimat tidak ada posisi sah untuk dituju."""
+    out = _validate([seg_hook(0, 100, "k200 k201 k202 k203")], KATA_UNIK, target=8)
+    assert out[0]["start_idx"] == 0

@@ -14,6 +14,7 @@ di tengah argumen — dua-duanya terlihat identik sebagai teks.
 """
 import bisect
 import json
+import re
 from pathlib import Path
 
 from config.settings import settings
@@ -115,6 +116,41 @@ Isi tiap field:
 
 Transkrip:
 {transcript}"""
+
+
+def _kunci_kata(teks: str) -> list[str]:
+    return re.findall(r"\w+", teks.lower())
+
+
+def _cocok_hook(hook: str, words: list[dict], a: int, n: int = 6) -> bool:
+    """Apakah `hook` benar-benar diucapkan mulai di index `a`?"""
+    h = _kunci_kata(hook)[:n]
+    if len(h) < 3:
+        # Hook terlalu pendek untuk dicocokkan dengan yakin — jangan menuduh.
+        return True
+    ada = _kunci_kata(" ".join(w["w"] for w in words[a:a + n + 4]))
+    return sum(1 for k in h if k in ada) >= max(2, len(h) - 2)
+
+
+def _cari_hook(hook: str, words: list[dict], anchors: list[int]) -> int | None:
+    """Cari di mana kalimat `hook` sebenarnya dimulai.
+
+    Hanya awal kalimat yang dipertimbangkan: batas klip memang cuma boleh jatuh
+    di situ, dan mencari di tengah kalimat akan menghasilkan potongan yang
+    menggantung.
+    """
+    h = _kunci_kata(hook)[:6]
+    if len(h) < 3:
+        return None
+    terbaik, skor_terbaik = None, 0
+    for a in anchors:
+        ada = _kunci_kata(" ".join(w["w"] for w in words[a:a + 10]))
+        skor = sum(1 for k in h if k in ada)
+        if skor > skor_terbaik:
+            terbaik, skor_terbaik = a, skor
+    # Perlu kecocokan kuat: menggeser klip ke tempat yang cuma mirip sedikit
+    # lebih buruk daripada membiarkannya di tempat semula.
+    return terbaik if skor_terbaik >= max(3, len(h) - 1) else None
 
 
 def _sebaran(skor: list[int]) -> str:
@@ -249,6 +285,31 @@ def _validate(
         except (KeyError, TypeError, ValueError):
             continue
         a, b = max(0, min(a, last)), max(0, min(b, last))
+
+        # ISI menang atas ARITMETIKA. LLM mengembalikan dua hal yang menunjuk
+        # momen yang sama — `hook` (kalimat pembukanya) dan `start_idx`
+        # (angkanya) — dan pada transkrip panjang keduanya bisa berbeda. Terjadi
+        # sungguhan pada podcast 2,4 jam: 3.528 kalimat jadi satu prompt, dan
+        # klip yang keluar berisi kalimat yang sama sekali lain dari hook yang
+        # dikutip. Video pendek tidak pernah bermasalah.
+        #
+        # Saat keduanya bertentangan, hook yang dipercaya: itu isi yang
+        # benar-benar dibaca dan dipilih model, sementara index cuma penunjuk
+        # yang gampang meleset saat masukannya besar. Kegagalannya juga senyap —
+        # klipnya tetap terlihat wajar, cuma diambil dari menit yang salah.
+        hook = str(s.get("hook", "")).strip()
+        if anchors and hook and not _cocok_hook(hook, words, a):
+            ketemu = _cari_hook(hook, words, anchors)
+            if ketemu is not None and ketemu != a:
+                geser = words[ketemu]["s"] - words[a]["s"]
+                log.warning(
+                    "start_idx tidak cocok dengan hook — dipindah %.0fs (%s -> %s): %r",
+                    geser, a, ketemu, hook[:60],
+                )
+                b += ketemu - a
+                a = ketemu
+                b = max(0, min(b, last))
+
         # Di-snap SEBELUM cek durasi: menarik batas ke kalimat terdekat mengubah
         # panjang klip, jadi yang divalidasi harus angka final.
         if anchors:
@@ -270,7 +331,7 @@ def _validate(
             {
                 "start_idx": a,
                 "end_idx": b,
-                "hook": str(s.get("hook", "")).strip(),
+                "hook": hook,
                 "reason": str(s.get("reason", "")).strip(),
                 "score": max(0, min(100, int(s.get("score", 0)))),
             }

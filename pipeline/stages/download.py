@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from config.settings import settings
 # run di-alias: stage ini mengekspor run(ctx) sendiri, dan nama itu akan
 # menimpa helper di namespace modul.
 from utils.ffmpeg_helpers import ffmpeg, probe
@@ -60,7 +61,21 @@ def _ytdlp(url: str, workdir: Path, deadline) -> None:
         ],
         deadline,
         cwd=workdir,
-        cap=1200,
+        # Batas per percobaan diturunkan dari anggaran job, BUKAN angka tetap.
+        #
+        # Dulu 1200 detik mati. Akibatnya menaikkan JOB_TIMEOUT_SEC tidak
+        # menolong sama sekali untuk video panjang: berapa pun anggarannya,
+        # satu percobaan unduh tetap berhenti di menit ke-20. Terukur di sini:
+        # jaringan 0,16 MB/s butuh 104 menit untuk podcast 2,4 jam (0,98 GB),
+        # sementara tiga percobaan @20 menit cuma menyediakan 60 menit — jadi
+        # video seperti itu TIDAK PERNAH bisa selesai diunduh, dan pesan
+        # errornya justru menyuruh menaikkan setelan yang tidak berpengaruh.
+        #
+        # Yang mencegah satu perintah menggantung selamanya bukan batas ini,
+        # melainkan --socket-timeout 30 di atas: koneksi yang diam lebih dari 30
+        # detik diputus, jadi waktu yang terpakai di sini selalu waktu yang
+        # benar-benar dipakai mengunduh. Deadline job tetap jadi pagar terakhir.
+        cap=max(1200.0, settings.JOB_TIMEOUT_SEC * 0.8),
     )
 
 
