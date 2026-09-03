@@ -108,6 +108,16 @@ function render() {
   document.getElementById('panels').innerHTML = panels.join('');
   document.querySelectorAll('.keylist').forEach(muatKey);
   document.querySelectorAll('[data-save]').forEach(b => b.onclick = () => simpan(b));
+  // Enter di dalam kolom menyimpan panel itu. Tanpa ini Enter tidak melakukan
+  // APA PUN — tidak ada <form> di halaman ini — dan orang yang menempel key
+  // lalu menekan Enter menyangka sudah tersimpan. Terjadi sungguhan: dua key
+  // dikira sudah masuk padahal request-nya tidak pernah terkirim.
+  document.querySelectorAll('input[data-key]').forEach(i => i.onkeydown = e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const b = i.closest('.panel')?.querySelector('[data-save]');
+    if (b) simpan(b);
+  });
   document.querySelectorAll('[data-test]').forEach(b => b.onclick = () => tes(b));
   pilih();
 }
