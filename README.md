@@ -181,7 +181,7 @@ belum pas:
 
 | Pengaturan | Default | Putar kalau |
 |---|---|---|
-| Ambang hening | `-30` dB | Source ber-musik latar atau berisik → `-35` |
+| Ambang hening | `-30` dB | Source ber-musik latar → **NAIKKAN** ke `-20`, jangan turunkan |
 | Durasi hening minimum | `0.25` s | Terlalu banyak kandidat batas → `0.5` |
 | Pergeseran batas maksimum | `1.2` s | Batas klip terasa meleset dari maksud LLM → kecilkan |
 | Durasi klip | `30`–`90` s | Menyesuaikan platform tujuan |
@@ -190,6 +190,24 @@ belum pas:
 Kalau tidak ada hening terdeteksi sama sekali, batas klip **tidak** digeser.
 Itu perilaku yang disengaja: batas yang tidak digeser masih menghasilkan klip
 yang layak, sedangkan batas yang digeser ke hening palsu justru merusak.
+
+**Ambang hening dinaikkan, bukan diturunkan, saat ada musik latar.** Ini
+berlawanan dengan naluri, jadi worker ikut menyebutkannya di log. Musik
+menaikkan lantai kebisingan — ambang `-30` dB berarti "dianggap hening kalau di
+bawah −30 dB", dan kalau musiknya sendiri duduk di −24 dB, tidak ada satu momen
+pun yang pernah turun ke sana. Menurunkannya ke −35 atau −40 membuat syaratnya
+makin mustahil. Diukur pada audio bicara yang sama, dicampur musik bertingkat:
+
+| Musik latar | −30 dB | −25 dB | −20 dB | −15 dB | −10 dB |
+|---|---|---|---|---|---|
+| tanpa musik | 7 | 13 | 18 | 25 | 39 |
+| −30 dB | 2 | 9 | 18 | 28 | 41 |
+| −24 dB | **0** | 2 | 15 | 27 | 40 |
+| −18 dB | **0** | 0 | 1 | 24 | 39 |
+| −12 dB | **0** | 0 | 0 | 0 | 32 |
+
+Angkanya jumlah jeda yang terdeteksi dalam 3 menit. Baca menyamping: makin keras
+musiknya, makin ke kanan ambang yang dibutuhkan.
 
 ---
 
@@ -318,9 +336,11 @@ diperkirakan.
   juga menyusut — 3 dari target 5, sementara video 15 menit biasanya 7–9.
 - **Source lebih sempit dari 9:16** (misalnya 9:20) akan ter-stretch vertikal.
   Perbaikannya mode `fit` dengan latar blur; worker memperingatkannya di log.
-- **Satu crop per klip, bukan per shot.** Memadai untuk talking-head satu orang;
-  pada percakapan dua arah, pembicara yang sedang bicara bisa berada di luar
-  bingkai. Belum diukur seberapa sering.
+- **Satu crop per klip, bukan per shot.** Memadai untuk talking-head satu orang.
+  Pada video wawancara yang berpindah kamera antar pembicara, **wajah utama
+  berada di luar bingkai sekitar 18% waktu** — diukur pada satu video 7 menit,
+  120 frame sampel, memakai jendela per 60 detik persis seperti cara crop
+  bekerja. Klipnya tetap jadi; yang hilang cuma wajah orang yang sedang bicara.
 - **Chunking transkrip** memotong tepat di menit ke-20 tanpa menyesuaikan ke
   jeda bicara. Cabang itu baru aktif di atas ~2,3 jam audio, dan sudah
   diverifikasi end-to-end pada podcast 2,44 jam.

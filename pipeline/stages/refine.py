@@ -125,7 +125,21 @@ def run(ctx: dict) -> dict:
         log.warning("silencedetect gagal (%s) — batas dipakai apa adanya", e)
         sils = []
     if not sils:
-        log.warning("tidak ada hening terdeteksi — batas tidak di-snap")
+        # Penyebab paling sering: musik latar. Musik MENAIKKAN lantai
+        # kebisingan, jadi tidak ada momen yang pernah turun di bawah ambang.
+        # Naluri pertama orang adalah menurunkan ambangnya, dan itu justru
+        # memperparah — terukur: audio bicara bermusik -24dB menghasilkan 0 jeda
+        # pada ambang -30dB, tetap 0 di -35 dan -40, tapi 15 jeda begitu ambang
+        # dinaikkan ke -20dB. Tanpa keterangan arah ini, setelan yang tersedia
+        # justru menuntun ke arah yang salah.
+        log.warning(
+            "Tidak ada hening terdeteksi pada ambang %s dB — batas klip TIDAK "
+            "digeser ke jeda alami, jadi potongannya lebih kasar. Kalau "
+            "sumbernya bermusik latar, NAIKKAN SILENCE_NOISE_DB (misal ke -20), "
+            "jangan diturunkan: musik menaikkan lantai kebisingan sehingga "
+            "ambang yang lebih rendah makin mustahil tercapai.",
+            settings.SILENCE_NOISE_DB,
+        )
 
     final = []
     for n, s in enumerate(segments, start=1):
