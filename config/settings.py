@@ -16,12 +16,26 @@ class Settings(BaseSettings):
     )
 
     # --- Transkrip (Stage 2) ---
-    # groq       : murah ($0.04/jam) dan sangat cepat, tapi meleset di campuran
-    #              Indonesia-Inggris dan MENOLAK IP datacenter dengan 403 —
-    #              perhatikan ini kalau worker nanti dijalankan di VPS.
-    # elevenlabs : jauh lebih akurat untuk Bahasa Indonesia (~2.4% vs ~7.7% WER),
-    #              $0.22/jam, tanpa blokir IP.
-    ASR_PROVIDER: str = "groq"  # groq | elevenlabs
+    #
+    # Default elevenlabs, dan ini keputusan yang diambil dari pengukuran, bukan
+    # dari klaim vendor. Tiga video Indonesia berisi istilah Inggris ditranskrip
+    # oleh kedua provider dari file audio yang sama persis:
+    #
+    #   - Pada satu dari tiga video, 29.6% keluaran Groq adalah TEKS JEPANG.
+    #     Bukan salah dengar — Whisper berpindah bahasa lalu mengarang panjang
+    #     lebar. Dua video lain nol. Jadi kegagalannya tidak merata, melainkan
+    #     ambruk total tanpa peringatan, dan itu lebih sulit diantisipasi
+    #     daripada kesalahan kecil yang konsisten.
+    #   - Kalimat Inggris DITERJEMAHKAN, bukan ditranskrip: "Tools like Google
+    #     Analytics" keluar sebagai "Tua seperti analitik".
+    #
+    # groq       : gratis dan 5-10x lebih cepat. Aman untuk konten Indonesia
+    #              murni. MENOLAK IP datacenter dengan 403 — perhatikan kalau
+    #              worker dijalankan di VPS.
+    # elevenlabs : akurat, tanpa blokir IP, ada tier gratis. Mengeja angka
+    #              ("seratus empat puluh empat"), tapi asr/angka.py sudah
+    #              mengubahnya kembali jadi digit sebelum masuk caption.
+    ASR_PROVIDER: str = "elevenlabs"  # groq | elevenlabs
 
     # Boleh lebih dari satu key dipisah koma, sama seperti Gemini — free tier
     # Groq dibatasi per key, jadi key yang dirotasi menaikkan atap tanpa biaya.

@@ -10,6 +10,7 @@ Kontrak yang dijamin sama untuk semua provider:
 """
 from pathlib import Path
 
+from asr import angka
 from config.settings import settings
 
 PROVIDERS = ("groq", "elevenlabs")
@@ -42,7 +43,24 @@ def size_limit() -> int:
 
 
 def transcribe(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
-    return _impl().transcribe(path, offset)
+    """Transkrip, lalu angka yang dieja diubah jadi digit.
+
+    Normalisasi dilakukan di sini, bukan di masing-masing client, karena ini
+    kebutuhan CAPTION dan bukan sifat provider: siapa pun yang mengeja angka
+    menghasilkan caption yang pecah dua tampilan. Pada transkrip yang sudah
+    memakai digit, langkah ini tidak mengubah apa pun.
+
+    Kalimat dibentuk ulang dari kata hasil normalisasi supaya teks yang dibaca
+    LLM di Stage 3 sama dengan yang tampil di caption — kalau dibiarkan
+    berbeda, index kata yang ditunjuk LLM tidak lagi menunjuk kata yang sama.
+    """
+    words, sentences = _impl().transcribe(path, offset)
+    rapi = angka.normalkan(words)
+    if len(rapi) != len(words):
+        from asr.client_elevenlabs import sentences_from_words
+
+        sentences = sentences_from_words(rapi)
+    return rapi, sentences
 
 
 __all__ = ["PROVIDERS", "check_config", "size_limit", "transcribe"]
