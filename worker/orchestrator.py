@@ -1,6 +1,7 @@
 """Satu-satunya tempat yang memanggil stage secara berurutan dan menulis
 progress ke db/jobs.py. Stage sendiri tidak tahu-menahu soal HTTP atau queue.
 """
+import time
 import traceback
 from pathlib import Path
 
@@ -38,6 +39,14 @@ STAGES = [
     (Status.METADATA, metadata),
 ]
 TOTAL_STEPS = len(STAGES) + 1  # +1 untuk upload
+
+
+def _rincian(lama: dict[str, float]) -> str:
+    """Waktu per stage, yang paling boros lebih dulu — itu yang dicari orang."""
+    return ", ".join(
+        f"{nama} {detik:.0f}s"
+        for nama, detik in sorted(lama.items(), key=lambda x: -x[1])
+    )
 
 
 def _build_clips(ctx: dict, job_id: str) -> list[dict]:
@@ -90,21 +99,49 @@ def run(job_id: str) -> None:
     }
     log.info("mulai job %s -> %s", job_id, workdir)
 
+    # Lama tiap stage, dicatat untuk dilampirkan ke pesan kegagalan. Batas waktu
+    # job dibagi seluruh stage, jadi saat deadline terlampaui pertanyaannya
+    # selalu "siapa yang memakannya" — dan tanpa angka ini jawabannya cuma
+    # tebakan. Terjadi sungguhan: satu video 26 menit gagal karena UNDUHANNYA
+    # sendiri menghabiskan seluruh anggaran, tapi pesannya hanya "deadline job
+    # terlampaui" sehingga terlihat seperti pipeline yang rusak.
+    lama: dict[str, float] = {}
+
     try:
         for i, (status, stage) in enumerate(STAGES):
             ctx["deadline"].check(status)
             jobs.update_status(job_id, status, progress=int(i / TOTAL_STEPS * 100))
             log.info("stage %s", status)
+            t0 = time.monotonic()
             ctx.update(stage.run(ctx))
+            lama[status] = time.monotonic() - t0
 
         jobs.update_status(job_id, Status.UPLOADING, progress=int(8 / TOTAL_STEPS * 100))
+        t0 = time.monotonic()
         clips = _build_clips(ctx, str(job_id))
+        lama[Status.UPLOADING] = time.monotonic() - t0
         jobs.finish(job_id, clips)
-        log.info("job %s selesai: %d klip", job_id, len(clips))
+        log.info("job %s selesai: %d klip (%s)", job_id, len(clips), _rincian(lama))
 
         # Baru dihapus setelah upload sukses. Kalau job gagal, workdir sengaja
         # ditinggal utuh supaya artefak antar-stage bisa diperiksa.
         rmtree_retry(workdir)
+
+    except TimeoutError as e:
+        # Kegagalan deadline butuh perlakuan sendiri: yang perlu diketahui
+        # bukan traceback-nya — stack-nya selalu sama — melainkan stage mana
+        # yang menghabiskan anggaran, karena itu yang menentukan apakah
+        # JOB_TIMEOUT_SEC perlu dinaikkan atau ada yang benar-benar macet.
+        rinci = _rincian(lama) or "belum ada stage yang selesai"
+        log.error("job %s kehabisan waktu: %s | %s", job_id, e, rinci)
+        jobs.fail(
+            job_id,
+            f"Waktu job habis ({settings.JOB_TIMEOUT_SEC}s). Waktu terpakai per "
+            f"tahap: {rinci}.\n\nKalau tahap yang boros adalah download, "
+            f"videonya terlalu panjang atau jaringan sedang lambat — naikkan "
+            f"JOB_TIMEOUT_SEC di halaman Setting.\n\n{traceback.format_exc()}",
+        )
+        raise
 
     except Exception as e:  # noqa: BLE001
         log.error("job %s gagal: %s", job_id, e)

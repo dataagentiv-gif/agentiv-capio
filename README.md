@@ -75,10 +75,10 @@ venv/Scripts/python main.py api
 venv/Scripts/python main.py worker
 ```
 
-> **Dijalankan di laptop sendiri, bukan VPS.** Groq menolak IP datacenter
-> dengan 403, dan yt-dlp kena bot-detection YouTube yang jauh lebih galak dari
-> sana. Kalau memang harus di server: pakai ElevenLabs untuk transkrip, dan
-> siapkan cookies untuk yt-dlp.
+> **Dijalankan di laptop sendiri, bukan VPS.** yt-dlp kena bot-detection
+> YouTube yang jauh lebih galak dari datacenter, jadi siapkan cookies kalau
+> memang harus di server. Transkrip sendiri tidak jadi penghalang selama
+> memakai ElevenLabs — hanya Groq yang menolak IP datacenter dengan 403.
 
 ---
 
@@ -108,7 +108,7 @@ dipanggil untuk dua tugas sempit saja dan tidak pernah memutuskan alur.
 | # | Tahap | Alat | Hasil |
 |---|---|---|---|
 | 1 | Unduh | yt-dlp + ffmpeg | `source.mp4`, `audio.ogg` (16kHz mono opus) |
-| 2 | Transkrip | Groq Whisper / ElevenLabs Scribe | kata + kalimat, bertimestamp |
+| 2 | Transkrip | ElevenLabs Scribe / Groq Whisper | kata + kalimat, bertimestamp |
 | 3 | Seleksi momen | LLM | kandidat klip + skor + alasan |
 | 4 | Geser batas | ffmpeg | batas dipindah ke jeda alami terdekat |
 | 5 | Caption | generator `.ass` | caption karaoke per kata |
@@ -142,12 +142,25 @@ project, jadi bisa juga disunting manual kalau lebih suka.
 
 | Provider | Biaya | Catatan |
 |---|---|---|
-| **Groq** Whisper | free tier 8 jam audio/hari | Sangat cepat — 15 menit audio selesai dalam ~4 detik. Meleset di campuran Indonesia-Inggris. Menolak IP datacenter/VPN dengan 403. |
-| **ElevenLabs** Scribe | berbayar per pemakaian | Jauh lebih akurat untuk Bahasa Indonesia. Tanpa blokir IP. |
+| **ElevenLabs** Scribe — *default* | ada tier gratis | Akurat untuk Bahasa Indonesia termasuk yang bercampur istilah Inggris. Tanpa blokir IP. Mengeja angka, tapi `asr/angka.py` mengubahnya kembali jadi digit. |
+| **Groq** Whisper | free tier 8 jam audio/hari | Sangat cepat — 15 menit audio selesai dalam ~4 detik. Aman untuk konten Indonesia murni. Menolak IP datacenter/VPN dengan 403. |
 
 Ini pilihan yang paling terasa hasilnya, karena **caption terbakar permanen di
 video**. Transkrip yang meleset kelihatan oleh penonton dan tidak bisa
 diperbaiki setelah render.
+
+**Kenapa Groq bukan lagi default.** Tiga video Indonesia berisi istilah Inggris
+ditranskrip kedua provider dari file audio yang sama persis. Pada satu dari tiga
+video, **29,6% keluaran Groq adalah teks Jepang** — Whisper berpindah bahasa
+lalu mengarang panjang lebar; dua video lain nol. Kalimat Inggris juga
+diterjemahkan alih-alih ditranskrip: *"Tools like Google Analytics"* keluar
+sebagai *"Tua seperti analitik"*.
+
+Yang menentukan bukan rata-rata akurasinya, melainkan bentuk kegagalannya: benar
+di dua video lalu ambruk total di video ketiga tanpa peringatan. Kegagalan tak
+merata seperti itu lebih sulit diantisipasi daripada kesalahan kecil yang
+konsisten. Groq tetap disediakan dan tetap berguna — cepat, gratis, dan aman
+untuk konten yang murni Bahasa Indonesia.
 
 ### LLM
 

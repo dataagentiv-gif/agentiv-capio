@@ -101,10 +101,28 @@ Isi tiap field:
 - start_idx / end_idx: index kata awal dan akhir klip.
 - hook: kalimat pembuka klip, disalin apa adanya dari transkrip.
 - reason: satu kalimat, kenapa momen ini layak jadi klip.
-- score: 0-100, seberapa yakin kamu klip ini bakal perform.
+- score: seberapa kuat momennya, dengan patokan berikut:
+    90-100 = luar biasa, jarang ada. Paling banyak SATU per video, sering nol.
+    70-89  = kuat, layak diposting apa adanya.
+    50-69  = lumayan, tapi ada kelemahan jelas (kailnya lemah, atau butuh
+             konteks dari bagian lain video).
+    30-49  = seadanya, dikirim hanya karena kandidat lain lebih sedikit.
+  PAKAI SELURUH RENTANG. Kandidat yang kamu usulkan tidak mungkin sama
+  kuatnya, jadi memberi mereka skor yang berdekatan (misalnya semuanya 85-95)
+  membuat skor itu tidak berguna. Skor dipakai untuk memilih saat kandidat
+  lebih banyak dari yang dibutuhkan — kalau semuanya mirip, pilihannya jadi
+  asal. Bedakan setidaknya 20 poin antara kandidat terbaik dan terlemah.
 
 Transkrip:
 {transcript}"""
+
+
+def _sebaran(skor: list[int]) -> str:
+    """Ringkasan sebaran skor untuk log. Rentang disebut eksplisit karena
+    itulah yang menunjukkan skornya membedakan atau menumpuk."""
+    if not skor:
+        return "-"
+    return f"{min(skor)}-{max(skor)} (rentang {max(skor) - min(skor)})"
 
 
 def _mmss(t: float) -> str:
@@ -302,5 +320,14 @@ def run(ctx: dict) -> dict:
     (workdir / "segments_raw.json").write_text(
         json.dumps(segments, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    log.info("segment: %d kandidat -> %d lolos", len(raw), len(segments))
+    # Sebaran skor ikut dicatat karena skor menentukan DUA keputusan di
+    # _validate: pemenang saat tumpang tindih, dan siapa yang dipotong saat
+    # kandidat lebih banyak dari target. Skor yang berdekatan membuat kedua
+    # keputusan itu praktis acak — dan itu tidak terlihat dari mana pun kecuali
+    # angka ini. Terukur sebelum patokan nilai ditambahkan ke prompt: 56 klip
+    # seluruhnya jatuh di rentang 78-96.
+    log.info(
+        "segment: %d kandidat -> %d lolos | skor %s",
+        len(raw), len(segments), _sebaran([s["score"] for s in segments]),
+    )
     return {"segments_raw": segments}

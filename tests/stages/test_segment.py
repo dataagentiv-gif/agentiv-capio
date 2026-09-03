@@ -227,3 +227,40 @@ def test_yang_kepanjangan_tetap_dibuang():
 def test_tanpa_anchors_perilaku_lama_dipertahankan():
     """Tanpa daftar kalimat tidak ada acuan untuk melebarkan."""
     assert _validate([seg(100, 136)], WORDS, target=8) == []
+
+
+# --- sebaran skor ---
+#
+# Skor menentukan DUA keputusan di _validate: pemenang saat tumpang tindih, dan
+# siapa yang dipotong saat kandidat lebih banyak dari target. Skor yang
+# berdekatan membuat keduanya praktis acak, dan itu tidak terlihat dari mana pun
+# kecuali angka ini. Terukur sebelum patokan nilai ditambahkan ke prompt: 56
+# klip seluruhnya jatuh di rentang 78-96.
+
+def test_sebaran_menyebut_rentang():
+    from pipeline.stages.segment import _sebaran
+
+    assert _sebaran([78, 90, 96]) == "78-96 (rentang 18)"
+
+
+def test_sebaran_skor_seragam_terlihat_nol():
+    """Inilah gejala yang dicari: rentang 0 berarti skor tidak membedakan
+    apa pun, dan pemilihan kandidat jadi asal."""
+    from pipeline.stages.segment import _sebaran
+
+    assert "rentang 0" in _sebaran([88, 88, 88])
+
+
+def test_sebaran_kosong_tidak_bikin_crash():
+    from pipeline.stages.segment import _sebaran
+
+    assert _sebaran([]) == "-"
+
+
+def test_prompt_menyebut_patokan_nilai():
+    """Regresi: prompt sempat cuma menulis '0-100, seberapa yakin kamu', dan
+    model membalas dengan skor yang menumpuk di ujung atas."""
+    from pipeline.stages.segment import PROMPT
+
+    assert "90-100" in PROMPT and "30-49" in PROMPT
+    assert "SELURUH RENTANG" in PROMPT

@@ -30,12 +30,15 @@ def _f(key, label, group, secret=False, kind="text", help="", options=None, pool
 # Satu-satunya daftar yang boleh ditulis dari UI.
 FIELDS = [
     _f("ASR_PROVIDER", "Provider transkrip", "Transkrip", kind="select",
-       options=["groq", "elevenlabs"],
-       help="groq: murah & cepat, tapi meleset di campuran Indonesia-Inggris dan menolak IP datacenter. "
-            "elevenlabs: jauh lebih akurat untuk Bahasa Indonesia, berbayar per pemakaian."),
+       options=["elevenlabs", "groq"],
+       help="elevenlabs (disarankan): akurat untuk Bahasa Indonesia, ada tier gratis. "
+            "groq: gratis dan 5-10x lebih cepat, tapi diuji pada 3 video berisi "
+            "istilah Inggris ia menghasilkan 29,6% teks Jepang di salah satunya, "
+            "dan menerjemahkan kalimat Inggris alih-alih mentranskripnya. "
+            "Aman untuk konten Indonesia murni."),
     _f("GROQ_API_KEYS", "Groq API key", "Transkrip", secret=True, pool="groq",
-       help="console.groq.com/keys — free tier dibatasi per key, jadi beberapa "
-            "key dipakai bergiliran untuk menaikkan atapnya."),
+       help="console.groq.com/keys — dipakai hanya kalau provider di atas groq. "
+            "Beberapa key dipakai bergiliran untuk menaikkan atap free tier."),
     _f("ELEVENLABS_API_KEYS", "ElevenLabs API key", "Transkrip", secret=True,
        pool="elevenlabs",
        help="elevenlabs.io/app/settings/api-keys — dipakai hanya kalau provider di atas elevenlabs. "
