@@ -76,3 +76,33 @@ def test_anggaran_kecil_tetap_punya_lantai_wajar(monkeypatch):
     """Anggaran job yang sangat kecil jangan sampai memberi unduhan waktu yang
     terlalu pendek untuk video pendek sekalipun."""
     assert _cap_terpakai(monkeypatch, 600) >= 1200
+
+
+# --- disk penuh ---
+#
+# Tidak ada hubungannya dengan video maupun jaringan, tapi tanpa penanganan
+# khusus pesannya jatuh ke "Download gagal." polos — yang mengirim orang
+# memeriksa link, VPN, dan cookies padahal yang perlu cuma mengosongkan ruang.
+
+@pytest.mark.parametrize("stderr", [
+    "ERROR: unable to write data: [Errno 28] No space left on device",
+    "OSError: [Errno 28] No space left on device",
+    "ffmpeg: Error writing trailer: No space left on device",
+])
+def test_disk_penuh_dikenali(stderr):
+    pesan = _sebab(stderr)
+    assert "ruang disk habis" in pesan.lower()
+
+
+def test_disk_penuh_tidak_menuduh_jaringan_atau_video():
+    """Salah menuduh di sini paling mahal: orang akan mengoprek cookies dan
+    VPN berjam-jam untuk masalah yang selesai dalam satu menit."""
+    pesan = _sebab("[Errno 28] No space left on device").lower()
+    for tuduhan in ("private", "bot", "koneksi", "diblokir", "dns"):
+        assert tuduhan not in pesan
+
+
+def test_disk_penuh_menyebut_folder_kerja():
+    """Folder kerja job yang GAGAL sengaja ditinggal untuk diperiksa, jadi
+    di situlah ruang paling mungkin habis — dan orang tidak akan menebaknya."""
+    assert "folder kerja" in _sebab("no space left on device").lower()

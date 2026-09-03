@@ -102,6 +102,17 @@ SEBAB = [
      "Download gagal: video diblokir untuk wilayah ini."),
     (("video unavailable", "has been removed", "does not exist"),
      "Download gagal: video tidak tersedia atau sudah dihapus."),
+    # Disk penuh tidak ada hubungannya dengan video maupun jaringan, dan tanpa
+    # baris ini pesannya jatuh ke "Download gagal." polos — yang mengirim orang
+    # memeriksa link, VPN, dan cookies padahal yang perlu dilakukan cuma
+    # mengosongkan ruang. Satu video 1080p berdurasi dua jam sendirian bisa
+    # menyita sekitar 1 GB, dan folder kerja job yang GAGAL sengaja ditinggal
+    # untuk diperiksa — jadi ruang habis justru paling mungkin terjadi setelah
+    # beberapa kegagalan beruntun.
+    (("no space left", "not enough space", "disk full", "errno 28"),
+     "Download gagal: ruang disk habis. Kosongkan folder kerja atau hapus job "
+     "lama dari halaman Proses — folder kerja job yang gagal sengaja tidak "
+     "dibersihkan otomatis."),
 ]
 
 

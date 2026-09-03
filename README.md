@@ -302,16 +302,28 @@ pipeline patah tanpa error.
 
 ## Batasan yang diketahui
 
-- **Job yatim.** Kalau proses worker mati di tengah job, row-nya tertinggal di
-  status berjalan dan tidak pulih sendiri — belum ada reaper, karena menyapunya
-  saat worker start akan salah membunuh job milik worker lain begitu jumlah
-  worker ditambah. Hapus job itu lewat halaman Proses, lalu submit ulang.
-- **Source lebih sempit dari 9:16** (misalnya video 1:1) akan ter-stretch
-  vertikal. Perbaikannya mode `fit` dengan latar blur.
-- **Satu crop per klip, bukan per shot.** Memadai untuk talking-head; source
-  dengan banyak b-roll belum tertangani.
+Dirancang untuk **talking-head berbahasa Indonesia**. Di luar itu tetap jalan,
+tapi hasilnya belum tentu layak — dan yang berikut ini sudah diukur, bukan
+diperkirakan.
+
+- **Bukan talking-head** (screencast, gameplay, animasi) dibingkai center karena
+  tidak ada wajah untuk diikuti. Pada sumber 16:9 itu **memotong 68% lebar**.
+  Diuji pada satu tutorial Excel: teks menu dan label angka terpotong di tengah
+  kata. Job-nya tetap selesai, jadi worker mencatat peringatan `TIDAK ADA WAJAH`
+  ketika seluruh klip jatuh ke center — periksa hasilnya sebelum diposting.
+- **Video sangat panjang** (di atas ~2 jam) membuat LLM kehilangan ketepatan
+  index: pada podcast 2,4 jam, ketiga kandidat menunjuk posisi yang meleset
+  11–45 detik dari kalimat yang dikutipnya sendiri. Sistem mendeteksi dan
+  membetulkannya dengan mempercayai kutipan di atas angka, tapi jumlah kandidat
+  juga menyusut — 3 dari target 5, sementara video 15 menit biasanya 7–9.
+- **Source lebih sempit dari 9:16** (misalnya 9:20) akan ter-stretch vertikal.
+  Perbaikannya mode `fit` dengan latar blur; worker memperingatkannya di log.
+- **Satu crop per klip, bukan per shot.** Memadai untuk talking-head satu orang;
+  pada percakapan dua arah, pembicara yang sedang bicara bisa berada di luar
+  bingkai. Belum diukur seberapa sering.
 - **Chunking transkrip** memotong tepat di menit ke-20 tanpa menyesuaikan ke
-  jeda bicara. Cabang itu baru aktif di atas ~2,3 jam audio.
+  jeda bicara. Cabang itu baru aktif di atas ~2,3 jam audio, dan sudah
+  diverifikasi end-to-end pada podcast 2,44 jam.
 - **Tidak ada autentikasi bawaan** selain `AUTH_TOKEN` opsional.
 
 ---

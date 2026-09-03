@@ -107,6 +107,7 @@ def run(ctx: dict) -> dict:
         log.warning("source lebih sempit dari 9:16 (%dx%d) — hasil akan ter-stretch", src_w, src_h)
 
     crops = {}
+    berwajah = 0
     for seg in ctx["segments_final"]:
         try:
             frames = _sample(source, seg["start"], seg["end"] - seg["start"], deadline)
@@ -134,10 +135,28 @@ def run(ctx: dict) -> dict:
             x = center_x
             log.info("crop %s: center (tidak ada wajah)", seg["id"])
         else:
+            berwajah += 1
             x = int(frac * src_w - win_w / 2)
             x = max(0, min(src_w - win_w, x)) & ~1
             log.info("crop %s: x=%d (wajah di %.0f%% lebar)", seg["id"], x, frac * 100)
 
         crops[seg["id"]] = {"x": x, "w": win_w}
+
+    # Tidak ada satu pun wajah di SELURUH klip berarti sumbernya kemungkinan
+    # bukan talking-head — screencast, gameplay, atau animasi. Center crop tetap
+    # menghasilkan video yang sah, dan justru itu masalahnya: tidak ada yang
+    # gagal, tapi hasilnya bisa jauh dari layak.
+    #
+    # Terukur pada satu tutorial Excel 16:9: jendela 9:16 hanya menyisakan 34%
+    # lebar layar, dan teks di kiri-kanan terpotong di tengah kata. Klipnya
+    # terlihat baik-baik saja di daftar hasil sampai benar-benar ditonton.
+    if crops and berwajah == 0:
+        log.warning(
+            "TIDAK ADA WAJAH di seluruh %d klip — sumbernya kemungkinan bukan "
+            "talking-head. Semua klip dibingkai center, dan pada layar yang "
+            "penuh konten (screencast, gameplay) itu memotong %.0f%% lebar. "
+            "Periksa hasilnya sebelum diposting.",
+            len(crops), (1 - win_w / src_w) * 100,
+        )
 
     return {"crops": crops}
