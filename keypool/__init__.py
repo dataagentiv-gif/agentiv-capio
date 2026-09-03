@@ -19,7 +19,7 @@ from utils.logging import get
 
 log = get(__name__)
 
-POOLS = ("groq", "gemini")
+POOLS = ("groq", "elevenlabs", "gemini", "openrouter")
 _lokal = itertools.count()
 # Status per key tidak perlu abadi: begitu worker dijalankan lagi, hasil lama
 # tidak lagi menggambarkan keadaan sekarang.
@@ -27,7 +27,9 @@ TTL = 24 * 3600
 
 
 def keys(pool: str) -> list[str]:
-    return settings.groq_keys if pool == "groq" else settings.gemini_keys
+    """Daftar key satu pool. Nama pool = nama properti di settings, jadi
+    menambah provider tidak menambah percabangan di sini."""
+    return getattr(settings, f"{pool}_keys")
 
 
 def _redis():
@@ -104,7 +106,7 @@ def status(pool: str) -> dict:
 
 # Nama env var penyimpan tiap pool. Dipisahkan dari kode pemakainya supaya
 # menambah provider baru cukup menambah satu baris di sini.
-ENV_FIELD = {"groq": "GROQ_API_KEYS", "gemini": "GEMINI_API_KEYS"}
+ENV_FIELD = {p: f"{p.upper()}_API_KEYS" for p in POOLS}
 
 
 def _simpan(pool: str, daftar: list[str]) -> None:

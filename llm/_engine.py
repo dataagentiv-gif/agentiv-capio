@@ -12,6 +12,7 @@ import time
 
 import httpx
 
+import keypool
 from utils.logging import get
 
 log = get(__name__)
@@ -37,6 +38,54 @@ def _tunggu(sementara: bool, attempt: int, label: str) -> None:
     detik = JEDA[min(attempt, len(JEDA) - 1)]
     log.info("%s: gangguan sementara, tunggu %ds sebelum coba lagi", label, detik)
     time.sleep(detik)
+
+
+class _Pemakai:
+    """Mengambil key dari pool dan mengingat indeksnya.
+
+    Indeksnya perlu diingat supaya hasil panggilan bisa dilaporkan balik ke
+    keypool, sementara `get_key` milik call() tidak boleh berubah tanda
+    tangannya. Satu instance per panggilan, jadi tidak ada state yang menetap
+    antar panggilan maupun antar thread.
+    """
+
+    def __init__(self, pool: str, label: str):
+        self.pool, self.label, self.idx = pool, label, -1
+
+    def __call__(self) -> str:
+        self.idx, key = keypool.ambil(self.pool)
+        # Yang di-log indeksnya, tidak pernah key-nya.
+        log.debug("%s pakai key #%d", self.label, self.idx + 1)
+        return key
+
+
+def call_pool(prompt, response_schema, *, pool: str, nama: str, **kw):
+    """call() dengan rotasi key dan pelaporan status.
+
+    Dipakai bersama semua provider LLM: yang membedakan mereka cuma endpoint,
+    model, dan apakah json_schema diterima — bukan cara merotasi key. Menulis
+    ulang logika ini per provider hanya menghasilkan dua salinan yang lambat
+    laun berbeda.
+    """
+    daftar = keypool.keys(pool)
+    if not daftar:
+        raise LLMError(f"{nama} API key kosong — isi di halaman Setting")
+
+    # Dengan banyak key, sediakan percobaan yang cukup supaya tiap key sempat
+    # dicoba saat satu di antaranya kena rate limit. Dibatasi 6 supaya kegagalan
+    # yang sebenarnya (JSON ngawur) tidak diulang belasan kali.
+    kw["attempts"] = min(max(kw.get("attempts", 3), len(daftar)), 6)
+
+    pemakai = _Pemakai(pool, pool)
+    try:
+        hasil = call(prompt, response_schema, get_key=pemakai, label=pool, **kw)
+    except Exception as e:
+        if pemakai.idx >= 0:
+            keypool.lapor(pool, pemakai.idx, False, f"{type(e).__name__}: {e}")
+        raise
+    if pemakai.idx >= 0:
+        keypool.lapor(pool, pemakai.idx, True, "OK")
+    return hasil
 
 
 def _kuota_habis(code: int, badan: str) -> bool:

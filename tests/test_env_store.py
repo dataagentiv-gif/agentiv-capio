@@ -74,10 +74,10 @@ def test_nilai_non_rahasia_tampil_apa_adanya(monkeypatch):
 def test_penanda_terisi_ikut_dikirim(monkeypatch):
     """UI perlu tahu key sudah ada atau belum tanpa melihat isinya."""
     monkeypatch.setattr(settings, "GROQ_API_KEYS", "gsk_ada")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
+    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
     f = {x["key"]: x for g in env_store.read_public()["groups"] for x in g["fields"]}
     assert f["GROQ_API_KEYS"]["filled"] is True
-    assert f["ELEVENLABS_API_KEY"]["filled"] is False
+    assert f["ELEVENLABS_API_KEYS"]["filled"] is False
 
 
 @pytest.mark.parametrize("nilai,harus", [("", ""), ("pendek", "••••••••")])

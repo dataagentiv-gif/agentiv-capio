@@ -86,8 +86,9 @@ def test_nama_provider_tidak_peduli_huruf_besar_kecil(monkeypatch, nama):
 
 def test_key_elevenlabs_kosong_ditolak_dengan_pesan_jelas(monkeypatch):
     monkeypatch.setattr(settings, "ASR_PROVIDER", "elevenlabs")
+    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
     monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
-    with pytest.raises(RuntimeError, match="ELEVENLABS_API_KEY"):
+    with pytest.raises(RuntimeError, match="ElevenLabs API key kosong"):
         asr.check_config()
 
 

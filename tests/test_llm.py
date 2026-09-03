@@ -49,21 +49,50 @@ def test_kosong_menghasilkan_list_kosong(keys):
 
 def test_client_mengambil_key_lewat_keypool(keys, monkeypatch):
     import keypool
-    from llm.client_gemini import _Pemakai
+    from llm._engine import _Pemakai
 
     keys("a,b,c")
     monkeypatch.setattr(keypool, "ambil", lambda pool: (1, "b"))
-    pemakai = _Pemakai()
+    pemakai = _Pemakai("gemini", "gemini")
     assert pemakai() == "b"
     assert pemakai.idx == 1
 
 
-def test_key_kosong_ditolak_dengan_pesan_jelas(keys):
-    from llm.client_gemini import _Pemakai
+@pytest.mark.parametrize("pool,nama,field", [
+    ("gemini", "Gemini", "GEMINI_API_KEYS"),
+    ("openrouter", "OpenRouter", "OPENROUTER_API_KEYS"),
+])
+def test_key_kosong_ditolak_dengan_pesan_jelas(monkeypatch, pool, nama, field):
+    """Kedua provider LLM harus menyebut namanya sendiri, bukan pesan generik —
+    orang perlu tahu key MANA yang kurang."""
+    from llm._engine import call_pool
 
-    keys("")
-    with pytest.raises(LLMError, match="Gemini API key"):
-        _Pemakai()()
+    monkeypatch.setattr(settings, field, "")
+    if pool == "openrouter":
+        monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "")
+    with pytest.raises(LLMError, match=f"{nama} API key kosong"):
+        call_pool("halo", None, pool=pool, nama=nama,
+                  endpoint="http://x", model="m", use_schema=False)
+
+
+def test_rotasi_dipakai_kedua_provider_llm(monkeypatch):
+    """Regresi: rotasi sempat cuma ada di Gemini. Menambah provider tanpa
+    rotasi berarti key keduanya tidak pernah terpakai."""
+    import httpx
+
+    import keypool
+    from llm import client_gemini, client_openrouter
+
+    for field in ("GEMINI_API_KEYS", "OPENROUTER_API_KEYS"):
+        monkeypatch.setattr(settings, field, "k1,k2")
+    dipakai = []
+    monkeypatch.setattr(keypool, "ambil", lambda p: (dipakai.append(p) or (0, "k1")))
+    monkeypatch.setattr(keypool, "lapor", lambda *a, **k: None)
+    monkeypatch.setattr(httpx, "post", _fake_post({}))
+
+    client_gemini.call_llm("halo")
+    client_openrouter.call_llm("halo")
+    assert dipakai == ["gemini", "openrouter"]
 
 
 # --- pemilihan provider ---
@@ -116,7 +145,7 @@ def test_openrouter_kirim_json_schema(monkeypatch):
 
     from llm import client_openrouter
 
-    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "or-key")
+    monkeypatch.setattr(settings, "OPENROUTER_API_KEYS", "or-key")
     cap = {}
     monkeypatch.setattr(httpx, "post", _fake_post(cap))
     client_openrouter.call_llm("halo", {"type": "object"})

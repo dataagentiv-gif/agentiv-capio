@@ -17,90 +17,73 @@ log = get(__name__)
 TIMEOUT = 25.0
 
 
-def _pesan_groq(kode: int, teks: str) -> str:
-    if kode == 200:
-        return "Terhubung"
-    if kode == 403:
-        return "Ditolak (403). Groq memblokir IP datacenter — matikan VPN kalau menyala."
-    if kode == 429:
-        return "Kuota habis (429)"
-    return f"HTTP {kode}: {teks[:100]}"
+# Penjelasan khusus provider untuk kode yang artinya tidak lazim. Groq menolak
+# IP datacenter dengan 403, dan tanpa keterangan ini orang akan mengira key-nya
+# yang salah lalu membuat key baru berkali-kali — padahal yang perlu dimatikan
+# cuma VPN-nya.
+KHUSUS = {
+    ("groq", 403): "Ditolak (403). Groq memblokir IP datacenter — matikan VPN kalau menyala.",
+}
 
 
-def _groq() -> tuple[bool, str]:
-    """Tiap key diuji sendiri. Satu key mati di antara beberapa key harus
-    ketahuan, bukan tertutup oleh key lain yang kebetulan jalan."""
-    keys = settings.groq_keys
+def _per_key(pool: str, kirim) -> tuple[bool, str]:
+    """Uji TIAP key satu per satu, bukan cuma yang pertama.
+
+    Satu key mati di antara beberapa key harus ketahuan, bukan tertutup oleh
+    key lain yang kebetulan jalan — itu justru kegagalan yang paling
+    membingungkan nanti: sebagian job jalan, sebagian tidak, tanpa pola.
+
+    Hasilnya sekalian dicatat ke keypool supaya lampu status di halaman Setting
+    ikut segar tanpa harus menunggu job berikutnya berjalan.
+    """
+    keys = keypool.keys(pool)
     if not keys:
         return False, "Key belum diisi"
     hasil = []
     for i, k in enumerate(keys):
-        r = httpx.get(
-            "https://api.groq.com/openai/v1/models",
-            headers={"Authorization": f"Bearer {k}"},
-            timeout=TIMEOUT,
-        )
-        pesan = _pesan_groq(r.status_code, r.text)
-        keypool.lapor("groq", i, r.status_code == 200, pesan)
-        hasil.append(f"#{i + 1} {'OK' if r.status_code == 200 else pesan}")
-    return all("OK" in h for h in hasil), f"{len(keys)} key: " + ", ".join(hasil)
-
-
-def _elevenlabs() -> tuple[bool, str]:
-    if not settings.ELEVENLABS_API_KEY:
-        return False, "Key belum diisi"
-    r = httpx.get(
-        "https://api.elevenlabs.io/v1/user/subscription",
-        headers={"xi-api-key": settings.ELEVENLABS_API_KEY},
-        timeout=TIMEOUT,
-    )
-    return (True, "Terhubung") if r.status_code == 200 else (
-        False, f"HTTP {r.status_code}: {r.text[:120]}"
-    )
-
-
-def _openrouter() -> tuple[bool, str]:
-    if not settings.OPENROUTER_API_KEY:
-        return False, "Key belum diisi"
-    r = httpx.get(
-        "https://openrouter.ai/api/v1/key",
-        headers={"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"},
-        timeout=TIMEOUT,
-    )
-    return (True, "Terhubung") if r.status_code == 200 else (
-        False, f"HTTP {r.status_code}: {r.text[:120]}"
-    )
-
-
-def _gemini() -> tuple[bool, str]:
-    keys = settings.gemini_keys
-    if not keys:
-        return False, "Key belum diisi"
-    # Tiap key diuji sendiri — satu key mati di antara beberapa key tetap harus
-    # ketahuan, bukan tertutup oleh key lain yang kebetulan jalan.
-    hasil = []
-    for i, k in enumerate(keys):
-        r = httpx.post(
-            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-            headers={"Authorization": f"Bearer {k}"},
-            json={"model": settings.GEMINI_MODEL,
-                  "messages": [{"role": "user", "content": "ping"}],
-                  "max_tokens": 1},
-            timeout=TIMEOUT,
-        )
+        r = kirim(k)
         ok_i = r.status_code == 200
-        pesan = "Terhubung" if ok_i else (
-            "Kuota habis (429)" if r.status_code == 429 else f"HTTP {r.status_code}")
-        keypool.lapor("gemini", i, ok_i, pesan)
+        pesan = _pesan(pool, r.status_code, r.text)
+        keypool.lapor(pool, i, ok_i, pesan)
         hasil.append(f"#{i + 1} {'OK' if ok_i else pesan}")
     return all("OK" in h for h in hasil), f"{len(keys)} key: " + ", ".join(hasil)
 
 
+def _pesan(pool: str, code: int, badan: str) -> str:
+    if code == 200:
+        return "Terhubung"
+    if (pool, code) in KHUSUS:
+        return KHUSUS[(pool, code)]
+    if code == 429:
+        return "Kuota habis (429)"
+    if code in (401, 403):
+        return f"Key ditolak ({code})"
+    return f"HTTP {code}: {badan[:100]}"
+
+
 PROBES = {
-    "groq": _groq,
-    "elevenlabs": _elevenlabs,
-    "openrouter": _openrouter,
-    "gemini": _gemini,
+    "groq": lambda: _per_key("groq", lambda k: httpx.get(
+        "https://api.groq.com/openai/v1/models",
+        headers={"Authorization": f"Bearer {k}"}, timeout=TIMEOUT)),
+
+    "elevenlabs": lambda: _per_key("elevenlabs", lambda k: httpx.get(
+        "https://api.elevenlabs.io/v1/user/subscription",
+        headers={"xi-api-key": k}, timeout=TIMEOUT)),
+
+    "openrouter": lambda: _per_key("openrouter", lambda k: httpx.get(
+        "https://openrouter.ai/api/v1/key",
+        headers={"Authorization": f"Bearer {k}"}, timeout=TIMEOUT)),
+
+    # Gemini diuji dengan panggilan chat sungguhan, bukan sekadar daftar model:
+    # ketersediaan MODEL berbeda per key (Google menutup model lama untuk
+    # project baru), dan itu tidak terlihat dari endpoint mana pun selain
+    # mencoba memanggilnya.
+    "gemini": lambda: _per_key("gemini", lambda k: httpx.post(
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        headers={"Authorization": f"Bearer {k}"},
+        json={"model": settings.GEMINI_MODEL,
+              "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1},
+        timeout=TIMEOUT)),
 }
 
 

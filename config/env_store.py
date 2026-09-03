@@ -36,8 +36,10 @@ FIELDS = [
     _f("GROQ_API_KEYS", "Groq API key", "Transkrip", secret=True, pool="groq",
        help="console.groq.com/keys — free tier dibatasi per key, jadi beberapa "
             "key dipakai bergiliran untuk menaikkan atapnya."),
-    _f("ELEVENLABS_API_KEY", "ElevenLabs API key", "Transkrip", secret=True,
-       help="elevenlabs.io/app/settings/api-keys — dipakai hanya kalau provider di atas elevenlabs."),
+    _f("ELEVENLABS_API_KEYS", "ElevenLabs API key", "Transkrip", secret=True,
+       pool="elevenlabs",
+       help="elevenlabs.io/app/settings/api-keys — dipakai hanya kalau provider di atas elevenlabs. "
+            "Beberapa key dipakai bergiliran, sama seperti provider lain."),
     _f("ELEVENLABS_MODEL", "Model ElevenLabs", "Transkrip"),
 
     _f("LLM_PROVIDER", "Provider LLM", "LLM", kind="select",
@@ -47,8 +49,9 @@ FIELDS = [
        help="aistudio.google.com/apikey — free tier dibatasi per key, jadi "
             "beberapa key dipakai bergiliran untuk menaikkan atapnya."),
     _f("GEMINI_MODEL", "Model Gemini", "LLM"),
-    _f("OPENROUTER_API_KEY", "OpenRouter API key", "LLM", secret=True,
-       help="openrouter.ai/keys"),
+    _f("OPENROUTER_API_KEYS", "OpenRouter API key", "LLM", secret=True,
+       pool="openrouter",
+       help="openrouter.ai/keys — beberapa key dipakai bergiliran, sama seperti provider lain."),
     _f("OPENROUTER_MODEL", "Model OpenRouter", "LLM"),
 
     _f("CLIPS_DIR", "Folder klip", "Penyimpanan",

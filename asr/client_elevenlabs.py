@@ -12,6 +12,7 @@ from pathlib import Path
 
 import httpx
 
+import keypool
 from config.settings import settings
 from utils.logging import get
 from utils.retry import retry
@@ -30,8 +31,8 @@ _PAUSE_SPLIT = 0.6
 
 
 def check_config() -> None:
-    if not settings.ELEVENLABS_API_KEY:
-        raise RuntimeError("ELEVENLABS_API_KEY kosong — isi di .env")
+    if not settings.elevenlabs_keys:
+        raise RuntimeError("ElevenLabs API key kosong — isi di halaman Setting")
 
 
 def _pack(group: list[dict]) -> dict:
@@ -88,10 +89,24 @@ def sentences_from_words(words: list[dict]) -> list[dict]:
 
 @retry(attempts=3, backoff=5.0)
 def transcribe(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
+    # Key diambil ulang di TIAP percobaan, bukan sekali di awal: percobaan yang
+    # gagal karena kena batas kuota otomatis memakai key berikutnya, bukan
+    # mengulang ke key yang sedang habis.
+    idx, key = keypool.ambil("elevenlabs")
+    try:
+        hasil = _panggil(key, path, offset)
+    except Exception as e:
+        keypool.lapor("elevenlabs", idx, False, f"{type(e).__name__}: {e}")
+        raise
+    keypool.lapor("elevenlabs", idx, True, f"{len(hasil[0])} kata")
+    return hasil
+
+
+def _panggil(key: str, path: Path, offset: float) -> tuple[list[dict], list[dict]]:
     with open(path, "rb") as f:
         r = httpx.post(
             ENDPOINT,
-            headers={"xi-api-key": settings.ELEVENLABS_API_KEY},
+            headers={"xi-api-key": key},
             files={"file": (path.name, f.read(), "audio/ogg")},
             data={
                 "model_id": settings.ELEVENLABS_MODEL,

@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # Nama lama, dipertahankan supaya .env yang sudah ada tetap jalan.
     GROQ_API_KEY: str = ""
 
+    ELEVENLABS_API_KEYS: str = ""
+    # Nama lama, dipertahankan supaya .env yang sudah ada tetap jalan.
     ELEVENLABS_API_KEY: str = ""
     ELEVENLABS_MODEL: str = "scribe_v2"
 
@@ -36,6 +38,8 @@ class Settings(BaseSettings):
     # provider atau model cukup ubah env var di sini — kode stage tidak disentuh.
     LLM_PROVIDER: str = "openrouter"  # openrouter | gemini
 
+    OPENROUTER_API_KEYS: str = ""
+    # Nama lama, dipertahankan supaya .env yang sudah ada tetap jalan.
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_MODEL: str = "google/gemini-2.5-flash-lite"
 
@@ -115,11 +119,24 @@ class Settings(BaseSettings):
     def gemini_keys(self) -> list[str]:
         return self._pecah(self.GEMINI_API_KEYS)
 
+    # Bentuk jamak dulu, bentuk tunggal sebagai cadangan. Nama tunggal dibaca
+    # supaya .env yang sudah ada tetap jalan tanpa harus disunting — termasuk
+    # milik orang lain yang sudah memasang versi sebelumnya.
     @property
     def groq_keys(self) -> list[str]:
-        # GROQ_API_KEY (tunggal) dibaca sebagai cadangan supaya .env lama tetap
-        # jalan tanpa harus disunting.
         return self._pecah(self.GROQ_API_KEYS) or self._pecah(self.GROQ_API_KEY)
+
+    @property
+    def elevenlabs_keys(self) -> list[str]:
+        return self._pecah(self.ELEVENLABS_API_KEYS) or self._pecah(
+            self.ELEVENLABS_API_KEY
+        )
+
+    @property
+    def openrouter_keys(self) -> list[str]:
+        return self._pecah(self.OPENROUTER_API_KEYS) or self._pecah(
+            self.OPENROUTER_API_KEY
+        )
 
 
 settings = Settings()

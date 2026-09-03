@@ -91,3 +91,40 @@ def test_pool_kosong_dilaporkan_nol(monkeypatch):
     monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
     s = keypool.status("gemini")
     assert s["jumlah"] == 0 and s["keys"] == []
+
+
+# --- keseragaman antar provider ---
+#
+# Rotasi awalnya cuma ada di Groq dan Gemini. ElevenLabs dan OpenRouter memakai
+# satu key tunggal, jadi menambah key kedua di sana diam-diam tidak berpengaruh:
+# UI menerimanya, .env menyimpannya, dan key itu tidak pernah dipakai.
+
+def test_semua_provider_punya_pool():
+    assert set(keypool.POOLS) == {"groq", "elevenlabs", "gemini", "openrouter"}
+
+
+@pytest.mark.parametrize("pool", keypool.POOLS)
+def test_tiap_pool_punya_sumber_key_dan_env_field(pool):
+    """Nama pool dipakai untuk menemukan properti settings DAN nama env var.
+    Kalau salah satunya tidak ada, kegagalannya baru muncul saat dipakai."""
+    assert hasattr(settings, f"{pool}_keys")
+    assert keypool.ENV_FIELD[pool] == f"{pool.upper()}_API_KEYS"
+
+
+@pytest.mark.parametrize("pool", keypool.POOLS)
+def test_tiap_pool_bisa_dirotasi(monkeypatch, pool, tanpa_redis):
+    monkeypatch.setattr(settings, keypool.ENV_FIELD[pool], "k1,k2,k3")
+    diambil = {keypool.ambil(pool)[1] for _ in range(6)}
+    assert diambil == {"k1", "k2", "k3"}, f"{pool} tidak berputar ke semua key"
+
+
+@pytest.mark.parametrize("pool", keypool.POOLS)
+def test_nama_lama_tunggal_masih_terbaca(monkeypatch, pool):
+    """.env milik orang yang sudah memasang versi sebelumnya tidak boleh mati
+    hanya karena nama variabelnya berubah jadi jamak."""
+    tunggal = f"{pool.upper()}_API_KEY"
+    if not hasattr(settings, tunggal):
+        pytest.skip(f"{pool} tidak punya nama tunggal")
+    monkeypatch.setattr(settings, keypool.ENV_FIELD[pool], "")
+    monkeypatch.setattr(settings, tunggal, "key-lama")
+    assert keypool.keys(pool) == ["key-lama"]

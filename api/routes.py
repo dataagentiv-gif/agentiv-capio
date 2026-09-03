@@ -208,14 +208,10 @@ def test_provider(provider: str):
 @app.get("/api/status")
 def config_status():
     """Ringkasan singkat untuk strip status di halaman Submit."""
-    asr_ok = bool(
-        settings.groq_keys if settings.ASR_PROVIDER == "groq"
-        else settings.ELEVENLABS_API_KEY
-    )
-    llm_ok = bool(
-        settings.OPENROUTER_API_KEY if settings.LLM_PROVIDER == "openrouter"
-        else settings.gemini_keys
-    )
+    # Nama provider = nama pool, jadi tidak ada daftar terpisah yang bisa basi
+    # saat provider baru ditambahkan.
+    asr_ok = bool(keypool.keys(settings.ASR_PROVIDER))
+    llm_ok = bool(keypool.keys(settings.LLM_PROVIDER))
     return {
         "asr": {"provider": settings.ASR_PROVIDER, "ok": asr_ok},
         "llm": {"provider": settings.LLM_PROVIDER, "ok": llm_ok},
