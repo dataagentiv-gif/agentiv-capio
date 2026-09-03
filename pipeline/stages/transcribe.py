@@ -38,7 +38,11 @@ def _chunks(audio: Path, workdir: Path, duration: float, deadline) -> tuple[list
         part = workdir / f"chunk{i}.ogg"
         ffmpeg(
             [
-                "-ss", f"{off:.3f}", "-i", "audio.ogg",
+                # Nama diambil dari argumen, bukan ditulis literal: cabang ini
+                # cuma hidup pada audio >2,3 jam, jadi kaitan diam-diam ke satu
+                # nama file akan rusak tanpa ketahuan sampai ada yang benar-benar
+                # memproses podcast panjang.
+                "-ss", f"{off:.3f}", "-i", audio.name,
                 "-t", f"{min(CHUNK_SEC, duration - off):.3f}",
                 "-c:a", "libopus", "-b:a", "24k", "-ac", "1", "-ar", "16000",
                 part.name,
