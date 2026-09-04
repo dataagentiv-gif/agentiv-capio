@@ -29,6 +29,22 @@ def _path(job_id: str, clip_id: str) -> Path:
     return Path(settings.CLIPS_DIR) / job_id / f"{clip_id}.mp4"
 
 
+def clip_path(job_id: str, clip_id: str) -> Path:
+    """Path mp4 klip. Publik supaya pemanggil yang perlu membaca berkasnya
+    langsung — pembuat thumbnail — tidak menyusun path itu sendiri."""
+    return _path(job_id, clip_id)
+
+
+def poster_path(job_id: str, clip_id: str) -> Path:
+    """Berkas thumbnail, di sebelah mp4-nya.
+
+    Sengaja bertetangga, bukan di folder cache terpisah: dengan begini ia ikut
+    terbawa saat folder job dipindahkan atau disalin, dan `delete_job()` yang
+    sudah rmtree seluruh folder tidak perlu tahu-menahu soal keberadaannya.
+    """
+    return _path(job_id, clip_id).with_suffix(".jpg")
+
+
 def save_clip(job_id: str, clip_id: str, path: Path) -> str:
     dest = _path(job_id, clip_id)
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -85,6 +101,10 @@ def delete_job(job_id: str) -> None:
 
 def delete_clip(job_id: str, clip_id: str) -> None:
     _path(job_id, clip_id).unlink(missing_ok=True)
+    # Thumbnail ikut dibuang. Ditinggal, ia jadi berkas yatim yang tidak pernah
+    # dibersihkan siapa pun — dan kalau suatu saat ada klip lain memakai id yang
+    # sama, yang tampil justru gambar milik klip yang sudah dihapus.
+    poster_path(job_id, clip_id).unlink(missing_ok=True)
     folder = Path(settings.CLIPS_DIR) / job_id
     # Folder job ikut dibuang begitu klip terakhirnya hilang, supaya tidak
     # meninggalkan folder kosong yang menumpuk.

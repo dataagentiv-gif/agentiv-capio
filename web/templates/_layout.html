@@ -8,7 +8,17 @@
   {# Tanpa ini browser meminta /favicon.ico dan dapat 404 di setiap muat
      halaman — mengotori log dengan kesalahan yang bukan kesalahan. #}
   <link rel="icon" href="/static/favicon.svg?v={{ v }}" type="image/svg+xml">
-  <meta name="theme-color" content="#1868db">
+  <meta name="theme-color" content="#0d1b2e">
+  {# Font di-preload, bukan dibiarkan ditemukan lewat @font-face di dalam CSS.
+     Tanpa ini browser baru tahu font itu ada SETELAH stylesheet selesai
+     di-parse, jadi judul halaman sempat tampil dengan font sistem lalu
+     berkedip berganti — paling terlihat di muat pertama, yang justru satu-
+     satunya muat yang dilihat orang baru. #}
+  {# TANPA ?v= — URL-nya harus sama persis dengan yang ada di @font-face, kalau
+     beda satu karakter pun browser mengunduhnya DUA KALI dan preload-nya
+     terbuang. Font tidak butuh cache-buster: isinya tidak pernah berubah. #}
+  <link rel="preload" href="/static/fonts/manrope-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/style.css?v={{ v }}">
 </head>
 <body>
@@ -51,6 +61,12 @@
     <g id="i-inbox" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M2.2 9.4h3.2l1 1.8h3.2l1-1.8h3.2"/><path d="M4 2.6h8l2.2 6.8v3a1 1 0 0 1-1 1h-10.4a1 1 0 0 1-1-1v-3z"/>
     </g>
+    {# Segitiga putar diisi penuh, bukan digaris: di atas thumbnail gelap,
+       bentuk bergaris kehilangan siluetnya dan terbaca sebagai coretan. #}
+    <g id="i-play" fill="currentColor"><path d="M5.4 3.4l7 4.6-7 4.6z"/></g>
+    <g id="i-download" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 2.4v7.2M8 9.6 5 6.6M8 9.6l3-3"/><path d="M2.6 10.6v2a1 1 0 0 0 1 1h8.8a1 1 0 0 0 1-1v-2"/>
+    </g>
   </defs>
 </svg>
 
@@ -86,6 +102,10 @@
       <a href="{{ href }}" class="{% if page == kunci %}on{% endif %}"
          {% if page == kunci %}aria-current="page"{% endif %}>
         <span class="ikon"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#{{ ikon }}"/></svg></span>
+        {# Titik penanda job berjalan, hanya di item Proses. Disembunyikan lewat
+           CSS sampai app.js menyalakannya — dirender kosong sejak awal supaya
+           tidak ada elemen yang disisipkan belakangan lalu menggeser layout. #}
+        {% if kunci == 'process' %}<span class="titik" hidden></span>{% endif %}
         <span class="lbl">{{ judul }}</span>
       </a>
       {% endfor %}

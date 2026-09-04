@@ -5,36 +5,70 @@
 {% block lede %}Tiap klip menampilkan skor dan alasan LLM memilih momen itu — supaya kualitas seleksinya bisa dinilai sendiri.{% endblock %}
 
 {% block content %}
-<div id="list"><div class="empty"><span class="spin"></span>Memuat…</div></div>
+<div id="list">{{ '' }}</div>
 {% endblock %}
 
 {% block script %}
 <script>
+document.getElementById('list').innerHTML = skKlip(3);
+
+function ikon(id, kelas = 'ic') {
+  return `<svg class="${kelas}" width="16" height="16" viewBox="0 0 16 16"
+               aria-hidden="true"><use href="#${id}"/></svg>`;
+}
+
 function clipHtml(c, jobId) {
   const tags = (c.hashtags || []).map(h => `<span>#${esc(h)}</span>`).join('');
   // Diputar lewat server ini, bukan lewat URL r2.dev: banyak ISP Indonesia
-  // memblokir r2.dev di level DNS. URL R2 aslinya tetap disediakan di samping.
+  // memblokir r2.dev di level DNS.
   const local = `/clips/${encodeURIComponent(jobId)}/${encodeURIComponent(c.id)}`;
+  // Pita warna skor. Angka telanjang menuntut dibaca satu per satu; warna
+  // menjawab "mana yang paling layak" tanpa membaca satu angka pun.
+  const pita = c.score >= 85 ? 'tinggi' : c.score >= 70 ? 'sedang' : '';
   return `
     <div class="clip">
-      <div class="score"><b>${c.score}</b><span>SCORE</span></div>
+      <button class="muka" data-putar="${local}"
+              aria-label="Putar ${esc(c.title || c.id)}">
+        <img src="${local}/poster.jpg" alt="" loading="lazy" width="116" height="206">
+        <span class="skor ${pita}">${c.score}</span>
+        <span class="main">${ikon('i-play')}</span>
+        <span class="durasi">${c.duration}s</span>
+      </button>
       <div>
-        <h3>
-          <a href="${local}" target="_blank" rel="noopener">${esc(c.title || c.id)}</a>
-          ${tombolHapus('Hapus', `clip:${jobId}:${c.id}`)}
-        </h3>
-        <div class="row reason"><b>Alasan LLM</b>${esc(c.reason)}</div>
-        <div class="row"><b>Hook</b>${esc(c.hook)}</div>
-        ${c.caption ? `<div class="row"><b>Caption</b>${esc(c.caption)}</div>` : ''}
-        <div class="row">
-          <b>Durasi</b>${c.duration}s
-          <span class="sep">·</span><a href="${local}" target="_blank" rel="noopener">putar</a>
-          <span class="sep">·</span><a href="${local}" download="${esc(c.id)}.mp4">unduh</a>
-        </div>
+        <h3>${esc(c.title || c.id)}</h3>
+        ${c.hook ? `<p class="hook">${esc(c.hook)}</p>` : ''}
+        ${c.caption ? `<div class="row potong" title="${esc(c.caption)}"><b>Caption</b>${esc(c.caption)}</div>` : ''}
+        ${c.reason ? `<details class="alasan">
+          <summary>Kenapa momen ini dipilih</summary>
+          <p>${esc(c.reason)}</p>
+        </details>` : ''}
         <div class="tags">${tags}</div>
+        <div class="aksi-klip">
+          <button class="btn sm ghost" data-putar="${local}">${ikon('i-play')}Putar</button>
+          <a class="btn sm ghost" href="${local}" download="${esc(c.id)}.mp4">${ikon('i-download')}Unduh</a>
+          ${tombolHapus('Hapus', `clip:${jobId}:${c.id}`)}
+        </div>
       </div>
     </div>`;
 }
+
+// Diputar DI TEMPAT, bukan membuka tab baru. Menilai klip berarti membandingkan
+// beberapa berturut-turut, dan tab baru tiap kali memutus perbandingan itu.
+document.getElementById('list').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-putar]');
+  if (!b) return;
+  const kotak = b.closest('.clip').querySelector('.muka');
+  if (kotak.tagName !== 'BUTTON') return;   // sudah jadi pemutar
+
+  // Tombolnya DIGANTI, bukan diisi ulang. <video controls> di dalam <button>
+  // adalah HTML tidak sah, dan akibatnya nyata: tiap klik pada tombol putar
+  // atau penggeser posisi ikut memicu tombol pembungkusnya.
+  const div = document.createElement('div');
+  div.className = 'muka jalan';
+  div.innerHTML =
+    `<video src="${kotak.dataset.putar}" controls autoplay playsinline></video>`;
+  kotak.replaceWith(div);
+});
 
 function jobHtml(j) {
   return `
@@ -50,16 +84,34 @@ function jobHtml(j) {
     </div>`;
 }
 
+// Tanda tangan isi halaman. Tanpa ini, tiap putaran polling menggambar ulang
+// SELURUH daftar walau tidak ada yang berubah — dan menggambar ulang bukan
+// operasi tanpa akibat di sini:
+//
+//   - video yang sedang diputar ikut terbuang di tengah jalan,
+//   - "Kenapa momen ini dipilih" yang sedang dibuka menutup sendiri,
+//   - puluhan <img> diganti elemen baru dan dipertimbangkan ulang.
+//
+// Halaman Proses tidak memakai ini dengan sengaja: di sana isi tiap baris
+// memang berubah tiap putaran, dan itu justru gunanya.
+let tandaTangan = null;
+
 async function tick() {
   const el = document.getElementById('list');
   try {
     const semua = await getJobs();
     const jobs = semua.filter(j => j.status === 'done' && (j.clips || []).length);
-    el.innerHTML = jobs.length
-      ? jobs.map(jobHtml).join('')
-      : empty('Belum ada hasil', '<a href="/">Submit video pertama</a> untuk mulai.');
+    const tanda = JSON.stringify(
+      jobs.map(j => [j.id, (j.clips || []).map(c => c.id)]));
+    if (tanda !== tandaTangan) {
+      tandaTangan = tanda;
+      el.innerHTML = jobs.length
+        ? jobs.map(jobHtml).join('')
+        : empty('Belum ada hasil', '<a href="/">Submit video pertama</a> untuk mulai.');
+    }
     return semua.some(isRunning);
   } catch (e) {
+    tandaTangan = null;   // paksa gambar ulang begitu API pulih
     el.innerHTML = empty('API tidak bisa dihubungi', esc(e));
     return true;
   }

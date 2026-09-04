@@ -6,11 +6,17 @@ Route di sini tidak pernah menjalankan pipeline secara sinkron: terima request
 import base64
 import re
 import secrets
+import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -286,10 +292,66 @@ def config_status():
         # Submit menampilkan ketiga bagian pipeline secara utuh.
         "storage": {"provider": "local", "ok": True},
         "ready": asr_ok and llm_ok,
+        # Jumlah job yang belum selesai. Dipakai titik penanda di dock, supaya
+        # dari halaman mana pun terlihat bahwa masih ada yang berjalan — orang
+        # submit lalu pindah halaman, dan sebelumnya tidak ada satu pun tanda.
+        #
+        # QUEUED IKUT DIHITUNG, berbeda dengan Status.BERJALAN yang sengaja
+        # mengecualikannya. Di sana pertanyaannya "apakah ada worker yang
+        # memegangnya sekarang"; di sini pertanyaannya "apakah masih ada yang
+        # saya tunggu" — dan job yang mengantre jelas termasuk.
+        "jalan": sum(
+            1 for j in jobs.list_all()
+            if j["status"] in models.Status.BERJALAN
+            or j["status"] == models.Status.QUEUED
+        ),
         "default_clips": settings.TARGET_CLIPS_DEFAULT,
         "min_sec": settings.MIN_CLIP_SEC,
         "max_sec": settings.MAX_CLIP_SEC,
     }
+
+
+@app.get("/clips/{job_id}/{clip_id}/poster.jpg")
+def poster_clip(job_id: str, clip_id: str):
+    """Satu frame klip sebagai thumbnail.
+
+    Dibuat SEKALI lalu disimpan di sebelah mp4-nya. Halaman Hasil memuat
+    puluhan klip sekaligus; membangkitkan ulang tiap kali halaman dibuka berarti
+    puluhan proses ffmpeg untuk gambar yang isinya tidak pernah berubah.
+
+    Diambil pada detik 1.0, bukan detik 0: frame pertama sebuah potongan sering
+    masih gelap atau di tengah pergantian shot, dan caption terbakarnya belum
+    muncul — padahal caption itu justru yang paling ingin dinilai sekilas.
+    """
+    # Batas kepercayaan yang SAMA dengan play_clip, sengaja memakai penjaga yang
+    # sama persis: dua nilai ini menyusun path di disk, dan penjaga versi kedua
+    # yang lambat laun berbeda adalah cara paling sunyi untuk membocorkannya.
+    if not _UUID.match(job_id) or not _CLIP.match(clip_id):
+        raise HTTPException(404, "Klip tidak ditemukan")
+
+    poster = storage.poster_path(job_id, clip_id)
+    if not poster.is_file():
+        sumber = storage.clip_path(job_id, clip_id)
+        if not sumber.is_file():
+            raise HTTPException(404, "Klip tidak ada di storage")
+        try:
+            subprocess.run(
+                ["ffmpeg", "-nostdin", "-y", "-v", "error",
+                 "-ss", "1.0", "-i", str(sumber), "-frames:v", "1",
+                 "-vf", "scale=240:-2", "-q:v", "5", str(poster)],
+                check=True, timeout=60,
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning("poster %s/%s gagal dibuat: %s", job_id, clip_id, e)
+            raise HTTPException(404, "Poster gagal dibuat") from e
+
+    return FileResponse(
+        poster,
+        media_type="image/jpeg",
+        # Isinya tidak akan pernah berubah untuk id yang sama — id klip tidak
+        # pernah dipakai ulang di dalam satu job.
+        headers={"Cache-Control": "public, max-age=604800, immutable"},
+    )
 
 
 @app.get("/clips/{job_id}/{clip_id}")

@@ -10,12 +10,13 @@
   <a href="#riwayat"  data-tab="riwayat">Riwayat <span class="hitung" id="n-riwayat"></span></a>
 </nav>
 
-<div id="p-berjalan"><div class="empty"><span class="spin"></span>Memuat…</div></div>
+<div id="p-berjalan"></div>
 <div id="p-riwayat" hidden></div>
 {% endblock %}
 
 {% block script %}
 <script>
+document.getElementById('p-berjalan').innerHTML = skJob(2);
 function stepper(status, progress) {
   const now = STAGES.findIndex(([k]) => k === status);
   const langkah = STAGES.map(([k, label], i) => {

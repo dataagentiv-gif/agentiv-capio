@@ -33,6 +33,7 @@
        warna. Nilai awalnya diambil dari default di Setting; yang diubah di
        sini berlaku untuk VIDEO INI saja. #}
     <div class="gaya-grid">
+     <div class="gaya-knob">
       {# Saklarnya di paling atas, bukan di antara knob lain: ia menentukan
          apakah lima kontrol di bawahnya berarti apa-apa. #}
       <div class="field saklar">
@@ -68,9 +69,13 @@
           <option value="true">ya</option>
         </select>
       </div>
+     </div>
       <div class="field pratinjau">
         <label>Pratinjau</label>
-        <div class="hp kecil">
+        {# `memuat` sejak awal: pratinjau pertama baru dipanggil setelah jeda
+           tunda 350ms, dan tanpa ini bingkainya sempat tampil hitam kosong —
+           terbaca sebagai pratinjau yang gagal, bukan yang sedang dimuat. #}
+        <div class="hp kecil memuat">
           <video id="pv-v" autoplay loop muted playsinline hidden></video>
           <img id="pv-i" alt="Pratinjau tampilan klip" hidden>
           <div class="hp-spin"><span class="spin"></span></div>
@@ -291,10 +296,16 @@ function segarkanPratinjau() {
 async function drawStatus() {
   try {
     const s = await (await fetch('/api/status')).json();
-    const item = (label, o) =>
-      `<span class="stat ${o.ok ? 'ok' : 'off'}">${label}: <b>${esc(o.provider)}</b></span>`;
+    // Ikon, bukan cuma label: tiga pil berteks sama panjang terbaca sebagai
+    // satu blok dan matanya lewat begitu saja — padahal ini ringkasan apakah
+    // pipeline-nya siap dipakai sama sekali.
+    const item = (label, ikon, o) =>
+      `<span class="stat ${o.ok ? 'ok' : 'off'}">
+         <svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#${ikon}"/></svg>
+         ${label}: <b>${esc(o.provider)}</b></span>`;
     document.getElementById('status').innerHTML =
-      item('Transkrip', s.asr) + item('LLM', s.llm) + item('Storage', s.storage) +
+      item('Transkrip', 'i-mic', s.asr) + item('LLM', 'i-llm', s.llm) +
+      item('Storage', 'i-folder', s.storage) +
       (s.ready ? '' : `<a class="stat warn" href="/settings">Konfigurasi belum lengkap &rarr;</a>`);
     document.getElementById('durasi').textContent =
       `Tiap klip ${s.min_sec}–${s.max_sec} detik. Ubah di halaman Setting.`;

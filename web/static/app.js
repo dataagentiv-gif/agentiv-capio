@@ -43,6 +43,45 @@ async function getJobs() {
   return r.json();
 }
 
+/* Skeleton ditaruh di sini, bukan di tiap template: tiga halaman memakainya,
+   dan tiga salinan akan lambat laun berbeda satu sama lain.
+
+   Bentuknya sengaja meniru isi yang akan datang — TERMASUK kotak thumbnailnya
+   di kartu klip. Skeleton yang ukurannya asal justru menambah satu lompatan
+   layout lagi, persis hal yang seharusnya ia cegah. */
+function skJob(n = 2) {
+  return Array.from({ length: n }, () => `
+    <div class="job">
+      <div class="job-head">
+        <span class="sk sk-pil" style="width:74px"></span>
+        <span class="sk sk-baris" style="width:280px;margin:0"></span>
+        <span class="sk sk-baris" style="width:90px;margin:0 0 0 auto"></span>
+      </div>
+      <div class="job-body">
+        <div class="sk sk-baris" style="width:100%"></div>
+        <div class="sk sk-baris" style="width:40%"></div>
+      </div>
+    </div>`).join('');
+}
+
+function skKlip(n = 3) {
+  const baris = Array.from({ length: n }, () => `
+    <div class="clip">
+      <div class="sk" style="aspect-ratio:9/16;border-radius:12px"></div>
+      <div>
+        <div class="sk sk-judul"></div>
+        <div class="sk sk-baris" style="width:100%"></div>
+        <div class="sk sk-baris" style="width:82%"></div>
+        <div class="tags">
+          <span class="sk sk-pil" style="width:76px"></span>
+          <span class="sk sk-pil" style="width:92px"></span>
+          <span class="sk sk-pil" style="width:64px"></span>
+        </div>
+      </div>
+    </div>`).join('');
+  return `<div class="job"><div class="clips">${baris}</div></div>`;
+}
+
 function empty(judul, isi) {
   return `<div class="empty">
             <svg class="ic-empty" width="40" height="40" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-inbox"/></svg>
@@ -186,6 +225,31 @@ function idJob(id) {
   // menggeser pusat item aktif beberapa piksel — cukup untuk membuat lingkaran
   // terlihat tidak duduk pas di lekukannya.
   document.fonts?.ready.then(gambar);
+})();
+
+// Titik penanda di dock: ada job yang belum selesai. Dipasang di app.js supaya
+// berlaku di SEMUA halaman — justru saat sedang tidak melihat halaman Proses-lah
+// penanda ini berguna. Halaman Proses dan Hasil sudah polling /jobs sendiri;
+// yang ini memakai /api/status yang jauh lebih ringan dan tidak mengirim
+// seluruh isi job beserta klipnya.
+(function penandaJalan() {
+  const titik = document.querySelector('.dock .titik');
+  if (!titik) return;
+
+  async function cek() {
+    try {
+      const s = await (await fetch('/api/status')).json();
+      titik.hidden = !s.jalan;
+      titik.title = s.jalan ? `${s.jalan} job berjalan` : '';
+    } catch {
+      // API tidak terjangkau bukan berarti tidak ada job berjalan. Titiknya
+      // dibiarkan apa adanya, bukan dimatikan — mematikannya adalah pernyataan
+      // yang tidak bisa dibuktikan.
+    }
+  }
+
+  cek();
+  setInterval(cek, 15000);
 })();
 
 // Menyalin id dipasang sekali di sini, bukan per halaman: dua halaman memakai

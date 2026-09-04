@@ -1,7 +1,31 @@
 /* Design tokens: sistem Atlassian (refero.design).
    Charlie Display/Text adalah font proprietary Atlassian; dipakai substitusi
-   resmi dari style guide-nya — Manrope untuk display, Inter untuk teks. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Manrope:wght@400;500;700;800&display=swap');
+   resmi dari style guide-nya — Manrope untuk display, Inter untuk teks.
+
+   Font di-vendor ke repo, BUKAN diambil dari fonts.googleapis.com seperti
+   sebelumnya. Tiga alasan, dan yang pertama paling menentukan: @import ke CDN
+   luar adalah request pemblokir render yang harus selesai sebelum satu piksel
+   pun tampil, dan alat ini dipakai di mesin sendiri — kadang tanpa internet
+   sama sekali. Kedua, tiap muat halaman mengirim IP pengguna ke Google untuk
+   berkas yang isinya tidak pernah berubah. Ketiga, satu berkas variable
+   melayani seluruh bobot, jadi totalnya justru lebih kecil dari empat berkas
+   statis yang diminta @import lama. Polanya sama dengan font caption di
+   assets/fonts/ yang sengaja di-vendor supaya build tidak bergantung jaringan. */
+@font-face {
+  font-family: 'Manrope';
+  src: url('/static/fonts/manrope-var.woff2') format('woff2');
+  font-weight: 200 800;   /* satu berkas, seluruh rentang bobot */
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/fonts/inter-var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   /* Warna brand CAPIO. Biru dan hitamnya kebetulan sudah sama persis dengan
@@ -10,24 +34,37 @@
   --color-action: #1868db;
   --color-action-hover: #1257bd;
 
-  /* Aksen brand. Dipakai HEMAT dan hanya untuk satu makna: ada yang sedang
-     berjalan sekarang. Kalau dipakai untuk hiasan, ia berhenti berarti apa-apa
-     — dan biru sudah memegang seluruh peran aksi. */
+  /* Aksen brand. Dipakai HEMAT dan hanya untuk satu makna: ADA YANG SEDANG
+     HIDUP SEKARANG, atau kualitas puncak. Boleh: progress, langkah aktif,
+     badge running, titik penanda di dock, skor klip tertinggi. Tidak boleh:
+     tombol, tautan, item nav aktif, cincin fokus — semua itu milik biru.
+     Kalau oranye dipakai untuk hiasan, ia berhenti berarti apa-apa. */
   --color-accent: #ff564d;
   --color-accent-soft: #fff0ef;
+  --color-accent-fg: #b3352e;   /* untuk teks di atas accent-soft */
 
-  --color-ink: #101214;
-  --color-body: #292a2e;
-  --color-muted: #42526e;
+  /* Netral bernada navy, bukan abu murni: latar gelap dock dan judul halaman
+     harus terbaca satu keluarga dengan biru brand, bukan hitam yang kebetulan
+     ada di sebelahnya. */
+  --color-ink: #0d1726;
+  --color-body: #2b3444;
+  /* Diturunkan nadanya dari #42526e. Nilai lama cukup biru untuk membuat
+     seluruh paragraf bantuan di halaman Setting terbaca seperti tautan yang
+     bisa diklik — dan halaman itu isinya memang penuh teks bantuan. */
+  --color-muted: #5a6577;
   --color-white: #ffffff;
-  --color-fog: #f0f1f2;
-  --color-ash: #b7b9be;
+  --color-fog: #eceef1;
+  --color-ash: #b0b6c0;
 
+  /* Dasar halaman TERPISAH dari permukaan kartu. Sebelumnya keduanya
+     --surface-canvas, jadi kartu putih di atas halaman putih cuma dibedakan
+     garis rambut 1px dan seluruh UI terbaca rata tanpa kedalaman. */
+  --surface-page: #fbfaf8;
   --surface-canvas: #ffffff;
-  --surface-soft: #f0f1f2;
+  --surface-soft: #f1f2f5;
   --surface-tinted: #e9f2fe;
   --surface-lavender: #eed7fc;
-  --surface-dark: #101214;
+  --surface-dark: #0d1b2e;
 
   /* PERLUASAN di luar token asli. Sistem Atlassian yang diberikan tidak punya
      warna sukses/gagal sama sekali — kuning, violet, dan hijau di sana khusus
@@ -50,6 +87,11 @@
   --radius-full: 10000px;
 
   --shadow-subtle: rgba(9, 30, 66, 0.31) 0 0 1px 0, rgba(9, 30, 66, 0.25) 0 1px 1px 0;
+  /* Bayangan kartu menggantikan garis rambut. Dua lapis: satu rapat untuk
+     mendefinisikan tepinya, satu lebar dan sangat samar untuk mengangkatnya
+     dari dasar halaman. Satu lapis saja terbaca seperti stiker. */
+  --shadow-card: 0 1px 2px rgba(13, 23, 38, .05), 0 6px 20px rgba(13, 23, 38, .05);
+  --shadow-card-hover: 0 2px 4px rgba(13, 23, 38, .07), 0 12px 32px rgba(13, 23, 38, .09);
   --page-max: 1200px;
 }
 
@@ -66,7 +108,7 @@
 
 body {
   margin: 0;
-  background: var(--surface-canvas);
+  background: var(--surface-page);
   color: var(--color-ink);
   font-family: var(--font-text);
   font-size: 16px;
@@ -82,7 +124,7 @@ a { color: var(--color-action); }
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--surface-canvas);
+  background: var(--surface-page);
   border-bottom: 1px solid var(--color-fog);
 }
 
@@ -209,6 +251,27 @@ a { color: var(--color-action); }
 
 .dock a:hover .ikon { background: rgba(255, 255, 255, .1); color: var(--color-white); }
 
+/* Titik koral: ada job yang belum selesai. Ditaruh di pojok ikon dan diberi
+   cincin sewarna dock supaya tetap terbaca sebagai titik terpisah, bukan bagian
+   dari ikonnya. */
+.dock .titik {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--surface-dark);
+  animation: denyut 1.6s ease-in-out infinite;
+}
+
+/* Item aktif ikonnya melompat keluar dock, jadi titik di pojok ikon akan ikut
+   melayang jauh dari docknya. Di sana ia dipindah ke pojok labelnya. */
+.dock a.on .titik { top: auto; bottom: 8px; right: 10px; }
+
+@media (prefers-reduced-motion: reduce) { .dock .titik { animation: none; } }
+
 .dock a:focus-visible { outline: none; }
 .dock a:focus-visible .ikon {
   outline: 2px solid var(--color-white);
@@ -237,12 +300,16 @@ a { color: var(--color-action); }
   transform: translate(-50%, -50%);
   width: calc((var(--lekuk) - var(--sela)) * 2);
   height: calc((var(--lekuk) - var(--sela)) * 2);
-  background: var(--surface-canvas);
+  /* WAJIB sama dengan latar nav, bukan putih murni. Lingkaran ini duduk di
+     dalam lubang lekukan, dan lubang itu memperlihatkan latar nav — kalau
+     keduanya beda sedikit saja, muncul cincin jahitan tipis mengelilinginya
+     yang terlihat seperti bug rendering. */
+  background: var(--surface-page);
   color: var(--color-action);
   box-shadow: 0 4px 10px rgba(16, 18, 20, .18);
 }
 
-.dock a.on:hover .ikon { background: var(--surface-canvas); }
+.dock a.on:hover .ikon { background: var(--surface-page); }
 
 .dock a.on .ic { width: 20px; height: 20px; }
 
@@ -282,8 +349,11 @@ h1.display {
 
 .card {
   background: var(--surface-canvas);
-  border: 1px solid var(--color-fog);
   border-radius: var(--radius-cards);
+  /* Bayangan, bukan garis rambut. Di atas dasar off-white, kartu putih akhirnya
+     terbaca sebagai kartu — sebelumnya putih di atas putih dan seluruh halaman
+     rata tanpa kedalaman. */
+  box-shadow: var(--shadow-card);
   padding: 24px;
 }
 
@@ -325,6 +395,13 @@ input:focus {
 .form-row > .field.compact { flex: 0 0 140px; }
 
 .btn {
+  /* inline-flex, bukan inline: .btn juga dipakai pada <a>, dan pada elemen
+     inline padding tidak mendorong tetangganya — tombolnya terlihat benar
+     sendirian tapi saling tindih begitu berjajar. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   margin-top: 24px;
   padding: 11px 24px;
   font-family: inherit;
@@ -335,11 +412,16 @@ input:focus {
   border: 0;
   border-radius: var(--radius-buttons);
   cursor: pointer;
-  transition: background .15s;
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(13, 23, 38, .12);
+  transition: background .15s, transform .08s, box-shadow .15s;
 }
 
 .btn:hover:not(:disabled) { background: var(--color-action-hover); }
-.btn:disabled { opacity: .5; cursor: default; }
+/* Tombol yang bergerak sedikit saat ditekan memberi tahu bahwa kliknya
+   mendarat — tanpa itu, aksi yang lambat terasa seperti tidak terjadi apa-apa. */
+.btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
+.btn:disabled { opacity: .5; cursor: default; box-shadow: none; }
 
 .hint {
   margin: 16px 0 0;
@@ -374,18 +456,41 @@ input:focus {
   color: var(--color-muted);
 }
 
-.badge.running { background: var(--surface-tinted); color: var(--color-action); }
+/* Koral, bukan biru: ini satu-satunya badge yang berarti "sedang terjadi
+   sekarang", dan itu persis makna yang dipegang aksen. Biru di sini bertabrakan
+   dengan biru tombol dan tautan, yang artinya "bisa kamu klik". */
+.badge.running {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-fg);
+}
+
 .badge.done { background: var(--success-bg); color: var(--success-fg); }
 .badge.failed { background: var(--danger-bg); color: var(--danger-fg); }
+
+/* Titik berdenyut di badge running — satu-satunya animasi yang menyatakan
+   "halaman ini tidak beku, pekerjaannya memang sedang jalan". */
+.badge.running::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  vertical-align: 1px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  animation: denyut 1.6s ease-in-out infinite;
+}
+
+@keyframes denyut { 50% { opacity: .25; } }
 
 /* ---------- Daftar job ---------- */
 
 .job {
-  border: 1px solid var(--color-fog);
   border-radius: var(--radius-cards);
   margin-bottom: 20px;
   overflow: hidden;
   background: var(--surface-canvas);
+  box-shadow: var(--shadow-card);
 }
 
 .job-head {
@@ -458,13 +563,16 @@ input:focus {
   overflow: auto;
 }
 
-/* ---------- Klip ---------- */
+/* ---------- Klip ----------
+   Isi halaman ini adalah VIDEO, dan sebelumnya tidak ada satu frame pun yang
+   terlihat — 80-an klip disajikan sebagai dinding teks. Thumbnail bukan hiasan
+   di sini: ia satu-satunya cara menilai sebuah klip tanpa membukanya. */
 
 .clips { border-top: 1px solid var(--color-fog); }
 
 .clip {
   display: grid;
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: 116px 1fr;
   gap: 20px;
   padding: 20px 24px;
   border-bottom: 1px solid var(--color-fog);
@@ -472,52 +580,150 @@ input:focus {
 
 .clip:last-child { border-bottom: 0; }
 
-.score {
-  text-align: center;
-  padding-top: 2px;
+/* --- kotak thumbnail --- */
+
+.muka {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-ink);
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  display: block;
+  width: 100%;
 }
 
-.score b {
+.muka img, .muka video {
   display: block;
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--color-action);
-  letter-spacing: -0.02em;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.score span {
-  display: block;
-  margin-top: 4px;
+/* Poster yang gagal dibuat (ffmpeg tidak ada, berkas rusak) menyisakan kotak
+   hitam kosong, bukan ikon gambar-rusak bawaan browser. */
+.muka img { color: transparent; }
+
+.muka .main {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: rgba(13, 23, 38, .55);
+  color: var(--color-white);
+  backdrop-filter: blur(3px);
+  transition: transform .15s, background .15s;
+}
+
+.muka:hover .main { transform: scale(1.1); background: rgba(13, 23, 38, .78); }
+.muka:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+.muka.jalan { cursor: default; }
+
+.muka .durasi {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(13, 23, 38, .78);
+  color: var(--color-white);
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: .06em;
-  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
 }
+
+/* --- skor --- */
+
+.skor {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-white);
+  background: var(--color-muted);
+}
+
+/* Koral hanya untuk pita teratas. Skor adalah satu-satunya angka mutu di
+   halaman ini, dan tanpa pita warna ia cuma deretan angka yang harus dibaca
+   satu per satu. */
+.skor.tinggi { background: var(--color-accent); }
+.skor.sedang { background: var(--color-action); }
+
+/* --- isi teks --- */
 
 .clip h3 {
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 19px;
   line-height: 1.25;
   font-weight: 700;
   letter-spacing: -0.01em;
   margin: 0 0 10px;
+  color: var(--color-ink);
 }
 
-.clip h3 a { color: var(--color-ink); text-decoration: none; }
-.clip h3 a:hover { color: var(--color-action); }
+/* Hook diangkat jadi kutipan. Ini kalimat pembuka klipnya — bagian teks yang
+   paling menentukan apakah sebuah klip layak diposting — dan sebelumnya ia
+   terkubur sebagai baris ketiga di antara label tebal berbunyi "Hook:". */
+.hook {
+  margin: 0 0 12px;
+  padding-left: 14px;
+  border-left: 3px solid var(--color-fog);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-body);
+}
 
 .row { font-size: 14px; line-height: 1.5; margin: 5px 0; color: var(--color-body); }
 
-/* Label dan isinya perlu pemisah tegas. Tanpa titik dua, "Hook Kali ini gue
+/* Label dan isinya perlu pemisah tegas. Tanpa titik dua, "Caption Kali ini gue
    akan bahas" terbaca sebagai satu kalimat dan labelnya hilang di dalamnya. */
 .row b { font-weight: 500; color: var(--color-muted); margin-right: 8px; }
 .row b::after { content: ':'; }
-.row.reason { color: var(--color-muted); font-style: italic; }
-.row a { text-decoration: none; font-weight: 500; }
-.row a:hover { text-decoration: underline; }
 .sep { color: var(--color-ash); margin: 0 6px; }
+
+/* Caption bisa sepanjang tiga baris dan itu membuatnya mendominasi kartu,
+   padahal ia teks untuk DISALIN saat posting — bukan untuk dibaca di sini.
+   Dipotong dua baris; utuhnya tetap ada di tooltip dan saat disalin. */
+.row.potong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Alasan LLM dilipat: berguna saat menilai mutu seleksi, tapi tidak cukup
+   sering dibaca untuk memakan empat baris di TIAP kartu. */
+.alasan { margin: 10px 0 0; font-size: 13.5px; }
+
+.alasan summary {
+  cursor: pointer;
+  color: var(--color-muted);
+  font-weight: 500;
+  list-style: none;
+}
+
+.alasan summary::-webkit-details-marker { display: none; }
+.alasan summary::before { content: '▸ '; }
+.alasan[open] summary::before { content: '▾ '; }
+.alasan summary:hover { color: var(--color-action); }
+
+.alasan p {
+  margin: 8px 0 0;
+  padding-left: 14px;
+  color: var(--color-muted);
+  line-height: 1.55;
+}
 
 .tags { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -529,6 +735,21 @@ input:focus {
   font-size: 12px;
   font-weight: 500;
 }
+
+.aksi-klip {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Tombol hapus didorong ke ujung, terpisah dari aksi yang aman. Berdampingan
+   rapat dengan "Unduh", ia terlalu mudah kena saat membidik cepat. */
+.aksi-klip .btn-hapus { margin-left: auto; }
+/* .btn membawa margin-top 24px untuk pemakaiannya sebagai tombol utama di
+   bawah form. Di dalam baris aksi, margin itu mendorongnya turun dari baris. */
+.aksi-klip .btn { margin-top: 0; }
 
 /* ---------- Tombol hapus ---------- */
 
@@ -557,20 +778,14 @@ input:focus {
   background: var(--danger-bg);
 }
 
-.clip h3 {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-content: space-between;
-}
-
-.clip h3 .btn-hapus { font-size: 12px; font-weight: 500; }
 .btn-hapus .ic { width: 14px; height: 14px; }
 
 /* ---------- Kosong ---------- */
 
+/* Garis putus-putus, bukan kartu penuh: keadaan kosong adalah tempat yang
+   MENUNGGU diisi, dan tepi bertitik menyampaikan itu tanpa satu kata pun. */
 .empty {
-  border: 1px solid var(--color-fog);
+  border: 1.5px dashed var(--color-fog);
   border-radius: var(--radius-cards);
   padding: 64px 24px;
   text-align: center;
@@ -581,6 +796,37 @@ input:focus {
   width: 40px; height: 40px;
   color: var(--color-ash);
   margin-bottom: 14px;
+}
+
+/* ---------- Skeleton ----------
+   Bentuk isi yang akan datang, bukan spinner. Spinner cuma bilang "tunggu";
+   skeleton bilang "segini yang akan muncul, dan di sini tempatnya" — jadi
+   halamannya tidak melompat saat datanya masuk. Karena itu bentuknya HARUS
+   menyerupai isi aslinya; skeleton yang ukurannya asal justru menambah satu
+   lompatan lagi. */
+.sk {
+  background: linear-gradient(90deg,
+    var(--surface-soft) 25%, #e4e7ec 37%, var(--surface-soft) 63%);
+  background-size: 400% 100%;
+  animation: kilau 1.5s ease infinite;
+  border-radius: 6px;
+}
+
+@keyframes kilau { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+.sk-baris { height: 12px; margin-bottom: 9px; }
+.sk-baris:last-child { margin-bottom: 0; }
+.sk-judul { height: 19px; width: 58%; margin-bottom: 15px; border-radius: 7px; }
+.sk-pil { height: 22px; border-radius: var(--radius-full); }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Kilau dan denyut dimatikan — keduanya murni dekoratif dan gerakannya
+     berulang tanpa henti. Spinner cuma DIPERLAMBAT, tidak dihentikan: spinner
+     yang diam terbaca sebagai antarmuka yang membeku, bukan sebagai
+     penghormatan terhadap setelan pengguna. */
+  .sk { animation: none; background: var(--surface-soft); }
+  .badge.running::before { animation: none; }
+  .spin { animation-duration: 2.4s; }
 }
 
 .empty .spin {
@@ -612,20 +858,30 @@ input:focus {
 .stat {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
+  gap: 7px;
+  padding: 7px 14px;
   border-radius: var(--radius-full);
   font-size: 13px;
-  background: var(--surface-soft);
+  /* Kartu putih bertepi, bukan pil hijau pucat. Hijau di ketiganya membuat
+     strip ini terbaca sebagai satu blok datar — dan yang justru harus menonjol
+     adalah saat salah satunya TIDAK hijau. */
+  background: var(--surface-canvas);
+  border: 1px solid var(--color-fog);
   color: var(--color-muted);
   text-decoration: none;
 }
 
-.stat b { font-weight: 500; color: var(--color-ink); }
-.stat.ok { background: var(--success-bg); color: var(--success-fg); }
-.stat.ok b { color: var(--success-fg); }
-.stat.off { background: var(--surface-soft); color: var(--color-muted); }
-.stat.warn { background: var(--danger-bg); color: var(--danger-fg); font-weight: 500; }
+.stat .ic { width: 15px; height: 15px; color: var(--color-ash); }
+.stat b { font-weight: 600; color: var(--color-ink); }
+.stat.ok .ic { color: var(--success-fg); }
+.stat.ok b { color: var(--color-ink); }
+.stat.off { background: var(--surface-soft); border-color: transparent; }
+.stat.warn {
+  background: var(--danger-bg);
+  border-color: transparent;
+  color: var(--danger-fg);
+  font-weight: 500;
+}
 
 /* ---------- Chip jumlah klip ---------- */
 
@@ -667,7 +923,7 @@ input.chip-num { width: 96px; cursor: text; text-align: center; }
      tombol utama di sebelahnya. */
   border: 1px solid var(--color-ash);
   text-decoration: none;
-  display: inline-block;
+  box-shadow: none;
 }
 
 .btn.ghost:hover:not(:disabled) {
@@ -983,9 +1239,11 @@ select:focus {
   .lede { font-size: 16px; }
   .form-row { flex-direction: column; }
   .form-row > .field.compact { flex: 1; width: 100%; }
-  .clip { grid-template-columns: 1fr; gap: 12px; }
-  .score { display: flex; align-items: baseline; gap: 8px; text-align: left; }
-  .score span { margin-top: 0; }
+  /* Thumbnail dipersempit, TIDAK ditumpuk di atas teksnya. Ditumpuk, satu klip
+     memakan hampir seluruh tinggi layar dan daftarnya berhenti bisa dipindai —
+     padahal memindai justru satu-satunya alasan halaman ini ada. */
+  .clip { grid-template-columns: 84px 1fr; gap: 14px; padding: 16px; }
+  .clip h3 { font-size: 17px; }
   .job-meta { margin-left: 0; width: 100%; }
 }
 
@@ -1106,26 +1364,33 @@ select:focus {
 
 /* ---------- Knob tampilan di halaman Submit ---------- */
 
+/* Flex dua kolom, BUKAN satu grid tiga kolom dengan pratinjau menjangkau
+   seluruh baris. Trik lama `.pratinjau { grid-row: 1 / -1 }` bekerja sampai
+   saklar caption ditambahkan dan menjangkau dua kolom — sejak itu ia
+   meregangkan baris pertama dan meninggalkan lubang abu-abu setinggi kotak
+   pratinjau di tengah panel. Sebagai dua kolom terpisah, tinggi keduanya tidak
+   lagi saling menarik. */
 .gaya-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
-  gap: 16px 20px;
-  align-items: start;
-  /* Baris kiri mengikuti tinggi isinya sendiri, bukan dibagi rata mengikuti
-     kotak pratinjau yang jauh lebih tinggi — tanpa ini kontrolnya merenggang
-     dengan celah kosong di antaranya. */
-  grid-auto-rows: min-content;
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
   margin-bottom: 20px;
   padding: 20px;
   background: var(--surface-soft);
   border-radius: var(--radius-inputs);
 }
 
-.gaya-grid .field { margin-bottom: 0; }
+.gaya-knob {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  align-content: start;
+}
 
-/* Pratinjau menempati kolom ketiga sepanjang seluruh baris — ia satu-satunya
-   yang tingginya berbeda, dan menaruhnya di alur biasa menyisakan lubang. */
-.gaya-grid .pratinjau { grid-column: 3; grid-row: 1 / -1; }
+.gaya-grid .field { margin-bottom: 0; }
+.gaya-grid .pratinjau { flex: none; }
 
 .gaya-grid select,
 .gaya-grid input[type=text],
@@ -1162,7 +1427,7 @@ select:focus {
 
 /* Saklar caption memayungi lima knob di bawahnya, jadi ia menempati kedua
    kolom kontrol — bukan berdiri sejajar dengan yang dikendalikannya. */
-.gaya-grid .saklar { grid-column: 1 / 3; }
+.gaya-knob .saklar { grid-column: 1 / -1; }
 
 .gaya-grid .saklar label {
   display: flex;
@@ -1186,8 +1451,10 @@ select:focus {
 .gaya-grid .field.mati { opacity: .4; }
 
 @media (max-width: 720px) {
-  .gaya-grid { grid-template-columns: 1fr; }
-  .gaya-grid .pratinjau { grid-column: 1; grid-row: auto; }
+  /* Pratinjau turun ke bawah knobnya. Berdampingan, keduanya tinggal ~120px
+     masing-masing dan tidak ada yang tersisa untuk dibaca. */
+  .gaya-grid { flex-direction: column; }
+  .gaya-knob { width: 100%; grid-template-columns: 1fr; }
 }
 
 /* Tombol hapus yang sedang memproses. Tanpa penanda, klik kedua terasa seperti
