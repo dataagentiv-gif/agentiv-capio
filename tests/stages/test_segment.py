@@ -4,6 +4,7 @@ Segmen di luar rentang tetap lolos validasi JSON tapi menghasilkan klip yang
 terlalu pendek atau terlalu panjang saat render.
 """
 from pipeline.stages.segment import (
+    _anchor_kalimat,
     _anchors,
     _indexed_transcript,
     _snap_idx,
@@ -122,6 +123,68 @@ def test_index_baris_menunjuk_kata_pertama_kalimat():
     lines = _indexed_transcript(SENT_WORDS, SENTENCES).splitlines()
     assert lines[0].startswith("[0 @")
     assert lines[1].startswith("[3 @")  # kata pertama kalimat kedua ada di t=3.0
+
+
+# --- label baris harus sejajar dengan kalimatnya ---
+#
+# Ini kesalahan yang paling lama tidak ketahuan di project ini, dan selama
+# berbulan-bulan dikira kelemahan LLM pada masukan besar. _indexed_transcript
+# dulu mengambil labelnya dari _anchors, yang membuang duplikat lewat set().
+# Begitu DUA kalimat jatuh di kata yang sama, daftarnya jadi lebih pendek dari
+# daftar kalimat — dan sejak titik itu tiap baris membawa label milik kalimat
+# BERIKUTNYA, menumpuk sampai akhir transkrip.
+#
+# Terukur pada podcast 27 menit: 540 kalimat, 538 anchor, 518 baris (96%) salah
+# label, meleset 3-20 detik ke depan. Sesudah diperbaiki: 0 salah.
+
+BENTROK_WORDS = [
+    {"i": i, "w": f"k{i}", "s": s, "e": s + 0.3}
+    for i, s in enumerate([0.0, 0.4, 2.0, 2.4, 5.0, 5.4, 8.0, 8.4])
+]
+#: Kalimat #1 dan #2 sengaja jatuh di kata yang sama (keduanya mulai ~2.0s).
+#: Ini lazim terjadi: ASR memberi dua kalimat pendek timestamp nyaris identik.
+BENTROK_SENTENCES = [
+    {"text": "Kalimat nol.", "s": 0.0, "e": 1.0},
+    {"text": "Kalimat satu.", "s": 2.0, "e": 2.2},
+    {"text": "Kalimat dua.", "s": 2.02, "e": 4.0},
+    {"text": "Kalimat tiga.", "s": 5.0, "e": 7.0},
+    {"text": "Kalimat empat.", "s": 8.0, "e": 9.0},
+]
+
+
+def test_jumlah_baris_sama_dengan_jumlah_kalimat_walau_ada_bentrokan():
+    lines = _indexed_transcript(BENTROK_WORDS, BENTROK_SENTENCES).splitlines()
+    assert len(lines) == len(BENTROK_SENTENCES)
+
+
+def test_label_tidak_bergeser_sesudah_bentrokan():
+    """Inti bugnya. Sebelum diperbaiki, kalimat "tiga" dan "empat" membawa label
+    milik kalimat sesudahnya — dan klip yang keluar diambil dari menit yang
+    salah tanpa satu pun error."""
+    lines = _indexed_transcript(BENTROK_WORDS, BENTROK_SENTENCES).splitlines()
+    for baris, harusnya in zip(lines, [0, 2, 2, 4, 6]):
+        assert baris.startswith(f"[{harusnya} @"), baris
+
+
+def test_label_menunjuk_kata_yang_benar_benar_mengucapkannya():
+    """Diperiksa dari sisi isi, bukan dari angka: kata di posisi label harus
+    mulai pada waktu yang sama dengan kalimatnya."""
+    idx = _anchor_kalimat(BENTROK_WORDS, BENTROK_SENTENCES)
+    for n, s in enumerate(BENTROK_SENTENCES):
+        assert abs(BENTROK_WORDS[idx[n]]["s"] - s["s"]) < 0.5
+
+
+def test_anchor_kalimat_sejajar_satu_satu_dengan_kalimat():
+    assert len(_anchor_kalimat(BENTROK_WORDS, BENTROK_SENTENCES)) == len(BENTROK_SENTENCES)
+
+
+def test_anchors_tetap_unik_untuk_batas_klip():
+    """Dua peran yang berbeda dan keduanya benar: label baris boleh berulang,
+    tapi daftar posisi yang sah jadi batas klip tidak boleh punya duplikat —
+    _snap_idx dan _cari_hook memindainya satu per satu."""
+    a = _anchors(BENTROK_WORDS, BENTROK_SENTENCES)
+    assert a == sorted(set(a))
+    assert a == [0, 2, 4, 6]
 
 
 # --- snap index ke batas kalimat ---

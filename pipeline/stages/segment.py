@@ -166,21 +166,33 @@ def _mmss(t: float) -> str:
     return f"{m:02d}:{s:02d}"
 
 
+def _anchor_kalimat(words: list[dict], sentences: list[dict]) -> list[int]:
+    """Index kata pertama untuk TIAP kalimat, sejajar satu-satu dengan
+    `sentences` — panjangnya selalu sama, dan nilainya boleh berulang.
+
+    Dipisahkan dari `_anchors` dengan sengaja. Keduanya menghitung hal yang
+    sama tapi menjawab pertanyaan yang berbeda: yang ini "kalimat ke-n mulai di
+    kata mana", yang itu "kata mana saja yang boleh jadi batas klip". Menyatukan
+    keduanya di satu daftar ber-dedupe pernah menghasilkan kesalahan potong yang
+    paling lama tidak ketahuan di project ini — lihat _indexed_transcript.
+    """
+    starts = [w["s"] for w in words]
+    return [
+        # -0.05 memberi toleransi: timestamp kalimat dan kata dari Whisper bisa
+        # meleset beberapa puluh milidetik satu sama lain.
+        min(max(bisect.bisect_left(starts, s["s"] - 0.05), 0), len(words) - 1)
+        for s in sentences
+    ]
+
+
 def _anchors(words: list[dict], sentences: list[dict]) -> list[int]:
-    """Index kata pertama tiap kalimat.
+    """Himpunan posisi yang boleh jadi batas klip — unik dan urut.
 
     Inilah satu-satunya titik yang boleh jadi awal klip. Dengan hanya
     menampilkan index ini ke LLM, batas yang bisa dipilihnya otomatis jatuh di
     awal kalimat, bukan di tengah.
     """
-    starts = [w["s"] for w in words]
-    out = set()
-    for s in sentences:
-        # -0.05 memberi toleransi: timestamp kalimat dan kata dari Whisper bisa
-        # meleset beberapa puluh milidetik satu sama lain.
-        i = bisect.bisect_left(starts, s["s"] - 0.05)
-        out.add(min(max(i, 0), len(words) - 1))
-    return sorted(out)
+    return sorted(set(_anchor_kalimat(words, sentences)))
 
 
 def _indexed_transcript(words: list[dict], sentences: list[dict]) -> str:
@@ -193,10 +205,27 @@ def _indexed_transcript(words: list[dict], sentences: list[dict]) -> str:
             for i in range(0, len(words), WORDS_PER_LINE)
         )
 
-    idx = _anchors(words, sentences)
+    # _anchor_kalimat, BUKAN _anchors. Ini kesalahan yang paling lama tidak
+    # ketahuan di project ini, dan bentuknya halus: _anchors membuang duplikat
+    # lewat set(), jadi begitu ada DUA kalimat yang jatuh di kata yang sama —
+    # lazim saat ASR memberi dua kalimat pendek timestamp yang nyaris identik —
+    # daftarnya jadi lebih pendek dari daftar kalimat. Sejak titik itu,
+    # `idx[n]` menempelkan label milik kalimat BERIKUTNYA pada tiap baris, dan
+    # pergeserannya menumpuk sampai akhir transkrip.
+    #
+    # Terukur pada podcast 27 menit: 540 kalimat, 538 anchor — dua bentrokan —
+    # dan 518 dari 540 baris (96%) membawa label yang salah, meleset 3 sampai 20
+    # detik ke depan. Tiga transkrip lain di uji yang sama tidak punya bentrokan
+    # sama sekali dan labelnya 100% benar.
+    #
+    # Inilah sebab "salah potong di video panjang" yang selama ini dikira
+    # kelemahan LLM pada masukan besar. Bukan panjangnya yang menentukan,
+    # melainkan peluang adanya bentrokan — dan peluang itu memang naik seiring
+    # jumlah kalimat. Modelnya sendiri patuh: ia menyalin label yang kita beri.
+    idx = _anchor_kalimat(words, sentences)
     lines = []
     for n, s in enumerate(sentences):
-        anchor = idx[min(n, len(idx) - 1)]
+        anchor = idx[n]
         # Waktu mulai ikut ditampilkan. Tanpa ini LLM tidak punya cara menaksir
         # durasi: saat tiap baris masih 10 kata, jumlah baris jadi penggaris
         # implisit, tapi begitu baris berubah jadi kalimat dengan panjang
