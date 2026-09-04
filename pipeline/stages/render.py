@@ -87,7 +87,8 @@ def _mask(workdir: Path, lay, g: dict, deadline) -> str:
 
 
 def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
-                src_w: int, src_h: int, deadline, nama_layout: str = "penuh") -> Path:
+                src_w: int, src_h: int, deadline, nama_layout: str = "penuh",
+                teks: bool = True) -> Path:
     out = Path("clips") / f"{seg['id']}.mp4"
     lay = layout.ambil(nama_layout)
     g = layout.geometri(lay, crop, src_w, src_h)
@@ -96,7 +97,7 @@ def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
     # dan movie mem-parse argumennya sendiri, dan path Windows absolut
     # (backslash, titik dua drive, spasi di nama user) harus di-escape berlapis.
     # Dengan nama relatif, tidak ada yang perlu di-escape.
-    vf = layout.filtergraph(lay, g, f"{seg['id']}.ass", mask)
+    vf = layout.filtergraph(lay, g, f"{seg['id']}.ass" if teks else None, mask)
     ff(
         [
             "ffmpeg", "-y", "-nostdin", "-hide_banner", "-nostats", "-v", "error",
@@ -108,8 +109,14 @@ def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
             "-ss", f"{seg['start']:.3f}",
             "-i", "source.mp4",
             "-t", f"{seg['end'] - seg['start']:.3f}",
-            "-vf", vf,
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            # Layout mentahan tidak punya filter sama sekali, dan `-vf ""`
+            # ditolak ffmpeg — jadi flagnya harus hilang, bukan dikosongkan.
+            *(["-vf", vf] if vf else []),
+            # Mentahan dikodekan lebih bagus: berkas ini akan diedit lalu
+            # dikodekan ULANG, dan crf 23 di sini berarti dua generasi kompresi
+            # bertumpuk pada hasil akhirnya.
+            "-c:v", "libx264", "-preset", "veryfast",
+            "-crf", "18" if lay.apa_adanya else "23",
             # Wajib per PRD: yuv420p supaya diputar di semua player, faststart
             # supaya moov atom di depan dan video bisa mulai sebelum unduh penuh.
             "-pix_fmt", "yuv420p",
@@ -133,14 +140,15 @@ def run(ctx: dict) -> dict:
     (workdir / "clips").mkdir(exist_ok=True)
 
     lay = layout.ambil(ctx.get("layout") or settings.CLIP_LAYOUT)
-    log.info("render memakai layout '%s'", lay.nama)
+    teks = layout.pakai_caption(lay, ctx.get("gaya"))
+    log.info("render memakai layout '%s'%s", lay.nama, "" if teks else " tanpa caption")
 
     rendered = {}
     for seg in ctx["segments_final"]:
         crop = ctx["crops"][seg["id"]]
         # Retry 1x (PRD Bagian 6) = 2 percobaan.
         path = retry(attempts=2, backoff=2.0)(_render_one)(
-            source, workdir, seg, crop, src_w, src_h, deadline, lay.nama
+            source, workdir, seg, crop, src_w, src_h, deadline, lay.nama, teks
         )
         size_mb = path.stat().st_size / 1e6
         if size_mb < 0.05:

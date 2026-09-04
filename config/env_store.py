@@ -62,11 +62,15 @@ FIELDS = [
             "dihapus, dan disalin lewat file manager. Tidak ada storage cloud."),
 
     _f("CLIP_LAYOUT", "Layout klip", "Tampilan", kind="select",
-       options=["penuh", "kotak", "samping"],
+       options=["penuh", "kotak", "samping", "ori"],
        help="penuh: video mengisi layar, caption di bawah. "
             "kotak: video dalam kotak sudut tumpul di tengah, latar hitam. "
             "samping: pembicara digeser ke kiri, satu baris teks tenang di kanan. "
-            "Layout dipilih utuh — posisi teks dan geometri video harus sepakat."),
+            "ori: rasio sumber dipertahankan dan tanpa caption — mentahan untuk "
+            "diedit lagi. "
+            "Ini cuma nilai AWAL di halaman Submit; layoutnya sendiri dipilih "
+            "per video. Layout dipilih utuh — posisi teks dan geometri video "
+            "harus sepakat."),
     _f("CAPTION_FONT", "Font caption", "Tampilan", kind="select",
        options=["Poppins", "Anton", "Archivo Black", "Lora", "DejaVu Sans"],
        help="Hanya font yang ikut dipasang di image. Nama lain tidak akan "

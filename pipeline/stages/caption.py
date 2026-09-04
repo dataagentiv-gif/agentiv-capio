@@ -166,6 +166,11 @@ def run(ctx: dict) -> dict:
     # Knob milik JOB menimpa default di setelan. Kosong berarti "ikut
     # default", bukan "kosongkan" — makanya disaring lebih dulu di schema.
     knob = {**knob_dari_settings(), **(ctx.get("gaya") or {})}
+
+    if not layout.pakai_caption(lay, knob):
+        log.info("caption dimatikan — tidak ada .ass yang dibuat")
+        return {"captions": {}}
+
     paths = {}
 
     for seg in ctx["segments_final"]:

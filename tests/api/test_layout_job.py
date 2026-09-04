@@ -110,6 +110,33 @@ def test_layout_kosong_bukan_error(client, bersihkan):
     assert _buat(client, layout=None)["layout"] in {"penuh", "kotak", "samping"}
 
 
+def test_layout_mentahan_bisa_dipilih(client, bersihkan):
+    assert _buat(client, layout="ori")["layout"] == "ori"
+
+
+# --- saklar caption ---
+
+def test_caption_mati_selamat_sampai_baris_job(client, bersihkan):
+    """Jebakannya `False == 0` di Python: saringan gaya membuang nilai kosong
+    dengan `not in (None, "", 0, "0")`, dan False cocok dengan 0 di situ. Kalau
+    lolos ke saringan itu, saklarnya terbuang justru saat DIMATIKAN — caption
+    tetap terbakar dan tidak ada satu pun error."""
+    assert _buat(client, gaya={"caption": False})["gaya"]["caption"] is False
+
+
+def test_caption_nyala_tidak_disimpan(client, bersihkan):
+    """Nyala adalah default. Menyimpannya berarti job lama tanpa kunci ini jadi
+    ambigu — dan itu satu-satunya bedanya dengan knob tampilan lain."""
+    assert "caption" not in _buat(client, gaya={"caption": True}).get("gaya", {})
+
+
+def test_caption_mati_tidak_menghapus_knob_lain(client, bersihkan):
+    """Orang bisa mematikan caption lalu menyalakannya lagi — warna dan font
+    yang sudah disetel jangan ikut hilang."""
+    g = _buat(client, gaya={"caption": False, "font": "Anton"})["gaya"]
+    assert g["caption"] is False and g["font"] == "Anton"
+
+
 # --- worker memakai yang tersimpan, bukan yang sedang aktif ---
 
 def test_worker_membaca_layout_dari_baris_job(monkeypatch, tmp_path):

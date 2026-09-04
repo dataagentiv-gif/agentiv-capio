@@ -102,9 +102,22 @@ def _face_center(frames: list) -> tuple[float, float] | None:
 
 
 def run(ctx: dict) -> dict:
+    from config.settings import settings
+    from pipeline import layout
+
     source: Path = ctx["source"]
     src_w, src_h = int(ctx["meta"]["width"]), int(ctx["meta"]["height"])
     deadline = ctx["deadline"]
+
+    # Layout yang tidak memotong frame tidak punya keputusan untuk diambil di
+    # sini. Deteksi wajah tetap berjalan puluhan detik per klip kalau dibiarkan,
+    # dan hasilnya dibuang seluruhnya.
+    lay = layout.ambil(ctx.get("layout") or settings.CLIP_LAYOUT)
+    if lay.apa_adanya:
+        log.info("layout '%s' memakai frame apa adanya — deteksi wajah dilewati",
+                 lay.nama)
+        return {"crops": {s["id"]: {"x": 0, "w": src_w, "fx": None, "fy": None}
+                          for s in ctx["segments_final"]}}
 
     # Lebar jendela 9:16 setinggi frame penuh, dibulatkan genap (libx264 butuh
     # dimensi genap untuk yuv420p).

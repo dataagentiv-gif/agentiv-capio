@@ -246,3 +246,64 @@ def test_layout_bersorot_tetap_punya_warna_aktif():
     """Perbaikan untuk samping jangan sampai mematikan sorotan di layout lain."""
     for nama in ("penuh", "kotak"):
         assert L.ambil(nama).sorot is True
+
+
+# --- layout mentahan ---
+
+def test_ori_tidak_punya_filter_sama_sekali():
+    """String kosong, bukan rantai yang tidak melakukan apa-apa: pemanggilnya
+    harus MENGHILANGKAN `-vf`, karena `-vf ""` ditolak ffmpeg."""
+    lay = L.ambil("ori")
+    assert L.filtergraph(lay, L.geometri(lay, crop(), 1920, 1080)) == ""
+
+
+def test_ori_tidak_memotong_maupun_menskala():
+    lay = L.ambil("ori")
+    vf = L.filtergraph(lay, L.geometri(lay, crop(), 1920, 1080), "c1.ass")
+    for f in ("crop=", "scale=", "pad=", "setsar="):
+        assert f not in vf, f"{f} merusak rasio asli"
+
+
+def test_ori_tidak_pernah_dapat_caption():
+    """Layout menang atas knob: teks yang terbakar ke gambar tidak bisa dicabut
+    lagi oleh yang mengedit ulang."""
+    lay = L.ambil("ori")
+    assert not L.pakai_caption(lay)
+    assert not L.pakai_caption(lay, {"caption": True})
+
+
+def test_ori_tidak_perlu_lapisan():
+    assert not L.butuh_lapisan(L.ambil("ori"))
+
+
+# --- saklar caption ---
+
+def test_caption_nyala_kalau_knob_tidak_menyebutnya():
+    """Kosong berarti ikut default, sama seperti knob tampilan lain."""
+    assert L.pakai_caption(L.ambil("penuh"))
+    assert L.pakai_caption(L.ambil("penuh"), {})
+    assert L.pakai_caption(L.ambil("penuh"), {"font": "Anton"})
+
+
+def test_caption_bisa_dimatikan_di_layout_biasa():
+    assert not L.pakai_caption(L.ambil("penuh"), {"caption": False})
+    assert not L.pakai_caption(L.ambil("samping"), {"caption": False})
+
+
+def test_caption_mati_menghapus_subtitles_tapi_menahan_geometri():
+    """Yang hilang cuma teksnya. Crop dan skala 9:16 tetap jalan — kalau ikut
+    hilang, mematikan caption diam-diam berubah jadi mengganti layout."""
+    lay = L.ambil("penuh")
+    vf = L.filtergraph(lay, L.geometri(lay, crop(), 1920, 1080))
+    assert "subtitles=" not in vf
+    assert "crop=608:1080:656:0" in vf and "scale=1080:1920" in vf
+
+
+def test_caption_mati_tetap_menumpuk_lapisan():
+    """Sudut tumpul dan gradasi bukan bagian dari caption."""
+    lay = L.ambil("kotak")
+    vf = L.filtergraph(lay, L.geometri(lay, crop(fx=0.5, fy=0.4), 1920, 1080),
+                       None, mask="m.png")
+    assert "overlay=0:0" in vf
+    assert "subtitles=" not in vf
+    assert not vf.endswith(",")

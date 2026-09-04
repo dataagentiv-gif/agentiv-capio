@@ -46,7 +46,7 @@ def seg():
     return {"id": "c1", "start": CLIP_START, "end": CLIP_END}
 
 
-def render(workdir, seg, crop=None):
+def render(workdir, seg, crop=None, layout="penuh", teks=True):
     return _render_one(
         workdir / "source.mp4",
         workdir,
@@ -55,6 +55,8 @@ def render(workdir, seg, crop=None):
         src_w=1920,
         src_h=1080,
         deadline=Deadline(300),
+        nama_layout=layout,
+        teks=teks,
     )
 
 
@@ -96,3 +98,36 @@ def test_ass_yang_rusak_menggagalkan_render_bukan_lolos_diam_diam(workdir, seg):
     (workdir / "c1.ass").unlink()
     with pytest.raises(RuntimeError):
         render(workdir, seg)
+
+
+# --- mentahan dan saklar caption ---
+
+def test_ori_mempertahankan_rasio_sumber(workdir, seg):
+    """Yang dituju justru TIDAK 1080x1920: ini mentahan untuk diedit lagi."""
+    info = probe(render(workdir, seg, layout="ori"), Deadline(60))
+    assert (info["width"], info["height"]) == (1920, 1080)
+
+
+def test_ori_tetap_dipotong_tepat_di_sumbu_waktu(workdir, seg):
+    """Tanpa filter bukan berarti tanpa potongan — dan potongannya harus tepat,
+    bukan melompat ke keyframe terdekat seperti `-c copy`."""
+    info = probe(render(workdir, seg, layout="ori"), Deadline(60))
+    assert abs(info["duration"] - (CLIP_END - CLIP_START)) < 0.5
+
+
+def test_caption_mati_tidak_menyentuh_ass(workdir, seg):
+    """Bukti bahwa filter subtitles benar-benar hilang, bukan cuma menunjuk file
+    kosong: tanpa .ass render harus tetap SUKSES di sini, padahal dengan caption
+    nyala hal yang sama menggagalkannya."""
+    (workdir / "c1.ass").unlink()
+    info = probe(render(workdir, seg, teks=False), Deadline(60))
+    assert (info["width"], info["height"]) == (OUT_W, OUT_H)
+
+
+def test_caption_mati_menghasilkan_gambar_yang_berbeda(workdir, seg):
+    """Kalau sama persis, captionnya memang tidak pernah terbakar sejak awal —
+    dan test di atas jadi lolos karena alasan yang salah."""
+    dengan = render(workdir, seg).read_bytes()
+    (workdir / "clips" / "c1.mp4").unlink()
+    tanpa = render(workdir, seg, teks=False).read_bytes()
+    assert dengan != tanpa

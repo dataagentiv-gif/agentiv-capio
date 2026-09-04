@@ -22,6 +22,13 @@ class Layout:
     keterangan: str
     #: True kalau layout menaruh video di kotak; False = 9:16 mengisi layar.
     kotak: bool = False
+    #: Frame sumber tidak disentuh sama sekali — tanpa crop, scale, maupun pad.
+    #: Klipnya keluar dengan rasio aslinya, cuma dipotong di sumbu waktu.
+    apa_adanya: bool = False
+    #: Layout ini memakai caption. Dimatikan untuk mentahan: teks yang terbakar
+    #: ke gambar tidak bisa dicabut lagi oleh yang mengedit ulang, jadi di sana
+    #: caption bukan pilihan yang mati — ia tidak masuk akal sejak awal.
+    teks: bool = True
     #: Tinggi kotak video sebagai pecahan tinggi keluaran. 1.0 = mengisi penuh.
     tinggi: float = 1.0
     #: Bagian tinggi sumber yang diambil. 1.0 = seluruh tinggi.
@@ -119,6 +126,15 @@ LAYOUTS = {
         kata=3,
         ukuran=64,
     ),
+    "ori": Layout(
+        nama="ori",
+        judul="Asli (mentahan)",
+        keterangan="Rasio sumber dipertahankan dan tidak ada caption — videonya "
+                   "cuma dipotong. Untuk mentahan yang mau diedit lagi di "
+                   "aplikasi lain.",
+        apa_adanya=True,
+        teks=False,
+    ),
 }
 
 DEFAULT = "penuh"
@@ -176,22 +192,30 @@ def geometri(lay: Layout, crop: dict, src_w: int, src_h: int) -> dict:
             "bw": bw, "bh": bh, "bx": 0, "by": _genap((OUT_H - bh) / 2)}
 
 
-def filtergraph(lay: Layout, g: dict, ass: str, mask: str | None = None) -> str:
-    """Rantai filter ffmpeg lengkap untuk satu klip."""
-    bagian = [f"crop={g['cw']}:{g['ch']}:{g['cx']}:{g['cy']}"]
+def filtergraph(lay: Layout, g: dict, ass: str | None = None,
+                mask: str | None = None) -> str:
+    """Rantai filter ffmpeg lengkap untuk satu klip.
 
-    if not lay.kotak:
-        bagian.append(f"scale={OUT_W}:{OUT_H}")
-    else:
-        bagian.append(f"scale={g['bw']}:{g['bh']}")
-        bagian.append(
-            f"pad={OUT_W}:{OUT_H}:{g['bx']}:{g['by']}:black"
-        )
+    `ass` None berarti tanpa caption. String KOSONG yang dikembalikan berarti
+    tidak ada filter sama sekali — pemanggilnya harus menghilangkan `-vf`, bukan
+    mengirimnya kosong, karena `-vf ""` ditolak ffmpeg.
+    """
+    bagian = []
 
-    bagian.append("setsar=1")
+    if not lay.apa_adanya:
+        bagian.append(f"crop={g['cw']}:{g['ch']}:{g['cx']}:{g['cy']}")
+        if not lay.kotak:
+            bagian.append(f"scale={OUT_W}:{OUT_H}")
+        else:
+            bagian.append(f"scale={g['bw']}:{g['bh']}")
+            bagian.append(
+                f"pad={OUT_W}:{OUT_H}:{g['bx']}:{g['by']}:black"
+            )
+        bagian.append("setsar=1")
 
     if not mask:
-        bagian.append(f"subtitles={ass}")
+        if ass:
+            bagian.append(f"subtitles={ass}")
         return ",".join(bagian)
 
     # Sudut tumpul DAN gradasi gelap lewat satu gambar bertumpuk, bukan filter
@@ -210,8 +234,19 @@ def filtergraph(lay: Layout, g: dict, ass: str, mask: str | None = None) -> str:
     return (
         ",".join(bagian) + "[v];"
         f"movie={mask}[m];"
-        f"[v][m]overlay=0:0,subtitles={ass}"
+        f"[v][m]overlay=0:0" + (f",subtitles={ass}" if ass else "")
     )
+
+
+def pakai_caption(lay: Layout, knob: dict | None = None) -> bool:
+    """Apakah klip ini dapat caption terbakar.
+
+    Dua sumber keputusan, dan layout menang: knob `caption` adalah pilihan
+    pengguna, tapi layout mentahan tidak pernah memakai caption apa pun isinya.
+    Nilai yang disimpan HANYA False — tidak adanya kunci berarti "nyala", sama
+    seperti knob tampilan lain di mana kosong berarti ikut default.
+    """
+    return lay.teks and (knob or {}).get("caption") is not False
 
 
 def butuh_lapisan(lay: Layout) -> bool:

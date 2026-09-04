@@ -23,6 +23,12 @@ class JobCreate(BaseModel):
             return None
         BOLEH = {"font", "ukuran", "aktif", "kata", "upper"}
         bersih = {k: v[k] for k in BOLEH if v.get(k) not in (None, "", 0, "0")}
+        # `caption` disaring terpisah, dan itu bukan gaya-gayaan: ia satu-satunya
+        # knob yang nilai bermaknanya False, sementara `False == 0` di Python
+        # membuat saringan di atas MEMBUANGNYA justru saat caption dimatikan.
+        # Hanya False yang disimpan — tidak adanya kunci berarti nyala.
+        if v.get("caption") is False or str(v.get("caption")).lower() in ("false", "0"):
+            bersih["caption"] = False
         return bersih or None
 
     @field_validator("layout")

@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     # geometri kotak, dan arah gradien harus sepakat satu sama lain. Yang di
     # bawahnya adalah knob yang benar-benar berdiri sendiri — diputar
     # bagaimanapun tidak bisa menghasilkan kombinasi yang bertentangan.
-    CLIP_LAYOUT: str = "penuh"  # penuh | kotak | samping
+    CLIP_LAYOUT: str = "penuh"  # penuh | kotak | samping | ori
 
     # Font harus SUDAH ADA di image. Nama yang tidak terpasang tidak menghasilkan
     # error apa pun — libass diam-diam menggantinya, dan yang terlihat cuma

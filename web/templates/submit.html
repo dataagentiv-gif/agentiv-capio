@@ -33,26 +33,35 @@
        warna. Nilai awalnya diambil dari default di Setting; yang diubah di
        sini berlaku untuk VIDEO INI saja. #}
     <div class="gaya-grid">
-      <div class="field">
+      {# Saklarnya di paling atas, bukan di antara knob lain: ia menentukan
+         apakah lima kontrol di bawahnya berarti apa-apa. #}
+      <div class="field saklar">
+        <label for="g-caption">
+          <input type="checkbox" id="g-caption" checked>
+          Caption terbakar di video
+        </label>
+        <p class="sub" id="ket-caption"></p>
+      </div>
+      <div class="field teks">
         <label for="g-font">Font</label>
         <select id="g-font" data-gaya="font"></select>
       </div>
-      <div class="field">
+      <div class="field teks">
         <label for="g-warna">Warna kata aktif</label>
         <div class="warna-baris">
           <input type="color" id="g-warna-pick" aria-label="Pilih warna">
           <input type="text" id="g-warna" data-gaya="aktif" spellcheck="false">
         </div>
       </div>
-      <div class="field">
+      <div class="field teks">
         <label for="g-ukuran">Ukuran</label>
         <input type="number" id="g-ukuran" data-gaya="ukuran" min="40" max="220" step="4">
       </div>
-      <div class="field">
+      <div class="field teks">
         <label for="g-kata">Kata per tampilan</label>
         <input type="number" id="g-kata" data-gaya="kata" min="1" max="8">
       </div>
-      <div class="field">
+      <div class="field teks">
         <label for="g-upper">Huruf besar semua</label>
         <select id="g-upper" data-gaya="upper">
           <option value="">tidak</option>
@@ -109,11 +118,13 @@ function drawChips() {
 // berlaku untuk semua video — padahal itu justru yang paling tidak diinginkan.
 let layoutPilih = null;
 let fontDisentuh = false;
+let layoutData = [];
 
 async function drawLayouts() {
   const el = document.getElementById('layouts');
   try {
     const d = await (await fetch('/api/layouts')).json();
+    layoutData = d.layouts;
     layoutPilih = layoutPilih || d.default;
     el.innerHTML = d.layouts.map(l => `
       <button type="button" class="layout-opt ${l.nama === layoutPilih ? 'on' : ''}"
@@ -133,6 +144,7 @@ async function drawLayouts() {
           [...font.options].some(o => o.value === l.font_saran)) {
         font.value = l.font_saran;
       }
+      segarkanCaption();
       drawLayouts();
       segarkanPratinjau();
     });
@@ -147,6 +159,9 @@ async function drawLayouts() {
            + 'yang bersih dan bergerak.';
     }
     document.getElementById('ket-layout').textContent = ket;
+    // Juga di sini, bukan cuma di onclick: kalau default di Setting kebetulan
+    // layout tanpa caption, knobnya harus sudah mati sejak halaman dibuka.
+    segarkanCaption();
   } catch {
     // Preview gagal jangan menghalangi submit — layout tetap bisa dipilih
     // lewat default di Setting.
@@ -160,12 +175,35 @@ async function drawLayouts() {
 function nilaiGaya() {
   const g = {};
   document.querySelectorAll('[data-gaya]').forEach(el => {
+    if (el.disabled) return;   // knob caption saat captionnya dimatikan
     const v = el.value.trim();
     if (v === '' || v === '0') return;
     g[el.dataset.gaya] = el.type === 'number' ? Number(v) : v;
   });
   if (g.upper) g.upper = true;
+  // Hanya dikirim saat MATI. Nyala adalah default, dan mengirimnya sama saja
+  // dengan tidak mengirim apa-apa.
+  if (!document.getElementById('g-caption').checked) g.caption = false;
   return Object.keys(g).length ? g : null;
+}
+
+// Saklar caption mengendalikan lima knob di bawahnya. Dimatikan sungguhan
+// (`disabled`), bukan cuma diburamkan: kontrol yang terlihat mati tapi masih
+// bisa di-tab dan diketik adalah janji yang tidak ditepati.
+function segarkanCaption() {
+  const t = document.getElementById('g-caption');
+  const l = layoutData.find(x => x.nama === layoutPilih);
+  const dukung = l ? l.teks !== false : true;
+  t.disabled = !dukung;
+  if (!dukung) t.checked = false;
+  const on = dukung && t.checked;
+  document.querySelectorAll('.gaya-grid .field.teks').forEach(f => {
+    f.classList.toggle('mati', !on);
+    f.querySelectorAll('input, select').forEach(el => { el.disabled = !on; });
+  });
+  document.getElementById('ket-caption').textContent = !dukung
+    ? 'Layout mentahan tidak memakai caption.'
+    : (on ? '' : 'Klip keluar tanpa teks apa pun.');
 }
 
 async function isiGaya() {
@@ -196,6 +234,12 @@ async function isiGaya() {
   document.getElementById('g-font').addEventListener('change',
     () => { fontDisentuh = true; });
 
+  document.getElementById('g-caption').addEventListener('change', () => {
+    segarkanCaption();
+    segarkanPratinjau();
+  });
+  segarkanCaption();
+
   document.querySelectorAll('[data-gaya]').forEach(el => {
     if (el.id !== 'g-warna') el.addEventListener('input', segarkanPratinjau);
     el.addEventListener('change', segarkanPratinjau);
@@ -216,7 +260,7 @@ function segarkanPratinjau() {
     if (layoutPilih) q.set('layout', layoutPilih);
     const g = nilaiGaya() || {};
     const peta = { font: 'font', ukuran: 'ukuran', aktif: 'warna',
-                   kata: 'kata', upper: 'upper' };
+                   kata: 'kata', upper: 'upper', caption: 'caption' };
     for (const [k, param] of Object.entries(peta)) {
       if (g[k] !== undefined) q.set(param, g[k]);
     }

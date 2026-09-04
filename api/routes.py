@@ -215,8 +215,11 @@ def daftar_layout():
     return {
         "default": layout_mod.ambil(settings.CLIP_LAYOUT).nama,
         "layouts": [
+            # `teks` dipakai UI untuk mematikan seluruh knob caption saat
+            # layoutnya memang tidak memakai caption — bukan menampilkan kontrol
+            # yang diputar tanpa akibat apa pun.
             {"nama": l.nama, "judul": l.judul, "keterangan": l.keterangan,
-             "font_saran": l.font_saran}
+             "font_saran": l.font_saran, "teks": l.teks}
             for l in layout_mod.LAYOUTS.values()
         ],
         # Tanpa video contoh bawaan, pratinjau memakai klip pengguna terbaru —
@@ -231,7 +234,7 @@ def daftar_layout():
 def preview_tampilan(layout: str | None = None, font: str | None = None,
                      ukuran: int | None = None, warna: str | None = None,
                      kata: int | None = None, upper: bool | None = None,
-                     kecil: bool = False):
+                     caption: bool | None = None, kecil: bool = False):
     """Satu frame contoh dengan setelan tampilan yang sedang dipilih.
 
     Parameternya opsional supaya halaman Setting bisa menampilkan akibat sebuah
@@ -240,7 +243,7 @@ def preview_tampilan(layout: str | None = None, font: str | None = None,
     """
     knob = {k: v for k, v in (
         ("font", font), ("ukuran", ukuran), ("aktif", warna),
-        ("kata", kata), ("upper", upper),
+        ("kata", kata), ("upper", upper), ("caption", caption),
     ) if v is not None}
     try:
         isi, tipe = preview.render(layout, knob, kecil=kecil)

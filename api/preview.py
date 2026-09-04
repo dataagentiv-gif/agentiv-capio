@@ -136,8 +136,10 @@ def render(nama_layout: str | None = None, knob_tambahan: dict | None = None,
         src, sw, sh, gerak = _sumber(kerja)
         gerak = gerak and not kecil
 
-        (kerja / "p.ass").write_text(
-            build_ass(_kata_contoh(), 0.0, DETIK, lay, knob), encoding="utf-8")
+        teks = layout.pakai_caption(lay, knob)
+        if teks:
+            (kerja / "p.ass").write_text(
+                build_ass(_kata_contoh(), 0.0, DETIK, lay, knob), encoding="utf-8")
 
         # Wajah dianggap di tengah-atas: preview menilai GEOMETRI dan gaya
         # teks, bukan ketepatan deteksi wajah pada satu frame.
@@ -153,7 +155,15 @@ def render(nama_layout: str | None = None, knob_tambahan: dict | None = None,
 
             mask = _mask(kerja, lay, g, _TanpaBatas())
 
-        vf = layout.filtergraph(lay, g, "p.ass", mask)
+        vf = layout.filtergraph(lay, g, "p.ass" if teks else None, mask)
+        if not vf:
+            # Layout mentahan tidak punya filter sama sekali, dan pratinjaunya
+            # tetap harus muat di bingkai HP yang 9:16. Bilah hitamnya bukan
+            # kompromi — justru itu yang menyampaikan "rasionya memang bukan
+            # 9:16", yang persis membedakan layout ini dari yang lain.
+            vf = (f"scale={layout.OUT_W}:{layout.OUT_H}"
+                  ":force_original_aspect_ratio=decrease,"
+                  f"pad={layout.OUT_W}:{layout.OUT_H}:(ow-iw)/2:(oh-ih)/2:black")
         if kecil:
             # Dikecilkan SETELAH seluruh rantai: caption dirender pada resolusi
             # penuh dulu supaya ukuran dan ketebalan hurufnya sebanding dengan
