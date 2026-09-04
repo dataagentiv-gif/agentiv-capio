@@ -943,3 +943,42 @@ select:focus {
   color: var(--color-action);
   font-weight: 500;
 }
+
+/* ---------- Tab halaman Proses ---------- */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--color-fog);
+}
+
+.tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: var(--color-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tabs a:hover { color: var(--color-ink); }
+
+.tabs a.on {
+  color: var(--color-action);
+  font-weight: 500;
+  border-bottom-color: var(--color-action);
+}
+
+/* Jumlah job per tab. Diredupkan karena bukan yang dicari mata — tapi begitu
+   ada job berjalan, angkanya memberi tahu tanpa perlu pindah tab. */
+.hitung {
+  font-size: 12px;
+  color: var(--color-ash);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabs a.on .hitung { color: var(--color-action); }

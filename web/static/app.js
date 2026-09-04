@@ -22,9 +22,19 @@ function badge(s) {
 }
 
 function waktu(iso) {
-  return iso ? new Date(iso).toLocaleString('id-ID', {
+  if (!iso) return '';
+  const t = new Date(iso);
+  const menit = (Date.now() - t) / 60000;
+  // Waktu relatif untuk yang baru, tanggal untuk yang lama. Tanggal saja
+  // menyamarkan umur: kegagalan dari KEMARIN duduk di baris teratas dan
+  // terbaca seperti baru saja terjadi — persis yang bikin salah sangka bahwa
+  // worker baru berhenti, padahal itu sisa uji sehari sebelumnya.
+  if (menit < 1) return 'baru saja';
+  if (menit < 60) return `${Math.floor(menit)} menit lalu`;
+  if (menit < 24 * 60) return `${Math.floor(menit / 60)} jam lalu`;
+  return t.toLocaleString('id-ID', {
     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-  }) : '';
+  });
 }
 
 async function getJobs() {

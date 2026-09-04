@@ -2,10 +2,16 @@
 {% set page = 'process' %}
 {% block title %}Proses — CAPIO{% endblock %}
 {% block heading %}Proses{% endblock %}
-{% block lede %}Job yang sedang berjalan dan yang gagal. Halaman ini menyegar sendiri.{% endblock %}
+{% block lede %}Yang sedang berjalan, dan riwayat semua job yang sudah selesai. Halaman ini menyegar sendiri.{% endblock %}
 
 {% block content %}
-<div id="list"><div class="empty"><span class="spin"></span>Memuat…</div></div>
+<nav class="tabs" id="tabs">
+  <a href="#berjalan" data-tab="berjalan">Berjalan <span class="hitung" id="n-jalan"></span></a>
+  <a href="#riwayat"  data-tab="riwayat">Riwayat <span class="hitung" id="n-riwayat"></span></a>
+</nav>
+
+<div id="p-berjalan"><div class="empty"><span class="spin"></span>Memuat…</div></div>
+<div id="p-riwayat" hidden></div>
 {% endblock %}
 
 {% block script %}
@@ -20,43 +26,81 @@ function stepper(status, progress) {
           <div class="bar"><i style="width:${progress}%"></i></div>`;
 }
 
-function jobHtml(j) {
-  const gagal = j.status === 'failed';
+function kepala(j, ekor = '') {
   return `
-    <div class="job">
-      <div class="job-head">
-        ${badge(j.status)}
-        <a class="job-url" href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>
-        <span class="job-meta">${esc(waktu(j.created_at))} · target ${j.target_clips} klip</span>
-        ${idJob(j.id)}
-        ${tombolHapus('Hapus', `job:${j.id}`)}
-      </div>
-      ${gagal ? '' : `<div class="job-body">${stepper(j.status, j.progress)}</div>`}
-      ${j.error ? `<div class="error-box">${esc(j.error)}</div>` : ''}
+    <div class="job-head">
+      ${badge(j.status)}
+      <a class="job-url" href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>
+      <span class="job-meta">${esc(waktu(j.created_at))}${ekor}</span>
+      ${idJob(j.id)}
+      ${tombolHapus('Hapus', `job:${j.id}`)}
     </div>`;
 }
 
+function jobJalan(j) {
+  return `<div class="job">
+    ${kepala(j, ` · target ${j.target_clips} klip`)}
+    <div class="job-body">${stepper(j.status, j.progress)}</div>
+  </div>`;
+}
+
+// Riwayat memuat yang BERHASIL juga, bukan cuma yang gagal. Tanpa itu, job yang
+// selesai dalam dua menit lenyap dari halaman ini sebelum sempat dilihat — dan
+// yang tersisa di layar cuma kegagalan lama, yang terbaca seperti baru saja
+// terjadi. Persis itu yang bikin salah sangka bahwa worker baru berhenti.
+function jobRiwayat(j) {
+  const n = (j.clips || []).length;
+  const hasil = j.status === 'done'
+    ? `${n} klip · <a href="/results">lihat hasil</a>`
+    : 'gagal';
+  return `<div class="job">
+    ${kepala(j, ` · ${j.layout || 'penuh'}`)}
+    <div class="job-body"><p class="sub">${hasil}</p></div>
+    ${j.error ? `<div class="error-box">${esc(j.error)}</div>` : ''}
+  </div>`;
+}
+
+function pilihTab() {
+  const target = location.hash.slice(1) === 'riwayat' ? 'riwayat' : 'berjalan';
+  // Panel diberi awalan `p-` supaya id-nya TIDAK sama dengan nilai hash.
+  // Kalau sama, browser memperlakukan tautan tab sebagai jangkar dan
+  // menggulung halaman ke elemen itu — tab berpindah sambil melompat.
+  for (const id of ['berjalan', 'riwayat']) {
+    document.getElementById('p-' + id).hidden = id !== target;
+  }
+  document.querySelectorAll('[data-tab]').forEach(a =>
+    a.classList.toggle('on', a.dataset.tab === target));
+}
+
 async function tick() {
-  const el = document.getElementById('list');
   try {
     const semua = await getJobs();
-    // Halaman ini hanya untuk yang butuh perhatian: sedang jalan, atau gagal.
-    // Yang sudah selesai pindah ke halaman Hasil.
-    const jobs = semua.filter(j => isRunning(j) || j.status === 'failed');
-    el.innerHTML = jobs.length
-      ? jobs.map(jobHtml).join('')
-      : empty('Tidak ada proses berjalan',
-              '<a href="/">Submit video</a> atau lihat <a href="/results">hasil sebelumnya</a>.');
-    return semua.some(isRunning);
+    const jalan = semua.filter(isRunning);
+    const selesai = semua.filter(j => !isRunning(j));
+
+    document.getElementById('p-berjalan').innerHTML = jalan.length
+      ? jalan.map(jobJalan).join('')
+      : empty('Tidak ada job berjalan',
+              '<a href="/">Submit video</a>, atau lihat <a href="#riwayat">riwayat</a>.');
+
+    document.getElementById('p-riwayat').innerHTML = selesai.length
+      ? selesai.map(jobRiwayat).join('')
+      : empty('Belum ada riwayat', '<a href="/">Submit video pertama</a>.');
+
+    document.getElementById('n-jalan').textContent = jalan.length || '';
+    document.getElementById('n-riwayat').textContent = selesai.length || '';
+    pilihTab();
+    return jalan.length > 0;
   } catch (e) {
-    el.innerHTML = empty('API tidak bisa dihubungi', esc(e));
+    document.getElementById('p-berjalan').innerHTML =
+      empty('API tidak bisa dihubungi', esc(e));
     return true;
   }
 }
 
-// Delegasi di container: isinya digambar ulang tiap polling, jadi handler yang
+// Delegasi di body: isinya digambar ulang tiap polling, jadi handler yang
 // dipasang ke tombol satu per satu akan hilang di render berikutnya.
-document.getElementById('list').addEventListener('click', async (e) => {
+document.body.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-aksi]');
   if (!b) return;
   const id = b.dataset.aksi.split(':')[1];
@@ -64,6 +108,7 @@ document.getElementById('list').addEventListener('click', async (e) => {
       'Hapus job ini beserta seluruh berkasnya? Tindakan ini tidak bisa dibatalkan.')) tick();
 });
 
+window.addEventListener('hashchange', pilihTab);
 poll(tick);
 </script>
 {% endblock %}
