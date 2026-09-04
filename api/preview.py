@@ -74,10 +74,17 @@ def _sumber(kerja: Path) -> tuple[str, int, int, bool]:
                  key=lambda p: p.stat().st_mtime, reverse=True)
     if mp4:
         # Klip jadi BUKAN sumber mendatar: ia sudah ter-crop jadi 9:16 dan
-        # sudah punya caption terbakar. Memakainya mentah menghasilkan dua
-        # masalah — caption bertumpuk dua lapis, dan wajah yang di-crop ulang
-        # sampai terpotong di hidung. Dikembalikan mendekati bentuk aslinya:
-        # bujur sangkar bagian atas (bebas caption) ditempel ke kanvas 16:9.
+        # sudah punya caption terbakar. Memakainya mentah menghasilkan caption
+        # bertumpuk dua lapis, dan wajah yang di-crop ulang sampai terpotong.
+        #
+        # TIDAK ADA potongan yang menang di dua sisi, dan itu sudah dicoba:
+        # caption klip duduk di tempat berbeda tergantung layout yang dipakai
+        # saat merendernya (tengah-bawah untuk penuh dan kotak, tengah-kanan
+        # untuk samping), sementara potongan yang menghindari semuanya selalu
+        # merusak pembingkaian wajah. Dipilih yang pembingkaiannya paling baik
+        # dan caption yang sesekali ikut terbawa diterima apa adanya —
+        # assets/preview.mp4 adalah jawaban sebenarnya, karena ia bebas caption
+        # sejak awal.
         subprocess.run(
             ["ffmpeg", "-nostdin", "-y", "-v", "error", "-ss", "2",
              "-i", str(mp4[0]), "-frames:v", "1",
@@ -137,7 +144,7 @@ def render(nama_layout: str | None = None, knob_tambahan: dict | None = None,
         g = layout.geometri(lay, {"x": (sw - 608) // 2, "w": 608,
                                   "fx": 0.5, "fy": 0.38}, sw, sh)
         mask = None
-        if lay.radius:
+        if layout.butuh_lapisan(lay):
             from pipeline.stages.render import _mask
 
             class _TanpaBatas:
@@ -172,6 +179,11 @@ def render(nama_layout: str | None = None, knob_tambahan: dict | None = None,
 
     _CACHE[kunci] = hasil
     return hasil
+
+
+def pakai_contoh_bawaan() -> bool:
+    """True kalau pratinjau memakai video contoh di repo, bukan klip pengguna."""
+    return CONTOH_MP4.exists()
 
 
 def bersihkan_cache() -> None:

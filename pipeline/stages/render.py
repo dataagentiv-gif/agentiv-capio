@@ -19,38 +19,67 @@ OUT_W, OUT_H = 1080, 1920
 
 
 def _mask(workdir: Path, lay, g: dict, deadline) -> str:
-    """Gambar hitam berlubang persegi-sudut-tumpul, untuk ditumpuk di atas video.
+    """Gambar hitam beralpha untuk ditumpuk di atas video.
 
-    Sudut tumpul tanpa filter per-piksel-per-frame. Karena latarnya hitam solid,
-    tidak perlu transparansi sungguhan: cukup menimpakan gambar hitam yang
-    berlubang di posisi kotaknya. `geq` yang menghitung lubang itu berat, tapi
-    cuma jalan SEKALI pada satu gambar diam — bukan pada tiap frame video.
+    Menangani dua hal sekaligus, keduanya tanpa filter per-piksel-per-frame:
 
-    Berkasnya dipakai ulang untuk semua klip dalam job yang sama, karena
-    geometri kotaknya tidak berubah antar klip.
+    - **Sudut tumpul.** Latarnya hitam solid, jadi tidak perlu transparansi
+      sungguhan — cukup menimpakan gambar hitam yang berlubang di posisi
+      kotaknya.
+    - **Gradasi gelap dari kanan**, sebagai alas teks. Ini yang TIDAK bisa
+      dikerjakan `drawbox`: kotak beralpha rata meninggalkan garis batas yang
+      terlihat jelas dan membelah frame jadi dua bidang, sementara yang dituju
+      adalah tepi pekat yang memudar tanpa batas yang bisa ditunjuk.
+
+    `geq` memang berat, tapi cuma jalan SEKALI pada satu gambar diam — bukan
+    pada tiap frame video. Berkasnya dipakai ulang untuk semua klip dalam job
+    yang sama, karena geometrinya tidak berubah antar klip.
     """
-    nama = f"mask{g['bw']}x{g['bh']}r{lay.radius}.png"
+    r = lay.redup
+    nama = (f"lapis{g['bw']}x{g['bh']}r{lay.radius}"
+            f"g{int(r[0] * 100) if r else 0}_{int(r[1] * 100) if r else 0}.png")
     if (workdir / nama).exists():
         return nama
 
-    r = lay.radius
-    x0, y0 = g["bx"], g["by"]
-    x1, y1 = x0 + g["bw"], y0 + g["bh"]
-    # Alpha 0 (tembus) di dalam persegi yang sudutnya dibulatkan, 255 di luar.
-    # Jarak ke pusat lingkaran sudut dipakai untuk menentukan di dalam/di luar.
-    dalam = (
-        f"between(X,{x0 + r},{x1 - r})*between(Y,{y0},{y1})"
-        f"+between(X,{x0},{x1})*between(Y,{y0 + r},{y1 - r})"
-        f"+lt(hypot(X-{x0 + r},Y-{y0 + r}),{r})"
-        f"+lt(hypot(X-{x1 - r},Y-{y0 + r}),{r})"
-        f"+lt(hypot(X-{x0 + r},Y-{y1 - r}),{r})"
-        f"+lt(hypot(X-{x1 - r},Y-{y1 - r}),{r})"
-    )
+    bagian = []
+
+    if lay.radius:
+        rr = lay.radius
+        x0, y0 = g["bx"], g["by"]
+        x1, y1 = x0 + g["bw"], y0 + g["bh"]
+        # Di dalam persegi bersudut bulat -> alpha 0 (tembus), di luar -> 255.
+        # Jarak ke pusat lingkaran sudut menentukan di dalam/di luar.
+        dalam = (
+            f"between(X,{x0 + rr},{x1 - rr})*between(Y,{y0},{y1})"
+            f"+between(X,{x0},{x1})*between(Y,{y0 + rr},{y1 - rr})"
+            f"+lt(hypot(X-{x0 + rr},Y-{y0 + rr}),{rr})"
+            f"+lt(hypot(X-{x1 - rr},Y-{y0 + rr}),{rr})"
+            f"+lt(hypot(X-{x0 + rr},Y-{y1 - rr}),{rr})"
+            f"+lt(hypot(X-{x1 - rr},Y-{y1 - rr}),{rr})"
+        )
+        bagian.append(f"255*lt({dalam},1)")
+
+    if r:
+        mulai, maks = r
+        x0 = mulai * OUT_W
+        lebar = max(1.0, OUT_W - x0)
+        # Pangkat 1.6, bukan lurus: gradasi linear masih menyisakan tepi awal
+        # yang terasa sebagai garis. Kurva yang mulai landai lalu menguat
+        # membuat permulaannya tidak bisa ditunjuk.
+        bagian.append(
+            f"{maks * 255:.0f}*pow(clip((X-{x0:.0f})/{lebar:.0f},0,1),1.6)"
+        )
+
+    # Dua lapisan digabung dengan max, bukan dijumlah: penjumlahan bisa melewati
+    # 255 di daerah yang kena keduanya dan menghasilkan tepi keras yang justru
+    # mau dihindari.
+    alpha = bagian[0] if len(bagian) == 1 else f"max({bagian[0]},{bagian[1]})"
+
     ff(
         ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error",
          "-f", "lavfi", "-i", f"color=black:s={OUT_W}x{OUT_H}:d=1",
          "-frames:v", "1",
-         "-vf", f"format=rgba,geq=r=0:g=0:b=0:a='255*lt({dalam},1)'",
+         "-vf", f"format=rgba,geq=r=0:g=0:b=0:a='{alpha}'",
          nama],
         deadline, cwd=workdir, cap=120,
     )
@@ -62,7 +91,7 @@ def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
     out = Path("clips") / f"{seg['id']}.mp4"
     lay = layout.ambil(nama_layout)
     g = layout.geometri(lay, crop, src_w, src_h)
-    mask = _mask(workdir, lay, g, deadline) if lay.radius else None
+    mask = _mask(workdir, lay, g, deadline) if layout.butuh_lapisan(lay) else None
     # Nama file polos, tanpa path. Inilah gunanya cwd=workdir: filter subtitles
     # dan movie mem-parse argumennya sendiri, dan path Windows absolut
     # (backslash, titik dua drive, spasi di nama user) harus di-escape berlapis.

@@ -218,6 +218,11 @@ def daftar_layout():
             {"nama": l.nama, "judul": l.judul, "keterangan": l.keterangan}
             for l in layout_mod.LAYOUTS.values()
         ],
+        # Tanpa video contoh bawaan, pratinjau memakai klip pengguna terbaru —
+        # yang sudah punya caption terbakar sendiri. UI perlu tahu supaya bisa
+        # menyebutkan batas itu, bukan membiarkan orang mengira hasil aslinya
+        # akan punya caption dobel.
+        "contoh_bawaan": preview.pakai_contoh_bawaan(),
     }
 
 

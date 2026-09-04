@@ -40,7 +40,13 @@ class Layout:
     kepala: float = 0.34
     #: Radius sudut kotak dalam piksel keluaran. 0 = siku.
     radius: int = 0
-    #: (mulai, lebar) sisi yang digelapkan, pecahan lebar. None = tidak ada.
+    #: (mulai, alpha_maks) gradasi gelap dari kanan. None = tidak ada.
+    #:
+    #: `mulai` = di mana gelapnya MULAI muncul, pecahan lebar; dari situ ia
+    #: menguat sampai `alpha_maks` di tepi kanan. Bukan kotak beralpha rata:
+    #: kotak meninggalkan garis batas yang terlihat jelas dan membelah frame
+    #: jadi dua bidang, sementara yang dituju adalah tepi yang pekat lalu
+    #: memudar tanpa batas yang bisa ditunjuk.
     redup: tuple[float, float] | None = None
     #: Alignment .ass (numpad): 2 bawah-tengah, 5 tengah, 6 tengah-kanan.
     align: int = 2
@@ -86,7 +92,8 @@ LAYOUTS = {
         tinggi=0.42,
         zoom=0.85,
         wajah_x=0.3,
-        redup=(0.52, 0.48),
+        # Mulai memudar dari sepertiga lebar, pekat 88% di tepi kanan.
+        redup=(0.34, 0.88),
         align=6,
         margin_r=60,
         tumpuk=True,
@@ -165,20 +172,19 @@ def filtergraph(lay: Layout, g: dict, ass: str, mask: str | None = None) -> str:
 
     bagian.append("setsar=1")
 
-    if lay.redup:
-        mulai, lebar = lay.redup
-        bagian.append(
-            f"drawbox=x={int(mulai * OUT_W)}:y=0:"
-            f"w={int(lebar * OUT_W)}:h={OUT_H}:color=black@0.55:t=fill"
-        )
-
     if not mask:
         bagian.append(f"subtitles={ass}")
         return ",".join(bagian)
 
-    # Sudut tumpul lewat gambar bertumpuk, bukan filter per piksel: latarnya
-    # hitam solid, jadi cukup menimpakan PNG hitam yang berlubang. `geq` yang
-    # membuat lubang itu cuma jalan sekali pada satu gambar diam.
+    # Sudut tumpul DAN gradasi gelap lewat satu gambar bertumpuk, bukan filter
+    # per piksel per frame. Latarnya hitam solid, jadi cukup menimpakan PNG
+    # hitam beralpha; `geq` yang menghitungnya cuma jalan sekali pada satu
+    # gambar diam.
+    #
+    # Gradasi TIDAK memakai drawbox: kotak beralpha rata meninggalkan garis
+    # batas yang terlihat jelas dan membelah frame jadi dua bidang. Yang dituju
+    # adalah tepi pekat yang memudar tanpa batas yang bisa ditunjuk, dan itu
+    # menuntut alpha yang berubah per kolom piksel.
     #
     # Label rantai menempel LANGSUNG ke filter terakhir tanpa koma —
     # `setsar=1[v]`, bukan `setsar=1,[v]`. Yang kedua ditolak ffmpeg dengan
@@ -188,6 +194,11 @@ def filtergraph(lay: Layout, g: dict, ass: str, mask: str | None = None) -> str:
         f"movie={mask}[m];"
         f"[v][m]overlay=0:0,subtitles={ass}"
     )
+
+
+def butuh_lapisan(lay: Layout) -> bool:
+    """Apakah layout ini perlu gambar bertumpuk (sudut tumpul atau gradasi)."""
+    return bool(lay.radius or lay.redup)
 
 
 def header_ass(lay: Layout, knob: dict) -> str:

@@ -127,7 +127,16 @@ async function drawLayouts() {
       segarkanPratinjau();
     });
     const aktif = d.layouts.find(l => l.nama === layoutPilih);
-    document.getElementById('ket-layout').textContent = aktif ? aktif.keterangan : '';
+    let ket = aktif ? aktif.keterangan : '';
+    // Tanpa video contoh bawaan, pratinjau memakai klip pengguna terbaru — yang
+    // sudah punya caption terbakar sendiri. Disebutkan supaya caption dobel
+    // yang muncul di pratinjau tidak dikira akan ikut di hasil aslinya.
+    if (d.contoh_bawaan === false) {
+      ket += ' · Pratinjau memakai potongan klip terakhirmu, jadi caption '
+           + 'lamanya bisa ikut terlihat. Taruh assets/preview.mp4 untuk contoh '
+           + 'yang bersih dan bergerak.';
+    }
+    document.getElementById('ket-layout').textContent = ket;
   } catch {
     // Preview gagal jangan menghalangi submit — layout tetap bisa dipilih
     // lewat default di Setting.

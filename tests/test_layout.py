@@ -87,13 +87,40 @@ def test_samping_menggeser_pembicara_ke_kiri():
 
 
 def test_samping_menggelapkan_sisi_kanan():
+    """Gelapnya lewat gambar bertumpuk beralpha, BUKAN drawbox. Kotak beralpha
+    rata meninggalkan garis batas yang terlihat dan membelah frame jadi dua
+    bidang — yang dituju tepi pekat yang memudar tanpa batas yang bisa
+    ditunjuk."""
     lay = L.ambil("samping")
-    g = L.geometri(lay, crop(fx=0.5, fy=0.4), 1920, 1080)
-    vf = L.filtergraph(lay, g, "c1.ass")
-    assert "drawbox=" in vf and "black@" in vf
-    # Kotak gelap harus di paruh KANAN, bukan menutupi wajahnya.
-    x = int(vf.split("drawbox=x=")[1].split(":")[0])
-    assert x > L.OUT_W / 2
+    assert lay.redup is not None
+    assert L.butuh_lapisan(lay)
+    vf = L.filtergraph(lay, L.geometri(lay, crop(fx=0.5, fy=0.4), 1920, 1080),
+                       "c1.ass", mask="m.png")
+    assert "drawbox=" not in vf, "kotak beralpha rata meninggalkan tepi keras"
+    assert "overlay=0:0" in vf
+
+
+def test_gradasi_mulai_di_paruh_kiri_tapi_tidak_menutupi_wajah():
+    """Mulai terlalu kanan menghasilkan tepi yang terasa; terlalu kiri menutupi
+    pembicaranya, yang justru ditaruh di sepertiga kiri."""
+    lay = L.ambil("samping")
+    mulai, maks = lay.redup
+    assert 0.25 < mulai < 0.45
+    assert lay.wajah_x < mulai, "gradasi mulai sebelum posisi wajah"
+    assert 0.7 < maks <= 1.0, "tepi kanan harus pekat, bukan separuh"
+
+
+def test_layout_lain_tidak_punya_gradasi():
+    for nama in ("penuh", "kotak"):
+        assert L.ambil(nama).redup is None
+
+
+def test_butuh_lapisan_hanya_saat_perlu():
+    """Layout penuh tidak boleh ikut merender gambar bertumpuk — itu kerja
+    ffmpeg tambahan untuk hasil yang persis sama."""
+    assert not L.butuh_lapisan(L.ambil("penuh"))
+    assert L.butuh_lapisan(L.ambil("kotak"))      # sudut tumpul
+    assert L.butuh_lapisan(L.ambil("samping"))    # gradasi
 
 
 def test_samping_meratakan_teks_ke_kanan():
