@@ -70,6 +70,28 @@ class Settings(BaseSettings):
     # kelihatan seperti key yang salah, padahal modelnya yang sudah ditutup.
     GEMINI_MODEL: str = "gemini-flash-lite-latest"
 
+    # --- Tampilan klip (Stage 5 & 7) ---
+    #
+    # Layout dipilih UTUH, bukan dipreteli jadi setelan terpisah: posisi teks,
+    # geometri kotak, dan arah gradien harus sepakat satu sama lain. Yang di
+    # bawahnya adalah knob yang benar-benar berdiri sendiri — diputar
+    # bagaimanapun tidak bisa menghasilkan kombinasi yang bertentangan.
+    CLIP_LAYOUT: str = "penuh"  # penuh | kotak | samping
+
+    # Font harus SUDAH ADA di image. Nama yang tidak terpasang tidak menghasilkan
+    # error apa pun — libass diam-diam menggantinya, dan yang terlihat cuma
+    # caption yang "kurang mirip". Yang tersedia: Poppins, Anton, Archivo Black.
+    CAPTION_FONT: str = "Poppins"
+    CAPTION_SIZE: int = 0       # 0 = ikut bawaan layout
+    # RRGGBB seperti yang biasa ditulis orang, BUKAN urutan BGR milik .ass.
+    # Nilai lama di kode ditulis "00E5FF" karena itu sudah bentuk BGR-nya;
+    # ditulis sebagai RGB, warna yang sama adalah FFE500 (kuning keemasan).
+    # Menyalinnya mentah-mentah akan membalik emas jadi biru langit — dan itu
+    # tetap terlihat seperti pilihan desain, bukan kesalahan.
+    CAPTION_COLOR: str = "FFE500"
+    CAPTION_WORDS: int = 0      # 0 = ikut bawaan layout
+    CAPTION_UPPER: bool = False
+
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"
 

@@ -148,7 +148,7 @@ def test_klip_berwajah_tidak_memicu_peringatan(tmp_path, caplog, monkeypatch):
     """Satu wajah saja sudah cukup membuktikan sumbernya talking-head.
     Peringatan yang muncul di video normal akan diabaikan orang."""
     src = bikin(tmp_path / "v.mp4", 1920, 1080)
-    monkeypatch.setattr(crop, "_face_center", lambda frames: 0.5)
+    monkeypatch.setattr(crop, "_face_center", lambda frames: (0.5, 0.4))
     with caplog.at_level("WARNING"):
         crop.run({"source": src, "meta": {"width": 1920, "height": 1080},
                   "deadline": Deadline(600),

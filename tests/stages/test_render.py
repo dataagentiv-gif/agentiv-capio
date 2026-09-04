@@ -51,7 +51,8 @@ def render(workdir, seg, crop=None):
         workdir / "source.mp4",
         workdir,
         seg,
-        crop or {"x": 656, "w": 608},
+        crop or {"x": 656, "w": 608, "fx": None, "fy": None},
+        src_w=1920,
         src_h=1080,
         deadline=Deadline(300),
     )

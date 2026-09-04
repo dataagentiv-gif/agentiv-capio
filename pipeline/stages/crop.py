@@ -72,23 +72,33 @@ def _sample(source: Path, start: float, dur: float, deadline) -> list:
     )
 
 
-def _face_center(frames: list) -> float | None:
-    """Posisi horizontal wajah, 0.0-1.0. None kalau terlalu sedikit terdeteksi."""
+def _face_center(frames: list) -> tuple[float, float] | None:
+    """Posisi wajah (x, y) sebagai pecahan 0.0-1.0 dari lebar dan tinggi frame.
+    None kalau terlalu sedikit terdeteksi.
+
+    Y ikut dikembalikan walau layout `penuh` tidak memakainya sama sekali:
+    jendela 9:16 pada sumber mendatar memakai TINGGI PENUH, jadi tidak pernah
+    ada keputusan vertikal di sana. Begitu video ditaruh dalam kotak yang lebih
+    pendek dari frame, keputusan itu muncul — dan menebak "ambil tengah" akan
+    memotong dagu atau menyisakan ruang menganga di atas kepala, karena orang di
+    podcast biasanya duduk di sepertiga atas frame.
+    """
     if not frames:
         return None
     det, mp = _detector()
-    xs = []
+    xs, ys = [], []
     for frame in frames:
         res = det.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=frame))
         if res.detections:
             # Wajah terbesar = subjek utama; wajah kecil di latar diabaikan.
             box = max(res.detections, key=lambda d: d.bounding_box.width).bounding_box
             xs.append((box.origin_x + box.width / 2) / DET_W)
+            ys.append((box.origin_y + box.height / 2) / DET_H)
     if len(xs) < len(frames) * MIN_HIT_RATIO:
         return None
     # Median, bukan rata-rata: satu frame yang salah deteksi (poster di dinding,
     # penonton lewat) tidak boleh menyeret crop seluruh klip.
-    return statistics.median(xs)
+    return statistics.median(xs), statistics.median(ys)
 
 
 def run(ctx: dict) -> dict:
@@ -132,15 +142,22 @@ def run(ctx: dict) -> dict:
             frac = None
 
         if frac is None:
+            fx = fy = None
             x = center_x
             log.info("crop %s: center (tidak ada wajah)", seg["id"])
         else:
             berwajah += 1
-            x = int(frac * src_w - win_w / 2)
+            fx, fy = frac
+            x = int(fx * src_w - win_w / 2)
             x = max(0, min(src_w - win_w, x)) & ~1
-            log.info("crop %s: x=%d (wajah di %.0f%% lebar)", seg["id"], x, frac * 100)
+            log.info("crop %s: x=%d (wajah di %.0f%% lebar, %.0f%% tinggi)",
+                     seg["id"], x, fx * 100, fy * 100)
 
-        crops[seg["id"]] = {"x": x, "w": win_w}
+        # x/w adalah jendela 9:16 siap pakai untuk layout `penuh`. fx/fy adalah
+        # posisi wajah mentah, dipakai layout lain yang menentukan geometrinya
+        # sendiri — mereka butuh tahu di mana orangnya, bukan jendela yang sudah
+        # terlanjur diputuskan di sini.
+        crops[seg["id"]] = {"x": x, "w": win_w, "fx": fx, "fy": fy}
 
     # Tidak ada satu pun wajah di SELURUH klip berarti sumbernya kemungkinan
     # bukan talking-head — screencast, gameplay, atau animasi. Center crop tetap

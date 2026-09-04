@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from api import checks
+from api import checks, preview
 from api.schemas import JobCreate, JobCreated, JobOut
 import keypool
 from config import env_store
@@ -203,6 +203,34 @@ def hapus_key(pool: str, index: int):
 @app.post("/api/settings/test/{provider}")
 def test_provider(provider: str):
     return {"provider": provider, **checks.run(provider)}
+
+
+@app.get("/api/preview.png")
+def preview_tampilan(layout: str | None = None, font: str | None = None,
+                     ukuran: int | None = None, warna: str | None = None,
+                     kata: int | None = None, upper: bool | None = None):
+    """Satu frame contoh dengan setelan tampilan yang sedang dipilih.
+
+    Parameternya opsional supaya halaman Setting bisa menampilkan akibat sebuah
+    knob SEBELUM disimpan — kalau harus menyimpan dulu, mencoba lima warna
+    berarti lima kali menulis .env.
+    """
+    knob = {k: v for k, v in (
+        ("font", font), ("ukuran", ukuran), ("aktif", warna),
+        ("kata", kata), ("upper", upper),
+    ) if v is not None}
+    try:
+        png = preview.render(layout, knob)
+    except Exception as e:  # noqa: BLE001 — preview gagal jangan menjatuhkan halaman
+        log.warning("preview gagal: %s", e)
+        raise HTTPException(500, f"Preview gagal dibuat: {e}") from e
+    return Response(
+        content=png,
+        media_type="image/png",
+        # Preview berubah tiap knob diputar; menyimpannya di cache justru
+        # membuat halaman menampilkan setelan yang sudah tidak berlaku.
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/api/status")

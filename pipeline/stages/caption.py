@@ -61,12 +61,18 @@ def _clean(w: str) -> str:
     return w.replace("{", "(").replace("}", ")").replace("\\", "/").strip()
 
 
-def _group(words: list[dict]) -> list[list[dict]]:
+def _kata(w: str, besar: bool) -> str:
+    teks = _clean(w)
+    return teks.upper() if besar else teks
+
+
+def _group(words: list[dict], maks_kata: int = MAX_WORDS,
+           maks_char: int = MAX_CHARS) -> list[list[dict]]:
     groups, cur, chars = [], [], 0
     for w in words:
         cur.append(w)
         chars += len(w["w"]) + 1
-        if len(cur) >= MAX_WORDS or chars >= MAX_CHARS:
+        if len(cur) >= maks_kata or chars >= maks_char:
             groups.append(cur)
             cur, chars = [], 0
     if cur:
@@ -74,13 +80,31 @@ def _group(words: list[dict]) -> list[list[dict]]:
     return groups
 
 
-def build_ass(words: list[dict], clip_start: float, clip_end: float) -> str:
+def build_ass(words: list[dict], clip_start: float, clip_end: float,
+              lay=None, knob: dict | None = None) -> str:
     """Bangun isi file .ass. `words` pakai waktu SOURCE; di sini digeser jadi
     relatif terhadap clip_start, karena render memakai input seek (-ss sebelum
     -i) yang me-rebase pts filtergraph ke nol.
+
+    `lay` menentukan hal yang harus sepakat dengan geometri video — posisi,
+    perataan, penumpukan. `knob` menentukan hal yang berdiri sendiri: font,
+    ukuran, warna kata aktif, huruf besar.
     """
-    lines = [HEADER]
-    groups = _group(words)
+    knob = knob or {}
+    if lay is None:
+        from pipeline import layout as _l
+        lay = _l.ambil("penuh")
+
+    from pipeline import layout as _l
+    aktif = "{\\c&H" + _l._bgr(knob.get("aktif") or "FFE500") + "&}"
+    pasif = "{\\c&H" + _l._bgr(knob.get("pasif") or lay.warna_pasif) + "&}"
+    besar = bool(knob.get("upper"))
+    # Penumpukan vertikal cuma soal pemisah baris: \N di .ass memaksa baris
+    # baru, sementara spasi biasa membiarkan teks mengalir mendatar.
+    pisah = "\\N" if lay.tumpuk else " "
+
+    lines = [_l.header_ass(lay, knob)]
+    groups = _group(words, int(knob.get("kata") or lay.kata), MAX_CHARS)
     span = clip_end - clip_start
 
     for gi, g in enumerate(groups):
@@ -101,8 +125,9 @@ def build_ass(words: list[dict], clip_start: float, clip_end: float) -> str:
             if end_rel <= start_rel:
                 continue
 
-            text = " ".join(
-                (ACTIVE + _clean(x["w"]) + IDLE) if j == i else _clean(x["w"])
+            text = pisah.join(
+                (aktif + _kata(x["w"], besar) + pasif) if j == i
+                else _kata(x["w"], besar)
                 for j, x in enumerate(g)
             )
             lines.append(
@@ -111,9 +136,28 @@ def build_ass(words: list[dict], clip_start: float, clip_end: float) -> str:
     return "\n".join(lines) + "\n"
 
 
+def knob_dari_settings() -> dict:
+    """Knob tampilan dari .env. Dipisah supaya preview di halaman Setting bisa
+    memakai jalur yang sama persis dengan produksi."""
+    from config.settings import settings
+
+    return {
+        "font": settings.CAPTION_FONT,
+        "ukuran": settings.CAPTION_SIZE or None,
+        "aktif": settings.CAPTION_COLOR,
+        "kata": settings.CAPTION_WORDS or None,
+        "upper": settings.CAPTION_UPPER,
+    }
+
+
 def run(ctx: dict) -> dict:
+    from config.settings import settings
+    from pipeline import layout
+
     words: list[dict] = ctx["words"]
     workdir: Path = ctx["workdir"]
+    lay = layout.ambil(settings.CLIP_LAYOUT)
+    knob = knob_dari_settings()
     paths = {}
 
     for seg in ctx["segments_final"]:
@@ -122,7 +166,7 @@ def run(ctx: dict) -> dict:
         # batasnya — index asli dari LLM tidak lagi mewakili batas yang dipakai.
         slice_ = [w for w in words if w["e"] > start and w["s"] < end]
         path = workdir / f"{seg['id']}.ass"
-        path.write_text(build_ass(slice_, start, end), encoding="utf-8")
+        path.write_text(build_ass(slice_, start, end, lay, knob), encoding="utf-8")
         paths[seg["id"]] = path
         log.info("caption %s: %d kata", seg["id"], len(slice_))
 

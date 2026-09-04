@@ -5,6 +5,8 @@ Output : clips/{clip_id}.mp4
 """
 from pathlib import Path
 
+from config.settings import settings
+from pipeline import layout
 # Di-alias: tiap stage mengekspor run(ctx) sendiri, dan nama itu akan
 # menimpa helper ini di namespace modul.
 from utils.ffmpeg_helpers import run as ff
@@ -16,17 +18,56 @@ log = get(__name__)
 OUT_W, OUT_H = 1080, 1920
 
 
-def _render_one(source: Path, workdir: Path, seg: dict, crop: dict, src_h: int, deadline) -> Path:
-    out = Path("clips") / f"{seg['id']}.mp4"
-    vf = (
-        f"crop={crop['w']}:{src_h}:{crop['x']}:0,"
-        f"scale={OUT_W}:{OUT_H},setsar=1,"
-        # Nama file .ass polos, tanpa path. Inilah gunanya cwd=workdir: filter
-        # subtitles mem-parse argumennya sendiri, dan path Windows absolut
-        # (backslash, titik dua drive, spasi di nama user) harus di-escape
-        # berlapis. Dengan nama relatif, tidak ada yang perlu di-escape.
-        f"subtitles={seg['id']}.ass"
+def _mask(workdir: Path, lay, g: dict, deadline) -> str:
+    """Gambar hitam berlubang persegi-sudut-tumpul, untuk ditumpuk di atas video.
+
+    Sudut tumpul tanpa filter per-piksel-per-frame. Karena latarnya hitam solid,
+    tidak perlu transparansi sungguhan: cukup menimpakan gambar hitam yang
+    berlubang di posisi kotaknya. `geq` yang menghitung lubang itu berat, tapi
+    cuma jalan SEKALI pada satu gambar diam — bukan pada tiap frame video.
+
+    Berkasnya dipakai ulang untuk semua klip dalam job yang sama, karena
+    geometri kotaknya tidak berubah antar klip.
+    """
+    nama = f"mask{g['bw']}x{g['bh']}r{lay.radius}.png"
+    if (workdir / nama).exists():
+        return nama
+
+    r = lay.radius
+    x0, y0 = g["bx"], g["by"]
+    x1, y1 = x0 + g["bw"], y0 + g["bh"]
+    # Alpha 0 (tembus) di dalam persegi yang sudutnya dibulatkan, 255 di luar.
+    # Jarak ke pusat lingkaran sudut dipakai untuk menentukan di dalam/di luar.
+    dalam = (
+        f"between(X,{x0 + r},{x1 - r})*between(Y,{y0},{y1})"
+        f"+between(X,{x0},{x1})*between(Y,{y0 + r},{y1 - r})"
+        f"+lt(hypot(X-{x0 + r},Y-{y0 + r}),{r})"
+        f"+lt(hypot(X-{x1 - r},Y-{y0 + r}),{r})"
+        f"+lt(hypot(X-{x0 + r},Y-{y1 - r}),{r})"
+        f"+lt(hypot(X-{x1 - r},Y-{y1 - r}),{r})"
     )
+    ff(
+        ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error",
+         "-f", "lavfi", "-i", f"color=black:s={OUT_W}x{OUT_H}:d=1",
+         "-frames:v", "1",
+         "-vf", f"format=rgba,geq=r=0:g=0:b=0:a='255*lt({dalam},1)'",
+         nama],
+        deadline, cwd=workdir, cap=120,
+    )
+    return nama
+
+
+def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
+                src_w: int, src_h: int, deadline) -> Path:
+    out = Path("clips") / f"{seg['id']}.mp4"
+    lay = layout.ambil(settings.CLIP_LAYOUT)
+    g = layout.geometri(lay, crop, src_w, src_h)
+    mask = _mask(workdir, lay, g, deadline) if lay.radius else None
+    # Nama file polos, tanpa path. Inilah gunanya cwd=workdir: filter subtitles
+    # dan movie mem-parse argumennya sendiri, dan path Windows absolut
+    # (backslash, titik dua drive, spasi di nama user) harus di-escape berlapis.
+    # Dengan nama relatif, tidak ada yang perlu di-escape.
+    vf = layout.filtergraph(lay, g, f"{seg['id']}.ass", mask)
     ff(
         [
             "ffmpeg", "-y", "-nostdin", "-hide_banner", "-nostats", "-v", "error",
@@ -57,16 +98,19 @@ def _render_one(source: Path, workdir: Path, seg: dict, crop: dict, src_h: int, 
 def run(ctx: dict) -> dict:
     workdir: Path = ctx["workdir"]
     source: Path = ctx["source"]
+    src_w = int(ctx["meta"]["width"])
     src_h = int(ctx["meta"]["height"])
     deadline = ctx["deadline"]
     (workdir / "clips").mkdir(exist_ok=True)
+
+    log.info("render memakai layout '%s'", layout.ambil(settings.CLIP_LAYOUT).nama)
 
     rendered = {}
     for seg in ctx["segments_final"]:
         crop = ctx["crops"][seg["id"]]
         # Retry 1x (PRD Bagian 6) = 2 percobaan.
         path = retry(attempts=2, backoff=2.0)(_render_one)(
-            source, workdir, seg, crop, src_h, deadline
+            source, workdir, seg, crop, src_w, src_h, deadline
         )
         size_mb = path.stat().st_size / 1e6
         if size_mb < 0.05:

@@ -31,6 +31,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Font caption dipasang ke sistem supaya libass menemukannya lewat fontconfig.
+#
+# Tanpa ini image cuma punya DejaVu, dan nama font apa pun yang ditulis di .ass
+# diam-diam diganti: `fc-match Arial` mengembalikan DejaVu Sans "Book" — bahkan
+# bukan versi tebalnya. Caption tetap terender, jadi tidak ada tanda apa pun
+# bahwa yang tampil bukan font yang diminta.
+#
+# fc-cache WAJIB: tanpanya berkas ada di disk tapi fontconfig tidak
+# mengetahuinya, dan gejalanya persis sama dengan font yang tidak terpasang.
+RUN mkdir -p /usr/share/fonts/truetype/capio \
+    && cp assets/fonts/*.ttf /usr/share/fonts/truetype/capio/ \
+    && fc-cache -f > /dev/null
+
 # Berjalan sebagai non-root. Kalau container jebol, penyerang tidak langsung
 # dapat root di dalamnya.
 RUN useradd -m -u 1000 clipper \

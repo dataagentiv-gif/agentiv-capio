@@ -61,13 +61,40 @@ FIELDS = [
        help="Klip jadi disimpan di sini sebagai file mp4 biasa — bisa dibuka, "
             "dihapus, dan disalin lewat file manager. Tidak ada storage cloud."),
 
+    _f("CLIP_LAYOUT", "Layout klip", "Tampilan", kind="select",
+       options=["penuh", "kotak", "samping"],
+       help="penuh: video mengisi layar, caption di bawah. "
+            "kotak: video dalam kotak sudut tumpul di tengah, latar hitam. "
+            "samping: pembicara digeser ke kiri, teks bertumpuk di kanan. "
+            "Layout dipilih utuh — posisi teks dan geometri video harus sepakat."),
+    _f("CAPTION_FONT", "Font caption", "Tampilan", kind="select",
+       options=["Poppins", "Anton", "Archivo Black", "DejaVu Sans"],
+       help="Hanya font yang ikut dipasang di image. Nama lain tidak akan "
+            "menghasilkan error — libass diam-diam menggantinya, dan yang "
+            "terlihat cuma caption yang kurang mirip."),
+    _f("CAPTION_SIZE", "Ukuran caption", "Tampilan", kind="number",
+       help="0 = ikut bawaan layout. Kata panjang dalam Bahasa Indonesia "
+            "kadang perlu dikecilkan."),
+    _f("CAPTION_COLOR", "Warna kata aktif", "Tampilan",
+       help="RRGGBB tanpa tanda pagar, urutan biasa seperti di CSS. "
+            "Bawaan FFE500 (kuning keemasan)."),
+    _f("CAPTION_WORDS", "Kata per tampilan", "Tampilan", kind="number",
+       help="0 = ikut bawaan layout. 1 kata besar terasa sangat beda dari 4."),
+    _f("CAPTION_UPPER", "HURUF BESAR semua", "Tampilan", kind="select",
+       options=["false", "true"],
+       help="Lazim di klip pendek, tapi kalimat panjang jadi lebih makan ruang."),
+
     _f("TARGET_CLIPS_DEFAULT", "Jumlah klip default", "Guardrail", kind="number"),
     _f("MIN_CLIP_SEC", "Durasi klip minimum (detik)", "Guardrail", kind="number"),
     _f("MAX_CLIP_SEC", "Durasi klip maksimum (detik)", "Guardrail", kind="number"),
     _f("JOB_TIMEOUT_SEC", "Batas waktu per job (detik)", "Guardrail", kind="number"),
 
     _f("SILENCE_NOISE_DB", "Ambang hening (dB)", "Kalibrasi", kind="number",
-       help="-30 untuk podcast bersih; turunkan ke -35 kalau source ada musik latar."),
+       help="-30 untuk podcast bersih. Kalau source ada musik latar, NAIKKAN "
+            "ke -20 — jangan diturunkan. Musik menaikkan lantai kebisingan, "
+            "jadi ambang yang lebih rendah makin mustahil tercapai: audio "
+            "bermusik -24dB menghasilkan 0 jeda di -30dB, tetap 0 di -40dB, "
+            "tapi 15 jeda di -20dB."),
     _f("SILENCE_MIN_DUR", "Durasi hening minimum (detik)", "Kalibrasi", kind="number"),
     _f("SNAP_MAX_DRIFT", "Pergeseran batas maksimum (detik)", "Kalibrasi", kind="number",
        help="Seberapa jauh batas klip boleh digeser ke jeda alami terdekat."),

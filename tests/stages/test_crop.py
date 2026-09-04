@@ -66,3 +66,53 @@ def test_crop_x_tidak_pernah_keluar_frame():
     for frac in (0.0, 0.02, 0.5, 0.98, 1.0):
         x = max(0, min(src_w - win_w, int(frac * src_w - win_w / 2))) & ~1
         assert 0 <= x <= src_w - win_w
+
+
+# --- posisi wajah mentah untuk layout lain ---
+#
+# Layout `penuh` memakai jendela 9:16 setinggi frame penuh, jadi tidak pernah
+# ada keputusan vertikal. Layout yang menaruh video di kotak lebih pendek harus
+# memutuskannya sendiri, dan untuk itu ia butuh tahu di mana orangnya — bukan
+# jendela yang sudah terlanjur diputuskan di stage ini.
+
+def _jalankan(tmp_path, monkeypatch, frac):
+    import subprocess
+
+    from pipeline.stages import crop as c
+
+    src = tmp_path / "v.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error",
+         "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=15:duration=3",
+         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(src)],
+        check=True, timeout=120)
+    from utils.ffmpeg_helpers import Deadline
+
+    monkeypatch.setattr(c, "_face_center", lambda frames: frac)
+    # Deadline sungguhan, bukan None: _sample memanggil .remaining() dan akan
+    # gagal lebih dulu, sehingga deteksi wajah tidak pernah tercapai — testnya
+    # lolos karena alasan yang salah.
+    return c.run({"source": src, "meta": {"width": 1920, "height": 1080},
+                  "deadline": Deadline(300),
+                  "segments_final": [{"id": "c1", "start": 0.0, "end": 2.0}]})["crops"]["c1"]
+
+
+def test_posisi_wajah_ikut_dibawa(tmp_path, monkeypatch):
+    out = _jalankan(tmp_path, monkeypatch, (0.62, 0.35))
+    assert out["fx"] == 0.62
+    assert out["fy"] == 0.35
+
+
+def test_tanpa_wajah_posisinya_none_bukan_nol(tmp_path, monkeypatch):
+    """Nol adalah posisi yang SAH (tepi kiri/atas). Memakainya sebagai penanda
+    'tidak ada' membuat layout membingkai ke pojok, bukan jatuh ke tengah."""
+    out = _jalankan(tmp_path, monkeypatch, None)
+    assert out["fx"] is None and out["fy"] is None
+
+
+def test_jendela_lama_tidak_berubah(tmp_path, monkeypatch):
+    """Regresi: layout `penuh` harus menghasilkan angka yang persis sama seperti
+    sebelum koordinat vertikal dibuka. 1920x1080 -> jendela 608 px."""
+    out = _jalankan(tmp_path, monkeypatch, (0.5, 0.4))
+    assert out["w"] == 608
+    assert out["x"] == ((1920 - 608) // 2) & ~1
