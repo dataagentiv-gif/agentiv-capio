@@ -65,14 +65,41 @@ function poll(fn, cepat = 3000, lambat = 15000) {
 /* Penghapusan selalu lewat konfirmasi bawaan browser. Ini tindakan yang tidak
    bisa dibatalkan — berkasnya ikut hilang dari disk, bukan cuma barisnya di
    layar. */
-async function hapus(url, tanya) {
+// Penghapusan yang sedang berjalan, ditandai per URL. Tanpa ini, klik kedua
+// saat request pertama masih di jalan memunculkan dialog konfirmasi KEDUA lalu
+// mengirim DELETE lagi — dan di halaman yang menyegar sendiri, tombolnya
+// sempat berpindah tempat di antara dua klik itu, jadi klik kedua bisa mendarat
+// di baris yang sama sekali lain.
+const _menghapus = new Set();
+
+async function hapus(url, tanya, tombol = null) {
+  if (_menghapus.has(url)) return false;
   if (!confirm(tanya)) return false;
-  const r = await fetch(url, { method: 'DELETE' });
-  if (!r.ok && r.status !== 404) {
-    alert(`Gagal menghapus: HTTP ${r.status}`);
-    return false;
+
+  _menghapus.add(url);
+  if (tombol) {
+    tombol.disabled = true;
+    tombol.classList.add('sibuk');
   }
-  return true;
+  try {
+    const r = await fetch(url, { method: 'DELETE' });
+    // 404 diterima: yang mau dihapus memang sudah tidak ada, dan itu hasil
+    // akhir yang sama dengan berhasil.
+    if (!r.ok && r.status !== 404) {
+      alert(`Gagal menghapus: HTTP ${r.status}`);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    alert(`Gagal menghapus: ${e}`);
+    return false;
+  } finally {
+    _menghapus.delete(url);
+    if (tombol && tombol.isConnected) {
+      tombol.disabled = false;
+      tombol.classList.remove('sibuk');
+    }
+  }
 }
 
 function tombolHapus(label, aksi) {

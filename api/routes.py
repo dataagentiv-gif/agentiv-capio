@@ -251,11 +251,22 @@ def preview_tampilan(layout: str | None = None, font: str | None = None,
     )
 
 
+def _kurang_konfigurasi() -> str | None:
+    """Nama provider yang key-nya masih kosong, atau None kalau lengkap.
+
+    Nama provider = nama pool, jadi tidak ada daftar terpisah yang bisa basi
+    saat provider baru ditambahkan.
+    """
+    kosong = [
+        n for n in (settings.ASR_PROVIDER, settings.LLM_PROVIDER)
+        if not keypool.keys(n)
+    ]
+    return ", ".join(kosong) or None
+
+
 @app.get("/api/status")
 def config_status():
     """Ringkasan singkat untuk strip status di halaman Submit."""
-    # Nama provider = nama pool, jadi tidak ada daftar terpisah yang bisa basi
-    # saat provider baru ditambahkan.
     asr_ok = bool(keypool.keys(settings.ASR_PROVIDER))
     llm_ok = bool(keypool.keys(settings.LLM_PROVIDER))
     return {
@@ -307,6 +318,19 @@ def play_clip(job_id: str, clip_id: str, range: str | None = Header(default=None
 
 @app.post("/jobs", response_model=JobCreated, status_code=201)
 def create_job(payload: JobCreate):
+    # Ditolak SEKARANG, bukan dibiarkan gagal di tengah pipeline. Tanpa key,
+    # job tetap mengunduh videonya lebih dulu — beberapa menit sampai satu jam —
+    # baru berhenti di stage transkrip. Halaman Submit sudah mematikan
+    # tombolnya, tapi itu penjaga di browser saja: permintaan langsung ke API
+    # tetap bisa membuat job yang sejak awal pasti gagal.
+    kurang = _kurang_konfigurasi()
+    if kurang:
+        raise HTTPException(
+            400,
+            f"API key untuk {kurang} belum diisi. Buka halaman Setting dulu — "
+            "tanpa itu job akan gagal setelah videonya terlanjur diunduh.",
+        )
+
     # Layout kosong berarti ikut default di Setting. Diselesaikan di sini, bukan
     # dibiarkan kosong sampai render: nilai yang tersimpan di baris job harus
     # tetap menjelaskan bentuk klipnya walau defaultnya berubah setelah itu.

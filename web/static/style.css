@@ -1045,3 +1045,13 @@ select:focus {
   .gaya-grid { grid-template-columns: 1fr; }
   .gaya-grid .pratinjau { grid-column: 1; grid-row: auto; }
 }
+
+/* Tombol hapus yang sedang memproses. Tanpa penanda, klik kedua terasa seperti
+   klik pertama yang tidak bekerja — dan orang menekannya berkali-kali. */
+.btn-hapus.sibuk {
+  opacity: .5;
+  cursor: progress;
+  pointer-events: none;
+}
+
+.btn:disabled { cursor: not-allowed; }

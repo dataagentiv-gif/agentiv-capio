@@ -73,9 +73,9 @@ document.getElementById('list').addEventListener('click', async (e) => {
   const [jenis, jobId, clipId] = b.dataset.aksi.split(':');
   const ok = jenis === 'job'
     ? await hapus(`/jobs/${jobId}`,
-        'Hapus job ini beserta SEMUA klipnya? Berkasnya ikut terhapus dari disk.')
+        'Hapus job ini beserta SEMUA klipnya? Berkasnya ikut terhapus dari disk.', b)
     : await hapus(`/jobs/${jobId}/clips/${clipId}`,
-        'Hapus klip ini? Berkasnya ikut terhapus dari disk.');
+        'Hapus klip ini? Berkasnya ikut terhapus dari disk.', b);
   if (ok) tick();
 });
 

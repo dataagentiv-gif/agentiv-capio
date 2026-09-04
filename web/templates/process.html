@@ -105,7 +105,8 @@ document.body.addEventListener('click', async (e) => {
   if (!b) return;
   const id = b.dataset.aksi.split(':')[1];
   if (await hapus(`/jobs/${id}`,
-      'Hapus job ini beserta seluruh berkasnya? Tindakan ini tidak bisa dibatalkan.')) tick();
+      'Hapus job ini beserta seluruh berkasnya? Tindakan ini tidak bisa dibatalkan.',
+      b)) tick();
 });
 
 window.addEventListener('hashchange', pilihTab);

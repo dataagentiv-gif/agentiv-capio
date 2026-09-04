@@ -94,11 +94,12 @@ function drawChips() {
   ).join('') + `<input type="number" class="chip-num" id="custom" min="1" max="20"
                  value="${n.value}" aria-label="Jumlah klip kustom">`;
   document.querySelectorAll('.chip').forEach(b =>
-    b.onclick = () => { n.value = b.dataset.v; drawChips(); });
+    b.onclick = () => { n.value = b.dataset.v; drawChips(); segarkanTombol(); });
   document.getElementById('custom').oninput = e => {
     n.value = e.target.value;
     document.querySelectorAll('.chip').forEach(b =>
       b.classList.toggle('on', Number(b.dataset.v) === Number(n.value)));
+    segarkanTombol();
   };
 }
 
@@ -233,6 +234,8 @@ async function drawStatus() {
       `Tiap klip ${s.min_sec}–${s.max_sec} detik. Ubah di halaman Setting.`;
     if (!Number(n.value)) n.value = s.default_clips;
     drawChips();
+    siapProses = !!s.ready;
+    segarkanTombol();
   } catch (e) {
     document.getElementById('status').innerHTML =
       `<span class="stat off">API tidak bisa dihubungi</span>`;
@@ -240,8 +243,48 @@ async function drawStatus() {
 }
 
 const f = document.getElementById('f'), out = document.getElementById('out'), go = document.getElementById('go');
+
+// Pola link YouTube, sama dengan yang divalidasi server. Diperiksa di sini juga
+// supaya salah tempel ketahuan SEKARANG, bukan sebagai balasan 422 yang
+// pesannya baru muncul setelah tombol ditekan.
+const POLA_YT = /^https:\/\/((www|m)\.youtube\.com\/|youtube\.com\/|youtu\.be\/)/;
+
+let siapProses = true;   // diisi drawStatus() dari /api/status
+
+function cekForm() {
+  const url = document.getElementById('url').value.trim();
+  const jumlah = Number(n.value);
+
+  if (!url) return 'Link YouTube belum diisi.';
+  if (!POLA_YT.test(url))
+    return 'Link harus dari YouTube (youtube.com atau youtu.be), termasuk https:// di depannya.';
+  if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > 20)
+    return 'Jumlah klip harus antara 1 dan 20.';
+  if (!layoutPilih) return 'Tampilan klip belum terpilih.';
+  // Konfigurasi yang bolong membuat job gagal di tengah pipeline, belasan menit
+  // setelah submit — dan penyebabnya sudah bisa diketahui sekarang.
+  if (!siapProses)
+    return 'Konfigurasi belum lengkap. Isi API key di halaman Setting dulu.';
+  return null;
+}
+
+// Tombol mengikuti keadaan form, jadi tidak ada submit yang pasti gagal.
+function segarkanTombol() {
+  const alasan = cekForm();
+  go.disabled = alasan !== null;
+  go.title = alasan || 'Proses video';
+}
+
+document.getElementById('url').addEventListener('input', segarkanTombol);
+document.getElementById('n').addEventListener('change', segarkanTombol);
+
 f.addEventListener('submit', async (e) => {
   e.preventDefault();
+  const alasan = cekForm();
+  if (alasan) {
+    out.innerHTML = `<div class="note err">${esc(alasan)}</div>`;
+    return;
+  }
   go.disabled = true; go.textContent = 'Mengirim…'; out.innerHTML = '';
   try {
     const r = await fetch('/jobs', {
@@ -262,10 +305,14 @@ f.addEventListener('submit', async (e) => {
   } catch (err) {
     out.innerHTML = `<div class="note err">${esc(err)}</div>`;
   } finally {
-    go.disabled = false; go.textContent = 'Proses video';
+    go.textContent = 'Proses video';
+    // Bukan `disabled = false` begitu saja: URL sudah dikosongkan setelah
+    // berhasil, jadi tombolnya memang harus mati lagi sampai ada link baru.
+    segarkanTombol();
   }
 });
 
+go.disabled = true;
 drawStatus();
 drawLayouts();
 isiGaya().then(segarkanPratinjau);
