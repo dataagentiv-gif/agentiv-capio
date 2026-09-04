@@ -156,7 +156,7 @@ def run(ctx: dict) -> dict:
 
     words: list[dict] = ctx["words"]
     workdir: Path = ctx["workdir"]
-    lay = layout.ambil(settings.CLIP_LAYOUT)
+    lay = layout.ambil(ctx.get("layout") or settings.CLIP_LAYOUT)
     knob = knob_dari_settings()
     paths = {}
 

@@ -3,7 +3,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, create_engine, func
+from sqlalchemy import DateTime, Integer, String, Text, create_engine, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
@@ -56,6 +56,12 @@ class Job(Base):
     )
     url: Mapped[str] = mapped_column(Text)
     target_clips: Mapped[int] = mapped_column(Integer, default=8)
+    # Bentuk tampilan dipilih PER VIDEO, bukan sekali di setelan: podcast
+    # serius dan potongan lucu tidak memakai bentuk yang sama, dan orang
+    # memutuskannya saat menempel link — bukan saat membuka halaman Setting.
+    # Disimpan di baris job supaya klip lama tetap bisa dijelaskan bentuknya
+    # walau setelan default sudah berubah sejak itu.
+    layout: Mapped[str] = mapped_column(String(20), default="penuh")
     status: Mapped[str] = mapped_column(String(20), default=Status.QUEUED, index=True)
     progress: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -72,6 +78,7 @@ class Job(Base):
             "id": str(self.id),
             "url": self.url,
             "target_clips": self.target_clips,
+            "layout": self.layout,
             "status": self.status,
             "progress": self.progress,
             "error": self.error,
@@ -103,3 +110,22 @@ def session_scope():
 def init() -> None:
     """Bikin tabel kalau belum ada. Dipanggil saat startup API."""
     Base.metadata.create_all(engine)
+
+    # create_all TIDAK menambah kolom ke tabel yang sudah ada — ia hanya
+    # membuat tabel yang belum ada sama sekali. Tanpa baris di bawah, database
+    # yang sudah terlanjur jalan akan menolak setiap INSERT dengan
+    # UndefinedColumn, dan itu terlihat seperti kode yang rusak padahal cuma
+    # skemanya yang tertinggal.
+    #
+    # Project ini sengaja belum memakai tool migrasi (PRD Bagian 7), jadi
+    # penambahan kolom ditulis di sini secara idempoten. Kalau nanti kolomnya
+    # bertambah banyak, ini saatnya beralih ke Alembic.
+    #
+    # ponytail: satu ALTER per kolom baru. Layak diganti tool migrasi begitu
+    # ada perubahan yang butuh mengisi ulang data lama, bukan sekadar menambah
+    # kolom berdefault.
+    with engine.begin() as c:
+        c.execute(text(
+            "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS "
+            "layout VARCHAR(20) NOT NULL DEFAULT 'penuh'"
+        ))

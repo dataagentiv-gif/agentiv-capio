@@ -9,9 +9,10 @@ from utils.logging import get
 log = get(__name__)
 
 
-def create(url: str, target_clips: int) -> dict:
+def create(url: str, target_clips: int, layout: str = "penuh") -> dict:
     with session_scope() as s:
-        job = Job(url=url, target_clips=target_clips, status=Status.QUEUED)
+        job = Job(url=url, target_clips=target_clips, layout=layout,
+                  status=Status.QUEUED)
         s.add(job)
         s.flush()
         return job.as_dict()

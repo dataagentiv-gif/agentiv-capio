@@ -21,6 +21,12 @@
       <p class="sub" id="durasi"></p>
     </div>
 
+    <div class="field">
+      <label>Tampilan klip</label>
+      <div class="layouts" id="layouts"></div>
+      <p class="sub" id="ket-layout"></p>
+    </div>
+
     <div class="actions">
       <button type="submit" class="btn" id="go">Proses video</button>
       <a class="btn ghost" href="/settings">Ubah parameter</a>
@@ -54,6 +60,37 @@ function drawChips() {
   };
 }
 
+// Pemilih tampilan ada DI SINI, bukan di halaman Setting: tiap video bisa
+// menuntut bentuk yang berbeda, dan keputusannya diambil saat menempel link.
+// Menaruhnya di Setting memaksa orang bolak-balik dan membuat satu pilihan
+// berlaku untuk semua video — padahal itu justru yang paling tidak diinginkan.
+let layoutPilih = null;
+
+async function drawLayouts() {
+  const el = document.getElementById('layouts');
+  try {
+    const d = await (await fetch('/api/layouts')).json();
+    layoutPilih = layoutPilih || d.default;
+    el.innerHTML = d.layouts.map(l => `
+      <button type="button" class="layout-opt ${l.nama === layoutPilih ? 'on' : ''}"
+              data-l="${esc(l.nama)}" title="${esc(l.keterangan)}">
+        <img src="/api/preview.png?layout=${encodeURIComponent(l.nama)}&kecil=1"
+             alt="" loading="lazy">
+        <span>${esc(l.judul)}</span>
+      </button>`).join('');
+    el.querySelectorAll('.layout-opt').forEach(b => b.onclick = () => {
+      layoutPilih = b.dataset.l;
+      drawLayouts();
+    });
+    const aktif = d.layouts.find(l => l.nama === layoutPilih);
+    document.getElementById('ket-layout').textContent = aktif ? aktif.keterangan : '';
+  } catch {
+    // Preview gagal jangan menghalangi submit — layout tetap bisa dipilih
+    // lewat default di Setting.
+    el.innerHTML = '<p class="sub">Preview tampilan tidak bisa dimuat.</p>';
+  }
+}
+
 // Strip status: supaya konfigurasi yang belum lengkap ketahuan SEBELUM submit,
 // bukan belasan menit kemudian sebagai job gagal di tengah pipeline.
 async function drawStatus() {
@@ -81,7 +118,8 @@ f.addEventListener('submit', async (e) => {
   try {
     const r = await fetch('/jobs', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ url: document.getElementById('url').value, target_clips: Number(n.value) })
+      body: JSON.stringify({ url: document.getElementById('url').value,
+                             target_clips: Number(n.value), layout: layoutPilih })
     });
     const d = await r.json();
     if (!r.ok) {
@@ -100,5 +138,6 @@ f.addEventListener('submit', async (e) => {
 });
 
 drawStatus();
+drawLayouts();
 </script>
 {% endblock %}

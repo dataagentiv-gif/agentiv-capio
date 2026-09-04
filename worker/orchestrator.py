@@ -94,6 +94,11 @@ def run(job_id: str) -> None:
         "job_id": str(job_id),
         "url": job["url"],
         "target_clips": job["target_clips"],
+        # Dibaca dari BARIS JOB, bukan dari settings: layout dipilih saat
+        # menempel link, dan job yang mengantre beberapa jam harus tetap keluar
+        # dengan bentuk yang dipilih waktu itu — bukan bentuk yang kebetulan
+        # aktif saat gilirannya tiba.
+        "layout": job.get("layout") or "penuh",
         "workdir": workdir,
         "deadline": Deadline(settings.JOB_TIMEOUT_SEC),
     }

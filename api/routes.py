@@ -21,6 +21,7 @@ from config import env_store
 from config.settings import settings
 from db import jobs, models
 from jobqueue.client import enqueue
+from pipeline import layout as layout_mod
 import storage
 from utils.ffmpeg_helpers import rmtree_retry
 from utils.logging import get
@@ -205,10 +206,23 @@ def test_provider(provider: str):
     return {"provider": provider, **checks.run(provider)}
 
 
+@app.get("/api/layouts")
+def daftar_layout():
+    """Pilihan tampilan untuk halaman Submit."""
+    return {
+        "default": layout_mod.ambil(settings.CLIP_LAYOUT).nama,
+        "layouts": [
+            {"nama": l.nama, "judul": l.judul, "keterangan": l.keterangan}
+            for l in layout_mod.LAYOUTS.values()
+        ],
+    }
+
+
 @app.get("/api/preview.png")
 def preview_tampilan(layout: str | None = None, font: str | None = None,
                      ukuran: int | None = None, warna: str | None = None,
-                     kata: int | None = None, upper: bool | None = None):
+                     kata: int | None = None, upper: bool | None = None,
+                     kecil: bool = False):
     """Satu frame contoh dengan setelan tampilan yang sedang dipilih.
 
     Parameternya opsional supaya halaman Setting bisa menampilkan akibat sebuah
@@ -220,7 +234,7 @@ def preview_tampilan(layout: str | None = None, font: str | None = None,
         ("kata", kata), ("upper", upper),
     ) if v is not None}
     try:
-        png = preview.render(layout, knob)
+        png = preview.render(layout, knob, kecil=kecil)
     except Exception as e:  # noqa: BLE001 — preview gagal jangan menjatuhkan halaman
         log.warning("preview gagal: %s", e)
         raise HTTPException(500, f"Preview gagal dibuat: {e}") from e
@@ -289,7 +303,13 @@ def play_clip(job_id: str, clip_id: str, range: str | None = Header(default=None
 
 @app.post("/jobs", response_model=JobCreated, status_code=201)
 def create_job(payload: JobCreate):
-    job = jobs.create(payload.url, payload.target_clips)
+    # Layout kosong berarti ikut default di Setting. Diselesaikan di sini, bukan
+    # dibiarkan kosong sampai render: nilai yang tersimpan di baris job harus
+    # tetap menjelaskan bentuk klipnya walau defaultnya berubah setelah itu.
+    job = jobs.create(
+        payload.url, payload.target_clips,
+        payload.layout or layout_mod.ambil(settings.CLIP_LAYOUT).nama,
+    )
     try:
         enqueue(job["id"])
     except Exception as e:  # noqa: BLE001

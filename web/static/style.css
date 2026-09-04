@@ -906,3 +906,40 @@ select:focus {
 }
 
 .hp.memuat .hp-spin { display: flex; }
+
+/* ---------- Pemilih tampilan (halaman Submit) ---------- */
+
+.layouts { display: flex; gap: 12px; flex-wrap: wrap; }
+
+.layout-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface-canvas);
+  border: 2px solid var(--color-fog);
+  border-radius: var(--radius-inputs);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+
+.layout-opt img {
+  display: block;
+  width: 96px;
+  height: 171px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--color-ink);
+}
+
+.layout-opt:hover { border-color: var(--color-ash); }
+
+.layout-opt.on {
+  border-color: var(--color-action);
+  color: var(--color-action);
+  font-weight: 500;
+}

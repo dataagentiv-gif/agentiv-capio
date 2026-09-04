@@ -6,6 +6,21 @@ from config.settings import settings
 class JobCreate(BaseModel):
     url: str
     target_clips: int = Field(default=settings.TARGET_CLIPS_DEFAULT, ge=1, le=20)
+    # Bentuk tampilan dipilih di sini, bukan di halaman Setting: tiap video
+    # bisa menuntut bentuk yang berbeda, dan keputusannya diambil saat menempel
+    # link. Kosong = ikut default yang dipilih di Setting.
+    layout: str | None = None
+
+    @field_validator("layout")
+    @classmethod
+    def _layout_dikenal(cls, v):
+        if v is None or v == "":
+            return None
+        from pipeline.layout import LAYOUTS
+
+        if v not in LAYOUTS:
+            raise ValueError(f"Layout '{v}' tidak dikenal")
+        return v
 
     @field_validator("url")
     @classmethod
@@ -43,6 +58,7 @@ class JobOut(BaseModel):
     id: str
     url: str
     target_clips: int
+    layout: str = "penuh"
     status: str
     progress: int
     error: str | None = None

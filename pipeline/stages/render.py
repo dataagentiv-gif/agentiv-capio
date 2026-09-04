@@ -58,9 +58,9 @@ def _mask(workdir: Path, lay, g: dict, deadline) -> str:
 
 
 def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
-                src_w: int, src_h: int, deadline) -> Path:
+                src_w: int, src_h: int, deadline, nama_layout: str = "penuh") -> Path:
     out = Path("clips") / f"{seg['id']}.mp4"
-    lay = layout.ambil(settings.CLIP_LAYOUT)
+    lay = layout.ambil(nama_layout)
     g = layout.geometri(lay, crop, src_w, src_h)
     mask = _mask(workdir, lay, g, deadline) if lay.radius else None
     # Nama file polos, tanpa path. Inilah gunanya cwd=workdir: filter subtitles
@@ -103,14 +103,15 @@ def run(ctx: dict) -> dict:
     deadline = ctx["deadline"]
     (workdir / "clips").mkdir(exist_ok=True)
 
-    log.info("render memakai layout '%s'", layout.ambil(settings.CLIP_LAYOUT).nama)
+    lay = layout.ambil(ctx.get("layout") or settings.CLIP_LAYOUT)
+    log.info("render memakai layout '%s'", lay.nama)
 
     rendered = {}
     for seg in ctx["segments_final"]:
         crop = ctx["crops"][seg["id"]]
         # Retry 1x (PRD Bagian 6) = 2 percobaan.
         path = retry(attempts=2, backoff=2.0)(_render_one)(
-            source, workdir, seg, crop, src_w, src_h, deadline
+            source, workdir, seg, crop, src_w, src_h, deadline, lay.nama
         )
         size_mb = path.stat().st_size / 1e6
         if size_mb < 0.05:

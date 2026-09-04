@@ -75,8 +75,13 @@ def _sumber(kerja: Path) -> tuple[Path, int, int]:
     return latar, 1920, 1080
 
 
-def render(nama_layout: str | None = None, knob_tambahan: dict | None = None) -> bytes:
-    """PNG 1080x1920 berisi satu frame dengan layout dan knob yang aktif."""
+def render(nama_layout: str | None = None, knob_tambahan: dict | None = None,
+           kecil: bool = False) -> bytes:
+    """PNG berisi satu frame dengan layout dan knob yang aktif.
+
+    `kecil` mengecilkan keluaran untuk deretan pilihan di halaman Submit —
+    tiga gambar 1080x1920 di satu halaman itu beberapa MB tanpa perlu.
+    """
     lay = layout.ambil(nama_layout or settings.CLIP_LAYOUT)
     knob = {**knob_dari_settings(), **(knob_tambahan or {})}
 
@@ -102,9 +107,14 @@ def render(nama_layout: str | None = None, knob_tambahan: dict | None = None) ->
             mask = _mask(kerja, lay, g, _TanpaBatas())
 
         keluar = kerja / "preview.png"
+        vf = layout.filtergraph(lay, g, "p.ass", mask)
+        if kecil:
+            # Dikecilkan SETELAH seluruh rantai, bukan sebelumnya: caption
+            # dirender pada resolusi penuh dulu supaya ukuran dan ketebalan
+            # hurufnya sebanding dengan hasil sungguhan.
+            vf += ",scale=270:480"
         subprocess.run(
             ["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", latar.name,
-             "-vf", layout.filtergraph(lay, g, "p.ass", mask),
-             "-frames:v", "1", keluar.name],
+             "-vf", vf, "-frames:v", "1", keluar.name],
             check=True, cwd=kerja, timeout=180)
         return keluar.read_bytes()
