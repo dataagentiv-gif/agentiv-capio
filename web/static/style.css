@@ -58,13 +58,31 @@
 
   /* Dasar halaman TERPISAH dari permukaan kartu. Sebelumnya keduanya
      --surface-canvas, jadi kartu putih di atas halaman putih cuma dibedakan
-     garis rambut 1px dan seluruh UI terbaca rata tanpa kedalaman. */
-  --surface-page: #fbfaf8;
+     garis rambut 1px dan seluruh UI terbaca rata tanpa kedalaman.
+     Bernada biru muda, bukan abu netral: warnanya cukup untuk terasa, masih
+     cukup pucat untuk tidak menyaingi apa pun yang berdiri di atasnya. */
+  --surface-page: #eef2fa;
   --surface-canvas: #ffffff;
   --surface-soft: #f1f2f5;
   --surface-tinted: #e9f2fe;
   --surface-lavender: #eed7fc;
-  --surface-dark: #0d1b2e;
+  /* Dock biru brand, bukan navy yang nyaris hitam. Cukup gelap untuk ikon
+     putih tetap terbaca, cukup biru untuk jelas satu keluarga dengan logonya. */
+  --surface-dark: #143c94;
+
+  /* Tinggi nav, diisi ulang app.js dari ukuran sebenarnya. Nilai di sini cuma
+     cadangan sebelum JS jalan. Dipakai sidebar Setting untuk menempel di bawah
+     nav — ditulis sebagai angka mati, ia PASTI ketinggalan begitu tinggi nav
+     berubah, dan gejalanya item teratas sidebar tersembunyi di balik navbar. */
+  --nav-h: 100px;
+
+  /* Sapuan warna dasar halaman. Ditulis sekali sebagai token karena DUA elemen
+     harus memakainya sama persis — body dan nav — dan dua salinan pasti akan
+     berbeda suatu saat. */
+  --wash:
+    radial-gradient(900px 340px at 16% -40px, rgba(24, 104, 219, .16), transparent 70%),
+    radial-gradient(760px 320px at 88% -60px, rgba(255, 86, 77, .13), transparent 70%),
+    var(--surface-page);
 
   /* PERLUASAN di luar token asli. Sistem Atlassian yang diberikan tidak punya
      warna sukses/gagal sama sekali — kuning, violet, dan hijau di sana khusus
@@ -106,9 +124,19 @@
   vertical-align: -2px;
 }
 
+/* Nav memakai sapuan yang SAMA dengan body, dan keduanya `fixed`.
+   Ini bukan gaya-gayaan: nav itu sticky, jadi saat digulung ia berpindah
+   melintasi dokumen. Kalau sapuannya menempel dokumen, nav akan menampilkan
+   potongan gradasi yang berbeda dari halaman di bawahnya dan muncul garis
+   mendatar tepat di tepi bawah nav. Ditambatkan ke VIEWPORT, keduanya selalu
+   melihat potongan yang sama berapa pun posisi gulungannya. */
+body, .nav {
+  background: var(--wash);
+  background-attachment: fixed;
+}
+
 body {
   margin: 0;
-  background: var(--surface-page);
   color: var(--color-ink);
   font-family: var(--font-text);
   font-size: 16px;
@@ -124,8 +152,8 @@ a { color: var(--color-action); }
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--surface-page);
-  border-bottom: 1px solid var(--color-fog);
+  /* Latar diatur bersama body di atas. */
+  border-bottom: 1px solid rgba(13, 23, 38, .07);
 }
 
 .nav-inner {
@@ -300,16 +328,16 @@ a { color: var(--color-action); }
   transform: translate(-50%, -50%);
   width: calc((var(--lekuk) - var(--sela)) * 2);
   height: calc((var(--lekuk) - var(--sela)) * 2);
-  /* WAJIB sama dengan latar nav, bukan putih murni. Lingkaran ini duduk di
-     dalam lubang lekukan, dan lubang itu memperlihatkan latar nav — kalau
-     keduanya beda sedikit saja, muncul cincin jahitan tipis mengelilinginya
-     yang terlihat seperti bug rendering. */
-  background: var(--surface-page);
-  color: var(--color-action);
-  box-shadow: 0 4px 10px rgba(16, 18, 20, .18);
+  /* Oranye penuh dengan ikon putih. Dulu lingkaran ini putih dan harus persis
+     sewarna latar nav supaya tidak meninggalkan cincin jahitan; sekarang ia
+     memang DIMAKSUDKAN menonjol, jadi kaitan warna itu lepas dengan sendirinya
+     — celah di sekelilingnya kembali jadi celah sungguhan. */
+  background: var(--color-accent);
+  color: var(--color-white);
+  box-shadow: 0 4px 12px rgba(255, 86, 77, .45);
 }
 
-.dock a.on:hover .ikon { background: var(--surface-page); }
+.dock a.on:hover .ikon { background: #ff6b63; }
 
 .dock a.on .ic { width: 20px; height: 20px; }
 
@@ -987,10 +1015,21 @@ input.chip-num { width: 96px; cursor: text; text-align: center; }
   align-items: start;
 }
 
-/* Sticky supaya berpindah sub-halaman tidak menuntut scroll ke atas dulu. */
-.settings-nav {
+/* Sticky supaya berpindah sub-halaman tidak menuntut scroll ke atas dulu.
+   Yang menempel adalah SELURUH kolom sisi, bukan cuma daftar tautannya:
+   catatan di bawahnya ikut sebagai saudara di dalam kolom yang sama, dan kalau
+   hanya daftarnya yang menempel, catatan itu tergulung ke atas lalu menembus
+   daftar yang diam — dua teks bertumpuk saling menimpa.
+
+   Jaraknya diikat ke tinggi nav sebenarnya, bukan angka mati: pernah 80px,
+   lalu nav ditinggikan dan item teratas sidebar tersembunyi di baliknya tanpa
+   satu pun tanda. */
+.settings-sisi {
   position: sticky;
-  top: 80px;
+  top: calc(var(--nav-h) + 20px);
+}
+
+.settings-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;

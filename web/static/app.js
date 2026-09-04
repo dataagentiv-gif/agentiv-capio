@@ -217,6 +217,16 @@ function idJob(id) {
       'Z',
     ].join(' '));
     el.classList.add('digambar');
+
+    // Tinggi nav sebenarnya diumumkan ke CSS. Sidebar Setting menempel di
+    // bawahnya, dan angka mati di CSS pasti ketinggalan begitu tinggi nav
+    // berubah — gejalanya item teratas sidebar tersembunyi di balik navbar,
+    // tanpa satu pun error.
+    const nav = el.closest('.nav');
+    if (nav) {
+      document.documentElement.style.setProperty(
+        '--nav-h', `${Math.round(nav.getBoundingClientRect().height)}px`);
+    }
   }
 
   gambar();
