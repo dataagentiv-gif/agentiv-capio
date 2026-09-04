@@ -117,6 +117,77 @@ function idJob(id) {
           >${esc(String(id).slice(0, 8))}</button>`;
 }
 
+// Lekukan dock digambar sebagai SATU path SVG, bukan ditumpuk dari beberapa
+// lingkaran atau dilubangi dengan mask. Alasannya sudut pertemuan: tepi datar
+// dock dan lingkaran lekukannya harus MENYAMBUNG mulus, dan kalau keduanya
+// ditumpuk sebagai bentuk terpisah, di titik potongnya selalu tersisa sudut
+// lancip — persis di bagian yang paling diperhatikan mata.
+//
+// Digambar sekali saat halaman dimuat, tanpa animasi geser: tiap item nav
+// memuat halaman baru, jadi lekukannya sudah berada di tempat yang benar
+// begitu halaman berikutnya tampil. Animasi apa pun di sini tidak akan pernah
+// sempat terlihat.
+(function dock() {
+  const el = document.getElementById('dock');
+  const aktif = el?.querySelector('a.on');
+  const path = el?.querySelector('.dock-bg path');
+  if (!el || !aktif || !path) return;
+
+  function gambar() {
+    const gaya = getComputedStyle(el);
+    const px = (n) => parseFloat(gaya.getPropertyValue(n));
+    const R = px('--lekuk'), r = px('--sambung'), Rb = px('--sudut');
+    const k = px('--angkat');
+    const kotak = el.getBoundingClientRect();
+    const W = Math.round(kotak.width), H = Math.round(kotak.height);
+    if (!W || !H || !R || !r) return;
+
+    // Pusat lekukan ada di (cx, -k) — DI ATAS tepi dock. Lengkung penyambung
+    // menyinggung tepi atas dari bawah (pusatnya di y = r) dan menyinggung
+    // lingkaran lekukan dari luar, jadi jarak antar pusatnya = R + r. Sisanya
+    // Pythagoras dengan beda tinggi (r + k).
+    const d = Math.sqrt((R + r) ** 2 - (r + k) ** 2);
+    // Dijepit supaya lekukan tidak pernah memakan sudut dock. Dengan padding
+    // yang sekarang ini tidak pernah aktif, tapi cukup satu label yang lebih
+    // pendek untuk membuatnya perlu — dan gejalanya path yang saling silang,
+    // bukan pergeseran kecil yang bisa diabaikan.
+    const pusat = aktif.offsetLeft + aktif.offsetWidth / 2;
+    const cx = Math.min(Math.max(pusat, Rb + d), W - Rb - d);
+    const ty = -k + R * (r + k) / (R + r);
+    const tx = (arah) => cx + arah * R * d / (R + r);
+    const n = (v) => v.toFixed(1);
+
+    // Lingkaran mengikuti pergeseran jepitan, bukan dipusatkan sendiri —
+    // supaya ia dan lekukannya tidak mungkin berbeda tempat.
+    el.style.setProperty('--geser', `${n(cx - pusat)}px`);
+    el.querySelector('.dock-bg').setAttribute('viewBox', `0 0 ${W} ${H}`);
+    path.setAttribute('d', [
+      `M${Rb} 0`,
+      `H${n(cx - d)}`,
+      `A${r} ${r} 0 0 1 ${n(tx(-1))} ${n(ty)}`,
+      `A${R} ${R} 0 0 0 ${n(tx(1))} ${n(ty)}`,
+      `A${r} ${r} 0 0 1 ${n(cx + d)} 0`,
+      `H${W - Rb}`,
+      `A${Rb} ${Rb} 0 0 1 ${W} ${Rb}`,
+      `V${H - Rb}`,
+      `A${Rb} ${Rb} 0 0 1 ${W - Rb} ${H}`,
+      `H${Rb}`,
+      `A${Rb} ${Rb} 0 0 1 0 ${H - Rb}`,
+      `V${Rb}`,
+      `A${Rb} ${Rb} 0 0 1 ${Rb} 0`,
+      'Z',
+    ].join(' '));
+    el.classList.add('digambar');
+  }
+
+  gambar();
+  addEventListener('resize', gambar);
+  // Font web mengubah lebar label setelah halaman terlanjur tergambar, dan itu
+  // menggeser pusat item aktif beberapa piksel — cukup untuk membuat lingkaran
+  // terlihat tidak duduk pas di lekukannya.
+  document.fonts?.ready.then(gambar);
+})();
+
 // Menyalin id dipasang sekali di sini, bukan per halaman: dua halaman memakai
 // tombol yang sama, dan dua salinan penanganan klik akan lambat laun berbeda.
 document.addEventListener('click', async (e) => {

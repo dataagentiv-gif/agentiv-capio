@@ -54,7 +54,7 @@
   </defs>
 </svg>
 
-<nav class="nav">
+<header class="nav">
   <div class="nav-inner">
     <a class="brand" href="/">
       {# Simbol CAPIO: dua kurung yang saling mengunci membentuk bingkai
@@ -70,14 +70,28 @@
       </svg>
       <span class="brand-name">CAPIO</span>
     </a>
-    <div class="nav-links">
-      <a href="/"         class="{% if page == 'submit'   %}active{% endif %}"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-submit"/></svg>Submit</a>
-      <a href="/process"  class="{% if page == 'process'  %}active{% endif %}"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-process"/></svg>Proses</a>
-      <a href="/results"  class="{% if page == 'results'  %}active{% endif %}"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-results"/></svg>Hasil</a>
-      <a href="/settings" class="{% if page == 'settings' %}active{% endif %}"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-settings"/></svg>Setting</a>
-    </div>
+    {# Dock gelap dengan lekukan di bawah item aktif. Bentuk docknya digambar
+       satu path SVG oleh app.js; kalau JS mati, CSS memberi latar pil biasa
+       sehingga navigasinya tetap terbaca dan bisa dipakai — cuma tanpa
+       lekukannya. #}
+    <nav class="dock" id="dock" aria-label="Navigasi utama">
+      <svg class="dock-bg" aria-hidden="true"><path d=""/></svg>
+      {% set menu = [
+        ('/',         'submit',   'i-submit',   'Submit'),
+        ('/process',  'process',  'i-process',  'Proses'),
+        ('/results',  'results',  'i-results',  'Hasil'),
+        ('/settings', 'settings', 'i-settings', 'Setting'),
+      ] %}
+      {% for href, kunci, ikon, judul in menu %}
+      <a href="{{ href }}" class="{% if page == kunci %}on{% endif %}"
+         {% if page == kunci %}aria-current="page"{% endif %}>
+        <span class="ikon"><svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#{{ ikon }}"/></svg></span>
+        <span class="lbl">{{ judul }}</span>
+      </a>
+      {% endfor %}
+    </nav>
   </div>
-</nav>
+</header>
 
 <main class="{% block main_class %}{% endblock %}">
   <div class="page-head">

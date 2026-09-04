@@ -89,8 +89,9 @@ a { color: var(--color-action); }
 .nav-inner {
   max-width: var(--page-max);
   margin: 0 auto;
-  height: 56px;
-  padding: 0 24px;
+  /* Atasnya jauh lebih lega dari bawahnya: lingkaran item aktif menyembul ke
+     luar dock, dan tanpa ruang itu ia terpotong tepi nav. */
+  padding: 36px 24px 12px;
   display: flex;
   align-items: center;
   gap: 32px;
@@ -115,29 +116,135 @@ a { color: var(--color-action); }
    bidang gelap, jadi tanpa ini ia terlihat menempel ke wordmark. */
 .brand .mark { margin-right: 1px; }
 
-.nav-links { margin-left: auto; display: flex; gap: 24px; }
+/* ---------- Dock navigasi ----------
+   Item aktif diangkat ke lingkaran putih yang menyembul di atas dock, dan
+   docknya melekuk mengikuti lingkaran itu.
 
-.nav-links a {
-  display: inline-flex;
+   Ukurannya ditulis SEBAGAI CUSTOM PROPERTY karena app.js membacanya balik
+   untuk menggambar path-nya. Kalau angkanya ditulis dua kali — sekali di sini
+   untuk lingkaran, sekali di JS untuk lekukan — keduanya pasti berbeda suatu
+   saat, dan gejalanya lingkaran yang tidak duduk pas di lekukannya. */
+.dock {
+  --tinggi: 52px;
+  --lekuk: 30px;     /* jari-jari lekukan */
+  /* Pusat lekukan diangkat ke ATAS tepi dock. Tanpa ini lekukan dan
+     lingkarannya sepusat di y=0, jadi lingkaran sebesar apa pun selalu
+     menggali dock sedalam jari-jarinya sendiri — dan lingkaran sebesar
+     referensi akan membelah dock jadi dua. Diangkat, keduanya bisa dipilih
+     terpisah: lingkaran besar, lekukan dangkal. */
+  --angkat: 8px;
+  --sambung: 15px;   /* lengkung penyambung antara tepi datar dan lekukan */
+  --sudut: 18px;     /* sudut dock */
+  --sela: 6px;       /* jarak lingkaran ke tepi lekukan */
+  --item: 64px;
+
+  position: relative;
+  margin-left: auto;
+  display: flex;
+  height: var(--tinggi);
+  /* Bukan sekadar ruang napas. Lekukan item PERTAMA dan TERAKHIR melebar
+     sampai ~39px dari pusatnya, dan begitu ia mencapai lengkung sudut dock,
+     bentuknya mulai saling makan. Padding inilah yang menjauhkannya. */
+  padding: 0 40px;
+  /* Latar pil biasa sebagai cadangan kalau JS tidak jalan. Begitu path-nya
+     tergambar, app.js menambah kelas `digambar` dan latar ini dilepas —
+     kalau tidak, lekukannya tertutup kembali oleh kotak ini. */
+  background: var(--surface-dark);
+  border-radius: var(--sudut);
+  box-shadow: 0 12px 26px rgba(16, 18, 20, .22);
+}
+
+.dock.digambar { background: none; box-shadow: none; }
+
+.dock-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Lekukan menyentuh y=0, dan tanpa ini bayangannya terpotong tepi viewBox. */
+  overflow: visible;
+  filter: drop-shadow(0 12px 26px rgba(16, 18, 20, .22));
+}
+
+.dock-bg path { fill: var(--surface-dark); }
+
+.dock a {
+  position: relative;
+  /* Wajib, dan bukan sekadar kehati-hatian: .dock-bg diposisikan absolut, jadi
+     ia melukis di atas semua elemen yang tidak diposisikan. Tanpa ini label
+     item aktif tertimbun docknya sendiri — terlihat persis seperti label yang
+     tidak pernah dirender. */
+  z-index: 1;
+  width: var(--item);
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 7px;
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--color-ink);
+  justify-content: center;
+  gap: 5px;
   text-decoration: none;
-  padding: 4px 0;
+  color: var(--color-ash);
 }
 
-.nav-links .ic { color: var(--color-ash); transition: color .15s; }
-.nav-links a:hover .ic, .nav-links a.active .ic { color: var(--color-action); }
+.dock .ikon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  transition: background .15s, color .15s;
+}
 
-.nav-links a:hover { color: var(--color-action); }
+.dock .ic { display: block; width: 18px; height: 18px; }
 
-.nav-links a.active {
-  color: var(--color-action);
+/* Label hanya untuk item aktif — persis seperti referensinya. Empat label
+   sekaligus di dock selebar ini akan berdesakan, dan yang ingin dibaca cuma
+   satu: yang sedang dibuka. */
+.dock .lbl {
+  font-size: 11px;
   font-weight: 500;
-  box-shadow: inset 0 -2px 0 var(--color-action);
+  letter-spacing: .01em;
+  color: var(--color-white);
+  display: none;
 }
+
+.dock a:hover .ikon { background: rgba(255, 255, 255, .1); color: var(--color-white); }
+
+.dock a:focus-visible { outline: none; }
+.dock a:focus-visible .ikon {
+  outline: 2px solid var(--color-white);
+  outline-offset: 2px;
+}
+
+/* --- item aktif --- */
+
+.dock a.on {
+  /* Lingkaran keluar dari alur biasa, jadi yang tersisa di dalam dock cuma
+     labelnya — dan itu duduk di bawah lekukan, bukan di tengah dock. */
+  justify-content: flex-end;
+  padding-bottom: 7px;
+}
+
+.dock a.on .lbl { display: block; }
+
+.dock a.on .ikon {
+  position: absolute;
+  /* Dipusatkan ke itemnya sendiri, DITAMBAH pergeseran yang sama dengan yang
+     dipakai menggambar lekukan. --geser hampir selalu nol; ia baru berisi saat
+     lekukan terpaksa dijepit menjauhi sudut dock, dan di saat itulah lingkaran
+     harus ikut bergeser — kalau tidak, ia berhenti duduk di lekukannya. */
+  left: calc(50% + var(--geser, 0px));
+  top: calc(-1 * var(--angkat));
+  transform: translate(-50%, -50%);
+  width: calc((var(--lekuk) - var(--sela)) * 2);
+  height: calc((var(--lekuk) - var(--sela)) * 2);
+  background: var(--surface-canvas);
+  color: var(--color-action);
+  box-shadow: 0 4px 10px rgba(16, 18, 20, .18);
+}
+
+.dock a.on:hover .ikon { background: var(--surface-canvas); }
+
+.dock a.on .ic { width: 20px; height: 20px; }
 
 /* ---------- Layout ---------- */
 
@@ -859,6 +966,18 @@ select:focus {
 }
 
 @media (max-width: 640px) {
+  /* Dock dikecilkan lewat custom property-nya sendiri, bukan lewat aturan
+     terpisah: app.js membaca angka yang sama untuk menggambar lekukannya, jadi
+     mengubahnya di satu tempat sudah cukup. */
+  .dock {
+    --tinggi: 48px; --lekuk: 26px; --angkat: 7px;
+    --sambung: 12px; --sudut: 16px; --item: 54px;
+    padding: 0 34px;
+  }
+  .nav-inner { padding: 30px 14px 10px; gap: 12px; }
+  /* Wordmark dilepas lebih dulu, bukan docknya: nama app sudah ada di title
+     bar, sementara dock adalah satu-satunya cara pindah halaman. */
+  .brand-name { display: none; }
   main { padding: 40px 16px 64px; }
   h1.display { font-size: 32px; }
   .lede { font-size: 16px; }
