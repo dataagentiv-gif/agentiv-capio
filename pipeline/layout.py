@@ -55,6 +55,16 @@ class Layout:
     margin_r: int = 80
     #: Kata ditumpuk vertikal satu per baris, bukan mengalir mendatar.
     tumpuk: bool = False
+    #: Kata yang sedang diucapkan diberi warna sendiri. Dimatikan untuk gaya
+    #: yang tenang: sorotan menarik mata mengikuti ucapan, tapi pada tipografi
+    #: serif yang kalem ia justru terasa ramai.
+    sorot: bool = True
+    #: Huruf tebal. Sans padat butuh ini; serif justru rusak ditebalkan —
+    #: libass mensintesis tebalnya, dan hasilnya blobby di ukuran besar.
+    tebal: bool = True
+    #: Font yang disarankan untuk layout ini. Bukan paksaan — form Submit
+    #: memakainya sebagai nilai awal, dan pilihan pengguna tetap menang.
+    font_saran: str = ""
     kata: int = 4
     ukuran: int = 96
     warna_pasif: str = "FFFFFF"
@@ -85,21 +95,29 @@ LAYOUTS = {
     "samping": Layout(
         nama="samping",
         judul="Pembicara di kiri",
-        keterangan="Video jadi pita mendatar, pembicara digeser ke kiri, "
-                   "teks bertumpuk di kanan. Sebagian tertutup UI TikTok — "
-                   "itu memang lazim di klip sekarang.",
+        keterangan="Pita mendatar, pembicara digeser ke kiri, satu baris teks "
+                   "tenang di kanan. Paling cocok untuk podcast berlatar gelap. "
+                   "Sebagian teks tertutup UI TikTok — itu memang lazim di klip "
+                   "sekarang.",
         kotak=True,
         tinggi=0.42,
         zoom=0.85,
         wajah_x=0.3,
-        # Mulai memudar dari sepertiga lebar, pekat 88% di tepi kanan.
-        redup=(0.34, 0.88),
+        # Jauh lebih halus dari sebelumnya. Di referensi tidak ada gelap buatan
+        # sama sekali — ruangannya memang gelap. Tapi sumber tidak selalu
+        # begitu, dan teks putih di atas latar terang tidak terbaca meski sudah
+        # ber-outline. Ini asuransi keterbacaan, bukan elemen desain: cukup
+        # untuk menahan latar terang, tidak cukup untuk terlihat sebagai bidang.
+        redup=(0.42, 0.45),
         align=6,
-        margin_r=60,
-        tumpuk=True,
-        kata=4,
-        ukuran=86,
-        warna_pasif="9A9A9A",
+        margin_r=70,
+        # Satu baris mendatar, bukan ditumpuk — mengikuti referensi.
+        tumpuk=False,
+        sorot=False,
+        tebal=False,
+        font_saran="Lora",
+        kata=3,
+        ukuran=64,
     ),
 }
 
@@ -221,7 +239,8 @@ def header_ass(lay: Layout, knob: dict) -> str:
         "ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, "
         "MarginL, MarginR, MarginV, Encoding\n"
         f"Style: Cap,{font},{ukuran},&H00{pasif},&H000000FF,&H00000000,"
-        f"&HA0000000,-1,0,0,0,100,100,0,0,1,6,2,{lay.align},"
+        f"&HA0000000,{-1 if lay.tebal else 0},0,0,0,100,100,0,0,1,"
+        f"{6 if lay.tebal else 3},2,{lay.align},"
         f"{lay.margin_l},{lay.margin_r},{lay.margin_v},1\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "

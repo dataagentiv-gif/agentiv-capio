@@ -96,8 +96,14 @@ def build_ass(words: list[dict], clip_start: float, clip_end: float,
         lay = _l.ambil("penuh")
 
     from pipeline import layout as _l
-    aktif = "{\\c&H" + _l._bgr(knob.get("aktif") or "FFE500") + "&}"
     pasif = "{\\c&H" + _l._bgr(knob.get("pasif") or lay.warna_pasif) + "&}"
+    # Layout yang tidak menyorot memakai warna yang sama untuk kata aktif —
+    # bukan menghapus tag warnanya, supaya bentuk baris tetap identik dan
+    # tidak ada cabang khusus di perakitan teks di bawah.
+    aktif = (
+        "{\\c&H" + _l._bgr(knob.get("aktif") or "FFE500") + "&}"
+        if lay.sorot else pasif
+    )
     besar = bool(knob.get("upper"))
     # Penumpukan vertikal cuma soal pemisah baris: \N di .ass memaksa baris
     # baru, sementara spasi biasa membiarkan teks mengalir mendatar.

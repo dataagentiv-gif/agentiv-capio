@@ -215,7 +215,8 @@ def daftar_layout():
     return {
         "default": layout_mod.ambil(settings.CLIP_LAYOUT).nama,
         "layouts": [
-            {"nama": l.nama, "judul": l.judul, "keterangan": l.keterangan}
+            {"nama": l.nama, "judul": l.judul, "keterangan": l.keterangan,
+             "font_saran": l.font_saran}
             for l in layout_mod.LAYOUTS.values()
         ],
         # Tanpa video contoh bawaan, pratinjau memakai klip pengguna terbaru —

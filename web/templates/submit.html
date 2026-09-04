@@ -108,6 +108,7 @@ function drawChips() {
 // Menaruhnya di Setting memaksa orang bolak-balik dan membuat satu pilihan
 // berlaku untuk semua video — padahal itu justru yang paling tidak diinginkan.
 let layoutPilih = null;
+let fontDisentuh = false;
 
 async function drawLayouts() {
   const el = document.getElementById('layouts');
@@ -123,6 +124,15 @@ async function drawLayouts() {
       </button>`).join('');
     el.querySelectorAll('.layout-opt').forEach(b => b.onclick = () => {
       layoutPilih = b.dataset.l;
+      // Tiap layout punya font yang paling cocok — serif untuk yang tenang,
+      // sans padat untuk yang tegas. Dipasang sebagai nilai awal saja: begitu
+      // font disentuh sendiri, pilihan itu menang dan tidak ditimpa lagi.
+      const l = d.layouts.find(x => x.nama === layoutPilih);
+      const font = document.getElementById('g-font');
+      if (l?.font_saran && !fontDisentuh &&
+          [...font.options].some(o => o.value === l.font_saran)) {
+        font.value = l.font_saran;
+      }
       drawLayouts();
       segarkanPratinjau();
     });
@@ -182,6 +192,9 @@ async function isiGaya() {
     if (/^#?[0-9a-f]{6}$/i.test(warna.value)) pick.value = '#' + warna.value.replace(/^#/, '');
     segarkanPratinjau();
   };
+
+  document.getElementById('g-font').addEventListener('change',
+    () => { fontDisentuh = true; });
 
   document.querySelectorAll('[data-gaya]').forEach(el => {
     if (el.id !== 'g-warna') el.addEventListener('input', segarkanPratinjau);

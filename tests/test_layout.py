@@ -100,14 +100,17 @@ def test_samping_menggelapkan_sisi_kanan():
     assert "overlay=0:0" in vf
 
 
-def test_gradasi_mulai_di_paruh_kiri_tapi_tidak_menutupi_wajah():
+def test_gradasi_mulai_setelah_posisi_wajah():
     """Mulai terlalu kanan menghasilkan tepi yang terasa; terlalu kiri menutupi
-    pembicaranya, yang justru ditaruh di sepertiga kiri."""
+    pembicaranya, yang justru ditaruh di sepertiga kiri.
+
+    Kepekatannya TIDAK diuji di sini — lihat
+    test_gradasi_samping_jauh_lebih_halus_dari_versi_awal. Versi awal memakai
+    0.88 dan itu terbaca sebagai bidang gelap, bukan bayangan."""
     lay = L.ambil("samping")
-    mulai, maks = lay.redup
-    assert 0.25 < mulai < 0.45
+    mulai, _ = lay.redup
+    assert 0.25 < mulai < 0.55
     assert lay.wajah_x < mulai, "gradasi mulai sebelum posisi wajah"
-    assert 0.7 < maks <= 1.0, "tepi kanan harus pekat, bukan separuh"
 
 
 def test_layout_lain_tidak_punya_gradasi():
@@ -125,7 +128,6 @@ def test_butuh_lapisan_hanya_saat_perlu():
 
 def test_samping_meratakan_teks_ke_kanan():
     assert L.ambil("samping").align == 6
-    assert L.ambil("samping").tumpuk is True
 
 
 # --- jendela selalu di dalam frame ---
@@ -190,3 +192,57 @@ def test_tanpa_mask_tidak_ada_label_rantai():
     g = L.geometri(lay, crop(), 1920, 1080)
     vf = L.filtergraph(lay, g, "c1.ass")
     assert "[" not in vf and ";" not in vf
+
+
+# --- samping mengikuti referensi ---
+#
+# Versi pertama salah di hampir semua sumbu, dan itu baru ketahuan setelah
+# hasilnya disandingkan dengan klip referensi sungguhan: teks ditumpuk vertikal
+# padahal referensinya satu baris, sans tebal bersorot kuning padahal
+# referensinya serif putih polos, dan gelap di sisi teks dibuat sebagai bidang
+# padahal di referensi ruangannya memang gelap.
+
+def test_samping_satu_baris_bukan_ditumpuk():
+    assert L.ambil("samping").tumpuk is False
+
+
+def test_samping_tidak_menyorot_kata():
+    """Sorotan menarik mata mengikuti ucapan, tapi pada tipografi serif yang
+    kalem ia justru terasa ramai."""
+    assert L.ambil("samping").sorot is False
+
+
+def test_samping_tidak_tebal():
+    """Serif rusak ditebalkan: libass mensintesis tebalnya, dan hasilnya blobby
+    di ukuran besar."""
+    assert L.ambil("samping").tebal is False
+
+
+def test_samping_menyarankan_serif():
+    assert L.ambil("samping").font_saran == "Lora"
+
+
+def test_gradasi_samping_jauh_lebih_halus_dari_versi_awal():
+    """Versi awal 0.88 terbaca sebagai bidang gelap. Sekarang perannya cuma
+    asuransi keterbacaan untuk sumber yang latarnya terang."""
+    _, maks = L.ambil("samping").redup
+    assert maks < 0.6
+
+
+def test_header_tidak_tebal_saat_layout_meminta():
+    h = L.header_ass(L.ambil("samping"), {})
+    baris = [x for x in h.splitlines() if x.startswith("Style:")][0]
+    assert baris.split(",")[7] == "0", "flag Bold harus 0 untuk serif"
+
+
+def test_header_tetap_tebal_untuk_layout_sans():
+    for nama in ("penuh", "kotak"):
+        baris = [x for x in L.header_ass(L.ambil(nama), {}).splitlines()
+                 if x.startswith("Style:")][0]
+        assert baris.split(",")[7] == "-1"
+
+
+def test_layout_bersorot_tetap_punya_warna_aktif():
+    """Perbaikan untuk samping jangan sampai mematikan sorotan di layout lain."""
+    for nama in ("penuh", "kotak"):
+        assert L.ambil(nama).sorot is True
