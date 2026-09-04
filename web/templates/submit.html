@@ -27,6 +27,48 @@
       <p class="sub" id="ket-layout"></p>
     </div>
 
+    {# Knob tampilan ada DI SINI, bukan cuma di halaman Setting. Kontrol yang
+       tidak terlihat saat submit praktis tidak pernah dipakai — orang harus
+       tahu dulu bahwa halaman itu ada, lalu bolak-balik untuk mencoba satu
+       warna. Nilai awalnya diambil dari default di Setting; yang diubah di
+       sini berlaku untuk VIDEO INI saja. #}
+    <div class="gaya-grid">
+      <div class="field">
+        <label for="g-font">Font</label>
+        <select id="g-font" data-gaya="font"></select>
+      </div>
+      <div class="field">
+        <label for="g-warna">Warna kata aktif</label>
+        <div class="warna-baris">
+          <input type="color" id="g-warna-pick" aria-label="Pilih warna">
+          <input type="text" id="g-warna" data-gaya="aktif" spellcheck="false">
+        </div>
+      </div>
+      <div class="field">
+        <label for="g-ukuran">Ukuran</label>
+        <input type="number" id="g-ukuran" data-gaya="ukuran" min="40" max="220" step="4">
+      </div>
+      <div class="field">
+        <label for="g-kata">Kata per tampilan</label>
+        <input type="number" id="g-kata" data-gaya="kata" min="1" max="8">
+      </div>
+      <div class="field">
+        <label for="g-upper">Huruf besar semua</label>
+        <select id="g-upper" data-gaya="upper">
+          <option value="">tidak</option>
+          <option value="true">ya</option>
+        </select>
+      </div>
+      <div class="field pratinjau">
+        <label>Pratinjau</label>
+        <div class="hp kecil">
+          <video id="pv-v" autoplay loop muted playsinline hidden></video>
+          <img id="pv-i" alt="Pratinjau tampilan klip" hidden>
+          <div class="hp-spin"><span class="spin"></span></div>
+        </div>
+      </div>
+    </div>
+
     <div class="actions">
       <button type="submit" class="btn" id="go">Proses video</button>
       <a class="btn ghost" href="/settings">Ubah parameter</a>
@@ -81,6 +123,7 @@ async function drawLayouts() {
     el.querySelectorAll('.layout-opt').forEach(b => b.onclick = () => {
       layoutPilih = b.dataset.l;
       drawLayouts();
+      segarkanPratinjau();
     });
     const aktif = d.layouts.find(l => l.nama === layoutPilih);
     document.getElementById('ket-layout').textContent = aktif ? aktif.keterangan : '';
@@ -89,6 +132,91 @@ async function drawLayouts() {
     // lewat default di Setting.
     el.innerHTML = '<p class="sub">Preview tampilan tidak bisa dimuat.</p>';
   }
+}
+
+// Knob tampilan diisi dari default di Setting, lalu boleh diubah untuk video
+// ini saja. Yang kosong TIDAK dikirim — kosong berarti "ikut default", bukan
+// "kosongkan", dan mengirimnya sebagai nilai kosong akan menimpa default itu.
+function nilaiGaya() {
+  const g = {};
+  document.querySelectorAll('[data-gaya]').forEach(el => {
+    const v = el.value.trim();
+    if (v === '' || v === '0') return;
+    g[el.dataset.gaya] = el.type === 'number' ? Number(v) : v;
+  });
+  if (g.upper) g.upper = true;
+  return Object.keys(g).length ? g : null;
+}
+
+async function isiGaya() {
+  const d = await (await fetch('/api/settings')).json();
+  const f = {};
+  for (const grup of d.groups) for (const x of grup.fields) f[x.key] = x;
+
+  const font = document.getElementById('g-font');
+  font.innerHTML = (f.CAPTION_FONT?.options || []).map(o =>
+    `<option ${o === f.CAPTION_FONT.value ? 'selected' : ''}>${esc(o)}</option>`).join('');
+  document.getElementById('g-ukuran').value = f.CAPTION_SIZE?.value || '';
+  document.getElementById('g-kata').value = f.CAPTION_WORDS?.value || '';
+  document.getElementById('g-upper').value =
+    String(f.CAPTION_UPPER?.value).toLowerCase() === 'true' ? 'true' : '';
+
+  const warna = document.getElementById('g-warna');
+  const pick = document.getElementById('g-warna-pick');
+  warna.value = f.CAPTION_COLOR?.value || 'FFE500';
+  pick.value = '#' + warna.value.replace(/^#/, '');
+  // Dua kontrol menulis nilai yang sama: pemilih warna untuk yang mau
+  // menunjuk, kotak teks untuk yang sudah punya kode hex dari brand-nya.
+  pick.oninput = () => { warna.value = pick.value.slice(1).toUpperCase(); segarkanPratinjau(); };
+  warna.oninput = () => {
+    if (/^#?[0-9a-f]{6}$/i.test(warna.value)) pick.value = '#' + warna.value.replace(/^#/, '');
+    segarkanPratinjau();
+  };
+
+  document.querySelectorAll('[data-gaya]').forEach(el => {
+    if (el.id !== 'g-warna') el.addEventListener('input', segarkanPratinjau);
+    el.addEventListener('change', segarkanPratinjau);
+  });
+}
+
+// Pratinjau dirender server lewat jalur yang sama dengan produksi. Ditunda
+// sejenak karena tiap permintaan menjalankan ffmpeg — memutar angka ukuran bisa
+// memicu puluhan panggilan kalau tidak ditahan.
+let pvTimer = null;
+function segarkanPratinjau() {
+  const vid = document.getElementById('pv-v');
+  const img = document.getElementById('pv-i');
+  if (!vid) return;
+  clearTimeout(pvTimer);
+  pvTimer = setTimeout(async () => {
+    const q = new URLSearchParams();
+    if (layoutPilih) q.set('layout', layoutPilih);
+    const g = nilaiGaya() || {};
+    const peta = { font: 'font', ukuran: 'ukuran', aktif: 'warna',
+                   kata: 'kata', upper: 'upper' };
+    for (const [k, param] of Object.entries(peta)) {
+      if (g[k] !== undefined) q.set(param, g[k]);
+    }
+    const hp = vid.closest('.hp');
+    hp?.classList.add('memuat');
+    try {
+      const r = await fetch(`/api/preview.png?${q}`);
+      if (!r.ok) throw new Error(String(r.status));
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const video = blob.type.startsWith('video/');
+      if (vid.dataset.url) URL.revokeObjectURL(vid.dataset.url);
+      (video ? vid : img).src = url;
+      (video ? vid : img).dataset.url = url;
+      vid.hidden = !video;
+      img.hidden = video;
+      if (video) vid.play().catch(() => {});
+    } catch {
+      vid.hidden = true; img.hidden = true;
+    } finally {
+      hp?.classList.remove('memuat');
+    }
+  }, 350);
 }
 
 // Strip status: supaya konfigurasi yang belum lengkap ketahuan SEBELUM submit,
@@ -119,7 +247,8 @@ f.addEventListener('submit', async (e) => {
     const r = await fetch('/jobs', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ url: document.getElementById('url').value,
-                             target_clips: Number(n.value), layout: layoutPilih })
+                             target_clips: Number(n.value),
+                             layout: layoutPilih, gaya: nilaiGaya() })
     });
     const d = await r.json();
     if (!r.ok) {
@@ -139,5 +268,6 @@ f.addEventListener('submit', async (e) => {
 
 drawStatus();
 drawLayouts();
+isiGaya().then(segarkanPratinjau);
 </script>
 {% endblock %}

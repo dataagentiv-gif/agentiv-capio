@@ -157,7 +157,9 @@ def run(ctx: dict) -> dict:
     words: list[dict] = ctx["words"]
     workdir: Path = ctx["workdir"]
     lay = layout.ambil(ctx.get("layout") or settings.CLIP_LAYOUT)
-    knob = knob_dari_settings()
+    # Knob milik JOB menimpa default di setelan. Kosong berarti "ikut
+    # default", bukan "kosongkan" — makanya disaring lebih dulu di schema.
+    knob = {**knob_dari_settings(), **(ctx.get("gaya") or {})}
     paths = {}
 
     for seg in ctx["segments_final"]:

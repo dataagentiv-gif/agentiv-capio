@@ -10,6 +10,20 @@ class JobCreate(BaseModel):
     # bisa menuntut bentuk yang berbeda, dan keputusannya diambil saat menempel
     # link. Kosong = ikut default yang dipilih di Setting.
     layout: str | None = None
+    # Knob tampilan untuk video INI. Kosong = ikut default di halaman Setting.
+    gaya: dict | None = None
+
+    @field_validator("gaya")
+    @classmethod
+    def _gaya_bersih(cls, v):
+        """Batas kepercayaan: isinya masuk ke generator .ass dan ikut tersimpan
+        di database. Hanya kunci yang dikenal yang lolos — sisanya dibuang
+        diam-diam, bukan ditolak, supaya form versi lama tetap bisa submit."""
+        if not v:
+            return None
+        BOLEH = {"font", "ukuran", "aktif", "kata", "upper"}
+        bersih = {k: v[k] for k in BOLEH if v.get(k) not in (None, "", 0, "0")}
+        return bersih or None
 
     @field_validator("layout")
     @classmethod
@@ -59,6 +73,7 @@ class JobOut(BaseModel):
     url: str
     target_clips: int
     layout: str = "penuh"
+    gaya: dict = {}
     status: str
     progress: int
     error: str | None = None

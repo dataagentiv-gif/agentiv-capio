@@ -99,6 +99,7 @@ def run(job_id: str) -> None:
         # dengan bentuk yang dipilih waktu itu — bukan bentuk yang kebetulan
         # aktif saat gilirannya tiba.
         "layout": job.get("layout") or "penuh",
+        "gaya": job.get("gaya") or {},
         "workdir": workdir,
         "deadline": Deadline(settings.JOB_TIMEOUT_SEC),
     }

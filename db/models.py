@@ -62,6 +62,12 @@ class Job(Base):
     # Disimpan di baris job supaya klip lama tetap bisa dijelaskan bentuknya
     # walau setelan default sudah berubah sejak itu.
     layout: Mapped[str] = mapped_column(String(20), default="penuh")
+    # Knob tampilan (font, ukuran, warna, jumlah kata, huruf besar) ikut
+    # per video, sealasan dengan layout: begitu kontrolnya ada di halaman
+    # Submit, orang mengubahnya untuk VIDEO ITU — bukan untuk semua video
+    # berikutnya. Disimpan sebagai JSONB, bukan satu kolom per knob, supaya
+    # menambah knob berikutnya tidak menuntut ALTER TABLE lagi.
+    gaya: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default=Status.QUEUED, index=True)
     progress: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -79,6 +85,7 @@ class Job(Base):
             "url": self.url,
             "target_clips": self.target_clips,
             "layout": self.layout,
+            "gaya": self.gaya or {},
             "status": self.status,
             "progress": self.progress,
             "error": self.error,
@@ -125,7 +132,8 @@ def init() -> None:
     # ada perubahan yang butuh mengisi ulang data lama, bukan sekadar menambah
     # kolom berdefault.
     with engine.begin() as c:
-        c.execute(text(
-            "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS "
-            "layout VARCHAR(20) NOT NULL DEFAULT 'penuh'"
-        ))
+        for kolom in (
+            "layout VARCHAR(20) NOT NULL DEFAULT 'penuh'",
+            "gaya JSONB",
+        ):
+            c.execute(text(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {kolom}"))

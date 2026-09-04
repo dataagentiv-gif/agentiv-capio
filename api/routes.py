@@ -313,6 +313,7 @@ def create_job(payload: JobCreate):
     job = jobs.create(
         payload.url, payload.target_clips,
         payload.layout or layout_mod.ambil(settings.CLIP_LAYOUT).nama,
+        payload.gaya,
     )
     try:
         enqueue(job["id"])
