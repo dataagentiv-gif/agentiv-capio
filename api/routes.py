@@ -166,6 +166,9 @@ def read_settings():
 @app.post("/api/settings")
 def save_settings(payload: dict):
     changed = env_store.write(payload.get("values") or {})
+    if changed:
+        # Hasil render lama tidak lagi mewakili setelan yang berlaku.
+        preview.bersihkan_cache()
     log.info("settings diubah: %s", ", ".join(changed) or "(tidak ada)")
     return {"changed": changed, **env_store.read_public()}
 
@@ -234,15 +237,16 @@ def preview_tampilan(layout: str | None = None, font: str | None = None,
         ("kata", kata), ("upper", upper),
     ) if v is not None}
     try:
-        png = preview.render(layout, knob, kecil=kecil)
+        isi, tipe = preview.render(layout, knob, kecil=kecil)
     except Exception as e:  # noqa: BLE001 — preview gagal jangan menjatuhkan halaman
         log.warning("preview gagal: %s", e)
         raise HTTPException(500, f"Preview gagal dibuat: {e}") from e
     return Response(
-        content=png,
-        media_type="image/png",
-        # Preview berubah tiap knob diputar; menyimpannya di cache justru
-        # membuat halaman menampilkan setelan yang sudah tidak berlaku.
+        content=isi,
+        media_type=tipe,
+        # Preview berubah tiap knob diputar; menyimpannya di cache browser
+        # justru membuat halaman menampilkan setelan yang sudah tidak berlaku.
+        # Yang di-cache adalah hasil render di sisi server, bukan responsnya.
         headers={"Cache-Control": "no-store"},
     )
 

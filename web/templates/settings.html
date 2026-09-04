@@ -88,7 +88,12 @@ function previewHtml() {
         yang sama dengan produksi. Berubah tiap setelan diputar — tidak perlu
         disimpan dulu.</p>
       <div class="hp">
-        <img id="pv" alt="Preview tampilan klip">
+        {# Dua elemen, satu tampil bergantian. Preview jadi VIDEO kalau ada
+           berkas contoh bawaan (assets/preview.mp4) — sorotan kata yang
+           berpindah adalah bagian paling menentukan dari gaya caption, dan itu
+           tidak ada di gambar diam. Tanpa berkas itu, jatuh ke gambar. #}
+        <video id="pv-v" autoplay loop muted playsinline hidden></video>
+        <img id="pv-i" alt="Preview tampilan klip" hidden>
         <div class="hp-spin"><span class="spin"></span></div>
       </div>
     </div>`;
@@ -99,10 +104,11 @@ function previewHtml() {
 // mengubah.
 let pvTimer = null;
 function segarkanPreview() {
-  const img = document.getElementById('pv');
-  if (!img) return;
+  const vid = document.getElementById('pv-v');
+  const img = document.getElementById('pv-i');
+  if (!vid || !img) return;
   clearTimeout(pvTimer);
-  pvTimer = setTimeout(() => {
+  pvTimer = setTimeout(async () => {
     const nilai = k => document.querySelector(`[data-key="${k}"]`)?.value ?? '';
     const q = new URLSearchParams();
     const peta = {
@@ -114,11 +120,31 @@ function segarkanPreview() {
       // Nol berarti "ikut bawaan layout", jadi jangan dikirim sebagai angka.
       if (v !== '' && v !== '0') q.set(param, v);
     }
-    q.set('t', Date.now());
-    img.closest('.hp')?.classList.add('memuat');
-    img.onload = img.onerror = () =>
-      img.closest('.hp')?.classList.remove('memuat');
-    img.src = `/api/preview.png?${q}`;
+    const hp = vid.closest('.hp');
+    hp?.classList.add('memuat');
+    try {
+      // Diambil sebagai blob supaya tipenya bisa diperiksa: server mengirim
+      // video kalau ada berkas contoh bawaan, gambar kalau tidak. Menebak dari
+      // URL tidak mungkin — endpoint-nya satu.
+      const r = await fetch(`/api/preview.png?${q}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const video = blob.type.startsWith('video/');
+      // URL lama dilepas: tanpa ini tiap putaran knob menyisakan satu blob di
+      // memori browser sampai halamannya ditutup.
+      if (vid.dataset.url) URL.revokeObjectURL(vid.dataset.url);
+      (video ? vid : img).src = url;
+      (video ? vid : img).dataset.url = url;
+      vid.hidden = !video;
+      img.hidden = video;
+      if (video) vid.play().catch(() => {});
+    } catch {
+      vid.hidden = true;
+      img.hidden = true;
+    } finally {
+      hp?.classList.remove('memuat');
+    }
   }, 350);
 }
 
