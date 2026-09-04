@@ -2,7 +2,7 @@
 {% set page = 'process' %}
 {% block title %}Proses — CAPIO{% endblock %}
 {% block heading %}Proses{% endblock %}
-{% block lede %}Yang sedang berjalan, dan riwayat semua job yang sudah selesai. Halaman ini menyegar sendiri.{% endblock %}
+{% block lede %}Video yang sedang dikerjakan, dan riwayat semua yang sudah selesai. Halaman ini memperbarui dirinya sendiri.{% endblock %}
 
 {% block content %}
 <nav class="tabs" id="tabs">
@@ -40,7 +40,7 @@ function kepala(j, ekor = '') {
 
 function jobJalan(j) {
   return `<div class="job">
-    ${kepala(j, ` · target ${j.target_clips} klip`)}
+    ${kepala(j, ` · minta ${j.target_clips} klip`)}
     <div class="job-body">${stepper(j.status, j.progress)}</div>
   </div>`;
 }
@@ -49,15 +49,32 @@ function jobJalan(j) {
 // selesai dalam dua menit lenyap dari halaman ini sebelum sempat dilihat — dan
 // yang tersisa di layar cuma kegagalan lama, yang terbaca seperti baru saja
 // terjadi. Persis itu yang bikin salah sangka bahwa worker baru berhenti.
+// Kegagalan dijelaskan lebih dulu dengan kalimat biasa dan satu tindakan yang
+// bisa diambil; teks mentahnya tetap ada, tapi dilipat. Sebelumnya yang tampil
+// langsung traceback Python — teks yang cuma berguna bagi yang menulis kodenya,
+// dan yang tidak menyebutkan satu pun hal yang bisa dilakukan.
+function masalahHtml(j) {
+  if (!j.masalah) return '';
+  return `
+    <div class="masalah">
+      <strong>${esc(j.masalah.judul)}</strong>
+      <p>${esc(j.masalah.saran)}</p>
+      ${j.error ? `<details>
+        <summary>Detail teknis</summary>
+        <div class="error-box">${esc(j.error)}</div>
+      </details>` : ''}
+    </div>`;
+}
+
 function jobRiwayat(j) {
   const n = (j.clips || []).length;
   const hasil = j.status === 'done'
     ? `${n} klip · <a href="/results">lihat hasil</a>`
-    : 'gagal';
+    : '';
   return `<div class="job">
-    ${kepala(j, ` · ${j.layout || 'penuh'}`)}
-    <div class="job-body"><p class="sub">${hasil}</p></div>
-    ${j.error ? `<div class="error-box">${esc(j.error)}</div>` : ''}
+    ${kepala(j, ` · ${esc(NAMA_LAYOUT[j.layout] || j.layout || 'Penuh')}`)}
+    ${hasil ? `<div class="job-body"><p class="sub">${hasil}</p></div>` : ''}
+    ${masalahHtml(j)}
   </div>`;
 }
 
@@ -81,12 +98,12 @@ async function tick() {
 
     document.getElementById('p-berjalan').innerHTML = jalan.length
       ? jalan.map(jobJalan).join('')
-      : empty('Tidak ada job berjalan',
-              '<a href="/">Submit video</a>, atau lihat <a href="#riwayat">riwayat</a>.');
+      : empty('Tidak ada video yang sedang diproses',
+              'Tempel link YouTube di <a href="/">halaman depan</a>, atau lihat <a href="#riwayat">riwayat</a>.');
 
     document.getElementById('p-riwayat').innerHTML = selesai.length
       ? selesai.map(jobRiwayat).join('')
-      : empty('Belum ada riwayat', '<a href="/">Submit video pertama</a>.');
+      : empty('Belum ada riwayat', 'Video yang sudah selesai atau gagal akan muncul di sini.');
 
     document.getElementById('n-jalan').textContent = jalan.length || '';
     document.getElementById('n-riwayat').textContent = selesai.length || '';
@@ -94,7 +111,8 @@ async function tick() {
     return jalan.length > 0;
   } catch (e) {
     document.getElementById('p-berjalan').innerHTML =
-      empty('API tidak bisa dihubungi', esc(e));
+      empty('CAPIO tidak merespons',
+              'Coba muat ulang halaman ini. Kalau tetap begini, CAPIO di komputermu kemungkinan sedang tidak berjalan.');
     return true;
   }
 }
@@ -106,7 +124,7 @@ document.body.addEventListener('click', async (e) => {
   if (!b) return;
   const id = b.dataset.aksi.split(':')[1];
   if (await hapus(`/jobs/${id}`,
-      'Hapus job ini beserta seluruh berkasnya? Tindakan ini tidak bisa dibatalkan.',
+      'Hapus video ini beserta semua klipnya? Berkasnya ikut hilang dari komputer dan tidak bisa dikembalikan.',
       b)) tick();
 });
 

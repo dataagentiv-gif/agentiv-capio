@@ -6,9 +6,9 @@ const RUNNING = ['queued', 'downloading', 'transcribing', 'segmenting', 'refinin
 // Urutan stage untuk penanda progres di halaman Proses. `queued` sengaja tidak
 // masuk: itu keadaan menunggu, bukan tahap kerja.
 const STAGES = [
-  ['downloading', 'Unduh'], ['transcribing', 'Transkrip'], ['segmenting', 'Seleksi'],
-  ['refining', 'Batas'], ['captioning', 'Caption'], ['cropping', 'Crop'],
-  ['rendering', 'Render'], ['metadata', 'Metadata'], ['uploading', 'Upload'],
+  ['downloading', 'Unduh'], ['transcribing', 'Dengar'], ['segmenting', 'Pilih momen'],
+  ['refining', 'Rapikan'], ['captioning', 'Teks'], ['cropping', 'Bingkai'],
+  ['rendering', 'Buat video'], ['metadata', 'Judul'], ['uploading', 'Simpan'],
 ];
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
@@ -16,10 +16,41 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
 
 const isRunning = j => RUNNING.includes(j.status);
 
+// Nama status untuk dibaca orang. Nilai di database tetap bahasa Inggris dan
+// tetap istilah teknis — itu kontrak API dan tidak boleh ikut berubah — tapi
+// "captioning" atau "uploading" di layar tidak memberi tahu apa-apa kepada yang
+// bukan pemrogram.
+const NAMA_STATUS = {
+  queued: 'Menunggu giliran',
+  downloading: 'Mengunduh video',
+  transcribing: 'Mendengarkan suara',
+  segmenting: 'Memilih momen',
+  refining: 'Merapikan potongan',
+  captioning: 'Menyusun teks',
+  cropping: 'Mengatur bingkai',
+  rendering: 'Membuat video',
+  metadata: 'Menulis judul',
+  uploading: 'Menyimpan',
+  done: 'Selesai',
+  failed: 'Gagal',
+};
+
 function badge(s) {
   const kind = s === 'done' ? 'done' : s === 'failed' ? 'failed' : 'running';
-  return `<span class="badge ${kind}">${esc(s)}</span>`;
+  return `<span class="badge ${kind}">${esc(NAMA_STATUS[s] || s)}</span>`;
 }
+
+// Nama tampilan klip. Disalin di sini alih-alih diambil dari /api/layouts:
+// halaman Proses tidak butuh apa pun dari endpoint itu selain empat kata ini,
+// dan satu permintaan tambahan tiap muat halaman terlalu mahal untuk itu.
+// Nama yang tidak dikenal jatuh ke nilai aslinya, jadi layout baru tidak
+// menghasilkan sel kosong.
+const NAMA_LAYOUT = {
+  penuh: 'Penuh',
+  kotak: 'Kotak tengah',
+  samping: 'Pembicara di kiri',
+  ori: 'Asli (mentahan)',
+};
 
 function waktu(iso) {
   if (!iso) return '';
@@ -39,7 +70,7 @@ function waktu(iso) {
 
 async function getJobs() {
   const r = await fetch('/jobs');
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  if (!r.ok) throw new Error('CAPIO tidak merespons');
   return r.json();
 }
 
@@ -125,12 +156,12 @@ async function hapus(url, tanya, tombol = null) {
     // 404 diterima: yang mau dihapus memang sudah tidak ada, dan itu hasil
     // akhir yang sama dengan berhasil.
     if (!r.ok && r.status !== 404) {
-      alert(`Gagal menghapus: HTTP ${r.status}`);
+      alert('Gagal menghapus. Coba muat ulang halaman ini lalu ulangi.');
       return false;
     }
     return true;
   } catch (e) {
-    alert(`Gagal menghapus: ${e}`);
+    alert('Gagal menghapus — CAPIO tidak merespons. Periksa apakah CAPIO masih berjalan.');
     return false;
   } finally {
     _menghapus.delete(url);
@@ -250,7 +281,7 @@ function idJob(id) {
     try {
       const s = await (await fetch('/api/status')).json();
       titik.hidden = !s.jalan;
-      titik.title = s.jalan ? `${s.jalan} job berjalan` : '';
+      titik.title = s.jalan ? `${s.jalan} video sedang diproses` : '';
     } catch {
       // API tidak terjangkau bukan berarti tidak ada job berjalan. Titiknya
       // dibiarkan apa adanya, bukan dimatikan — mematikannya adalah pernyataan

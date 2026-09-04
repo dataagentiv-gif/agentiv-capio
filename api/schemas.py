@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from config.settings import settings
 
@@ -83,9 +83,22 @@ class JobOut(BaseModel):
     status: str
     progress: int
     error: str | None = None
+    #: Kegagalan yang sudah diterjemahkan jadi kalimat yang bisa
+    #: ditindaklanjuti: {"judul", "saran"}. Diturunkan dari `error`, bukan
+    #: disimpan — job lama ikut mendapatkannya tanpa migrasi, dan teks mentahnya
+    #: tetap utuh kalau terjemahannya ternyata meleset.
+    masalah: dict | None = None
     clips: list[Clip] = []
     created_at: str | None = None
     updated_at: str | None = None
+
+    @model_validator(mode="after")
+    def _terjemahkan(self):
+        from utils.pesan import terjemah
+
+        if self.error and not self.masalah:
+            self.masalah = terjemah(self.error)
+        return self
 
 
 class JobCreated(BaseModel):

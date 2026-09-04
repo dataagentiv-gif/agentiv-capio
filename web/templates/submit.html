@@ -2,7 +2,7 @@
 {% set page = 'submit' %}
 {% block main_class %}narrow{% endblock %}
 {% block heading %}Ubah video panjang jadi klip siap posting.{% endblock %}
-{% block lede %}Satu link YouTube, beberapa klip 9:16 dengan caption burned-in, judul, dan hashtag.{% endblock %}
+{% block lede %}Tempel satu link YouTube, dapat beberapa klip tegak siap unggah — teksnya sudah menempel di videonya, lengkap dengan judul dan hashtag.{% endblock %}
 
 {% block content %}
 <div id="status" class="status-strip"></div>
@@ -39,7 +39,7 @@
       <div class="field saklar">
         <label for="g-caption">
           <input type="checkbox" id="g-caption" checked>
-          Caption terbakar di video
+          Tempelkan teks di videonya
         </label>
         <p class="sub" id="ket-caption"></p>
       </div>
@@ -85,14 +85,14 @@
 
     <div class="actions">
       <button type="submit" class="btn" id="go">Proses video</button>
-      <a class="btn ghost" href="/settings">Ubah parameter</a>
+      <a class="btn ghost" href="/settings">Ubah setelan</a>
     </div>
   </form>
   <div id="out"></div>
 </div>
 
 <p class="hint">
-  Diproses di background. Video 15 menit biasanya selesai sekitar 4&ndash;5 menit.
+  Pengerjaannya jalan sendiri di belakang layar — halaman ini boleh ditutup. Video 15 menit biasanya selesai sekitar 4&ndash;5 menit.
   Pantau tahapannya di halaman <a href="/process">Proses</a>.
 </p>
 {% endblock %}
@@ -207,8 +207,8 @@ function segarkanCaption() {
     f.querySelectorAll('input, select').forEach(el => { el.disabled = !on; });
   });
   document.getElementById('ket-caption').textContent = !dukung
-    ? 'Layout mentahan tidak memakai caption.'
-    : (on ? '' : 'Klip keluar tanpa teks apa pun.');
+    ? 'Tampilan mentahan memang tidak pakai teks.'
+    : (on ? '' : 'Klipnya keluar polos, tanpa teks sama sekali.');
 }
 
 async function isiGaya() {
@@ -306,7 +306,7 @@ async function drawStatus() {
     document.getElementById('status').innerHTML =
       item('Transkrip', 'i-mic', s.asr) + item('LLM', 'i-llm', s.llm) +
       item('Storage', 'i-folder', s.storage) +
-      (s.ready ? '' : `<a class="stat warn" href="/settings">Konfigurasi belum lengkap &rarr;</a>`);
+      (s.ready ? '' : `<a class="stat warn" href="/settings">Belum siap dipakai &mdash; isi API key &rarr;</a>`);
     document.getElementById('durasi').textContent =
       `Tiap klip ${s.min_sec}–${s.max_sec} detik. Ubah di halaman Setting.`;
     if (!Number(n.value)) n.value = s.default_clips;
@@ -315,7 +315,7 @@ async function drawStatus() {
     segarkanTombol();
   } catch (e) {
     document.getElementById('status').innerHTML =
-      `<span class="stat off">API tidak bisa dihubungi</span>`;
+      `<span class="stat off">CAPIO tidak merespons</span>`;
   }
 }
 
@@ -332,16 +332,16 @@ function cekForm() {
   const url = document.getElementById('url').value.trim();
   const jumlah = Number(n.value);
 
-  if (!url) return 'Link YouTube belum diisi.';
+  if (!url) return 'Tempel dulu link YouTube-nya di kotak di atas.';
   if (!POLA_YT.test(url))
-    return 'Link harus dari YouTube (youtube.com atau youtu.be), termasuk https:// di depannya.';
+    return 'Link ini bukan dari YouTube. Salin link dari YouTube (yang diawali https://), lalu tempel lagi.';
   if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > 20)
-    return 'Jumlah klip harus antara 1 dan 20.';
-  if (!layoutPilih) return 'Tampilan klip belum terpilih.';
+    return 'Jumlah klip harus antara 1 sampai 20.';
+  if (!layoutPilih) return 'Pilih dulu salah satu tampilan klip.';
   // Konfigurasi yang bolong membuat job gagal di tengah pipeline, belasan menit
   // setelah submit — dan penyebabnya sudah bisa diketahui sekarang.
   if (!siapProses)
-    return 'Konfigurasi belum lengkap. Isi API key di halaman Setting dulu.';
+    return 'CAPIO belum siap dipakai: API key-nya belum diisi. Buka halaman Setting dulu.';
   return null;
 }
 
@@ -376,7 +376,7 @@ f.addEventListener('submit', async (e) => {
       const msg = Array.isArray(d.detail) ? d.detail.map(x => x.msg).join('; ') : (d.detail || 'Gagal');
       out.innerHTML = `<div class="note err">${esc(msg)}</div>`;
     } else {
-      out.innerHTML = `<div class="note ok">Job masuk antrean &mdash; <a href="/process">lihat prosesnya</a></div>`;
+      out.innerHTML = `<div class="note ok">Videonya masuk antrean &mdash; <a href="/process">lihat prosesnya</a></div>`;
       document.getElementById('url').value = '';
     }
   } catch (err) {

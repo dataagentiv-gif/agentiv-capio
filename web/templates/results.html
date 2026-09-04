@@ -2,7 +2,7 @@
 {% set page = 'results' %}
 {% block title %}Hasil — CAPIO{% endblock %}
 {% block heading %}Hasil{% endblock %}
-{% block lede %}Tiap klip menampilkan skor dan alasan LLM memilih momen itu — supaya kualitas seleksinya bisa dinilai sendiri.{% endblock %}
+{% block lede %}Tiap klip datang dengan nilai dan alasan kenapa momen itu yang dipilih — supaya kamu bisa menilai sendiri sebelum mengunggah.{% endblock %}
 
 {% block content %}
 <div id="list">{{ '' }}</div>
@@ -107,12 +107,13 @@ async function tick() {
       tandaTangan = tanda;
       el.innerHTML = jobs.length
         ? jobs.map(jobHtml).join('')
-        : empty('Belum ada hasil', '<a href="/">Submit video pertama</a> untuk mulai.');
+        : empty('Belum ada klip', 'Tempel link YouTube di <a href="/">halaman depan</a> untuk mulai.');
     }
     return semua.some(isRunning);
   } catch (e) {
     tandaTangan = null;   // paksa gambar ulang begitu API pulih
-    el.innerHTML = empty('API tidak bisa dihubungi', esc(e));
+    el.innerHTML = empty('CAPIO tidak merespons',
+      'Coba muat ulang halaman ini. Kalau tetap begini, CAPIO di komputermu kemungkinan sedang tidak berjalan.');
     return true;
   }
 }
@@ -125,9 +126,9 @@ document.getElementById('list').addEventListener('click', async (e) => {
   const [jenis, jobId, clipId] = b.dataset.aksi.split(':');
   const ok = jenis === 'job'
     ? await hapus(`/jobs/${jobId}`,
-        'Hapus job ini beserta SEMUA klipnya? Berkasnya ikut terhapus dari disk.', b)
+        'Hapus video ini beserta SEMUA klipnya? Berkasnya ikut hilang dari komputer dan tidak bisa dikembalikan.', b)
     : await hapus(`/jobs/${jobId}/clips/${clipId}`,
-        'Hapus klip ini? Berkasnya ikut terhapus dari disk.', b);
+        'Hapus klip ini? Berkasnya ikut hilang dari komputer dan tidak bisa dikembalikan.', b);
   if (ok) tick();
 });
 

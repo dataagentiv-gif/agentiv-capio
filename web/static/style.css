@@ -577,17 +577,58 @@ input:focus {
    mata mencari dua kali. */
 .bar > i { display: block; height: 100%; background: var(--color-accent); transition: width .4s ease; }
 
-.error-box {
-  margin: 0 24px 20px;
-  padding: 14px 16px;
+/* Penjelasan kegagalan. Kalimat biasa dulu, satu tindakan yang bisa diambil,
+   baru teks mentahnya — dan yang terakhir itu dilipat. */
+.masalah {
+  margin: 0 24px 22px;
+  padding: 16px 18px;
   background: var(--danger-bg);
+  border-radius: var(--radius-inputs);
+  border-left: 3px solid var(--danger-fg);
+}
+
+.masalah strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--danger-fg);
+  margin-bottom: 5px;
+}
+
+.masalah p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-body);
+  max-width: 74ch;
+}
+
+.masalah details { margin-top: 12px; }
+
+.masalah summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-muted);
+  list-style: none;
+}
+
+.masalah summary::-webkit-details-marker { display: none; }
+.masalah summary::before { content: '▸ '; }
+.masalah details[open] summary::before { content: '▾ '; }
+.masalah summary:hover { color: var(--danger-fg); }
+
+.error-box {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  background: rgba(174, 46, 36, .08);
   border-radius: var(--radius-images);
   color: var(--danger-fg);
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
-  max-height: 200px;
+  max-height: 220px;
   overflow: auto;
 }
 
