@@ -54,7 +54,23 @@ def _pesan(pool: str, code: int, badan: str) -> str:
         return "Terhubung"
     if (pool, code) in KHUSUS:
         return KHUSUS[(pool, code)]
+    # 404 di sini hampir selalu soal NAMA MODEL, bukan key — dan itu perbedaan
+    # yang mahal. Tanpa dibedakan, orangnya akan menghapus key yang baik-baik
+    # saja lalu membuat key baru berkali-kali, sementara yang perlu diganti cuma
+    # satu baris di kolom Model. Google memensiunkan nama model berversi untuk
+    # akun baru sementara akun lama tetap bisa memakainya, jadi setelan yang
+    # diwarisi dari mesin lain bisa mati di mesin ini saja.
+    if code == 404:
+        return ("Model tidak ditemukan (404) — key-nya kemungkinan besar tidak "
+                "apa-apa, yang salah nama modelnya. Pakai nama beralias yang "
+                "berakhiran -latest supaya tidak ikut pensiun.")
     if code == 429:
+        # Dua hal yang sangat berbeda memakai kode yang sama. "plan and billing"
+        # berarti model itu memang TIDAK punya jatah gratis sama sekali —
+        # menunggu tidak akan menolong, modelnya yang harus diganti.
+        if "billing" in badan.lower() or "plan" in badan.lower():
+            return ("Model ini tidak punya jatah gratis (429). Menunggu tidak "
+                    "menolong — pilih model kelas flash, atau aktifkan billing.")
         return "Kuota habis (429)"
     if code in (401, 403):
         return f"Key ditolak ({code})"

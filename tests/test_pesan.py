@@ -59,6 +59,57 @@ def test_sebab_dikenali(mentah, kata):
     assert kata in pesan.terjemah(mentah)["judul"].lower()
 
 
+# --- nama model yang sudah dipensiunkan ---
+
+MODEL_MATI = (
+    'LLMError: gemini gagal setelah 3x: HTTP 404 [{"error": {"code": 404, '
+    '"message": "This model models/gemini-2.5-pro is no longer available to new '
+    'users. Please update your code to use models/gemini-3.1-pro-preview"}}]'
+)
+
+
+def test_model_pensiun_tidak_disalahartikan_sebagai_key_salah():
+    """Google memensiunkan nama model berversi untuk akun BARU sementara akun
+    lama tetap bisa memakainya — jadi setelan yang disalin dari mesin lain mati
+    di mesin ini saja, dan gejalanya sangat mirip key yang salah. Kalau salah
+    didiagnosis, orangnya menghapus key yang baik-baik saja."""
+    m = pesan.terjemah(MODEL_MATI)
+    assert "model" in m["judul"].lower()
+    assert "ditolak" not in m["judul"].lower()
+    assert "key" not in m["judul"].lower()
+
+
+def test_model_pensiun_menyuruh_pakai_alias():
+    saran = pesan.terjemah(MODEL_MATI)["saran"].lower()
+    assert "-latest" in saran, "alias adalah satu-satunya bentuk yang tidak ikut pensiun"
+    assert "setting" in saran
+
+
+# --- pesan tombol tes koneksi ---
+
+def test_tes_koneksi_membedakan_model_salah_dari_key_salah():
+    from api import checks
+
+    m = checks._pesan("gemini", 404, "models/gemini-2.5-pro is no longer available")
+    assert "model" in m.lower()
+    assert "-latest" in m
+
+
+def test_tes_koneksi_membedakan_tanpa_jatah_gratis_dari_kuota_habis():
+    """Dua hal yang sangat berbeda memakai kode yang sama. Model kelas pro
+    menjawab 429 karena memang tidak punya jatah gratis sama sekali — menunggu
+    tidak akan pernah menolong, dan menyuruh menunggu justru menyesatkan."""
+    from api import checks
+
+    tanpa_jatah = checks._pesan(
+        "gemini", 429,
+        "You exceeded your current quota, please check your plan and billing details.")
+    assert "tidak punya jatah gratis" in tanpa_jatah.lower()
+
+    biasa = checks._pesan("gemini", 429, "rate limit exceeded, retry later")
+    assert biasa == "Kuota habis (429)"
+
+
 def test_penyedia_disebut_namanya():
     """"Kuota habis" tanpa menyebut kuota MILIK SIAPA tidak bisa ditindaklanjuti
     — ada empat penyedia dan masing-masing punya halaman key sendiri."""

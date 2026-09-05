@@ -51,11 +51,24 @@ FIELDS = [
     _f("GEMINI_API_KEYS", "Gemini API key", "LLM", secret=True, pool="gemini",
        help="aistudio.google.com/apikey — free tier dibatasi per key, jadi "
             "beberapa key dipakai bergiliran untuk menaikkan atapnya."),
-    _f("GEMINI_MODEL", "Model Gemini", "LLM"),
+    _f("GEMINI_MODEL", "Model Gemini", "LLM",
+       help="Pakai nama beralias yang berakhiran -latest — alias selalu "
+            "menunjuk versi terbaru, jadi ia tidak ikut pensiun. Nama berversi "
+            "seperti gemini-2.5-pro dimatikan Google untuk akun baru sementara "
+            "akun lama tetap bisa memakainya, jadi setelan yang disalin dari "
+            "mesin lain bisa mati di sini saja. Yang tersedia untuk key gratis: "
+            "gemini-flash-lite-latest (bawaan, paling cepat) dan "
+            "gemini-flash-latest. Model kelas pro tidak punya jatah gratis "
+            "sama sekali. Tekan 'Tes gemini' setelah menggantinya."),
     _f("OPENROUTER_API_KEYS", "OpenRouter API key", "LLM", secret=True,
        pool="openrouter",
        help="openrouter.ai/keys — beberapa key dipakai bergiliran, sama seperti provider lain."),
-    _f("OPENROUTER_MODEL", "Model OpenRouter", "LLM"),
+    _f("OPENROUTER_MODEL", "Model OpenRouter", "LLM",
+       help="Nama lengkap dari openrouter.ai/models, termasuk nama penyedianya "
+            "— misalnya google/gemini-2.5-flash-lite. Berbeda dengan Gemini, "
+            "di sini tidak ada alias -latest: nama versi memang harus ditulis, "
+            "dan sesekali perlu diperbarui saat versinya dipensiunkan. Tekan "
+            "'Tes openrouter' setelah menggantinya."),
 
     _f("CLIPS_DIR", "Folder klip", "Penyimpanan",
        help="Klip jadi disimpan di sini sebagai file mp4 biasa — bisa dibuka, "

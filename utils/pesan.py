@@ -70,6 +70,18 @@ def _kosong(teks: str) -> tuple[str, str]:
     )
 
 
+def _model(teks: str) -> tuple[str, str]:
+    nama, _ = _penyedia(teks)
+    return (
+        f"Nama model {nama} sudah tidak berlaku",
+        f"Key-nya kemungkinan besar tidak apa-apa — yang perlu diganti nama "
+        f"modelnya. Buka halaman Setting, bagian LLM, lalu pakai nama beralias "
+        f"yang berakhiran -latest (misalnya gemini-flash-lite-latest): alias "
+        f"selalu menunjuk versi terbaru, jadi ia tidak ikut pensiun. Tekan "
+        f"'Tes {nama.lower()}' untuk memastikan sebelum memproses video.",
+    )
+
+
 def _batas(teks: str) -> tuple[str, str]:
     nama, _ = _penyedia(teks)
     return (
@@ -96,6 +108,13 @@ def _sambung(teks: str) -> tuple[str, str]:
 ATURAN: list[tuple[tuple[str, ...], object]] = [
     (("quota_exceeded", "exceeds your quota", "insufficient_quota",
       "credits remaining", "resource_exhausted", "out of credits"), _kuota),
+    # Diperiksa SEBELUM aturan "key ditolak": nama model yang salah dijawab 404,
+    # dan tanpa aturan ini pesannya jatuh ke "belum dikenali" — lalu orangnya
+    # menghapus key yang baik-baik saja. Google memensiunkan nama model
+    # berversi untuk akun baru sementara akun lama tetap bisa memakainya, jadi
+    # setelan yang diwarisi dari mesin lain bisa mati di mesin ini saja.
+    (("no longer available", "is not found for api version", "http 404",
+      "model tidak ditemukan"), _model),
     (("api key kosong", "tidak ada api key"), _kosong),
     (("invalid api key", "invalid_api_key", "unauthorized", "api key not valid",
       "invalid authentication", "http 401", "http 403"), _ditolak),
