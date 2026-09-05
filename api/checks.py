@@ -97,7 +97,10 @@ PROBES = {
     "gemini": lambda: _per_key("gemini", lambda k: httpx.post(
         "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         headers={"Authorization": f"Bearer {k}"},
-        json={"model": settings.GEMINI_MODEL,
+        # Model yang BENAR-BENAR dipakai job, bukan kolom satuan yang lama.
+        # Menguji nama lain dari yang dipakai membuat tombol ini berbohong
+        # persis di kasus yang paling ingin ditangkapnya: nama model yang mati.
+        json={"model": (settings.gemini_models or ["gemini-flash-lite-latest"])[0],
               "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1},
         timeout=TIMEOUT)),
 }

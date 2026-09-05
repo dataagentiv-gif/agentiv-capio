@@ -1258,6 +1258,50 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(24, 104, 219, .2);
 }
 
+/* Daftar centang model. Ditumpuk vertikal, bukan berjajar: nama modelnya
+   panjang dan mirip satu sama lain, dan berjajar mereka berhenti bisa
+   dibedakan sekilas. */
+.multi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-inputs);
+}
+
+.multi .opsi {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.multi .opsi:hover { background: var(--surface-canvas); }
+.multi input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--color-action); }
+.multi .opsi span { flex: 1; }
+
+/* Penanda mana yang dipakai lebih dulu. Tanpa ini urutan daftar terbaca
+   sebagai abjad acak, padahal itu urutan preferensi hasil pengujian. */
+.multi .opsi em {
+  font-family: var(--font-text);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--color-accent-fg);
+  background: var(--color-accent-soft);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+}
+
 .keyadd .btn { margin-top: 0; flex: none; }
 .keyout:empty { display: none; }
 .keyout .note { margin-top: 10px; margin-bottom: 0; }

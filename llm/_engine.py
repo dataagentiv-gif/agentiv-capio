@@ -71,10 +71,12 @@ def call_pool(prompt, response_schema, *, pool: str, nama: str, **kw):
     if not daftar:
         raise LLMError(f"{nama} API key kosong — isi di halaman Setting")
 
-    # Dengan banyak key, sediakan percobaan yang cukup supaya tiap key sempat
-    # dicoba saat satu di antaranya kena rate limit. Dibatasi 6 supaya kegagalan
-    # yang sebenarnya (JSON ngawur) tidak diulang belasan kali.
-    kw["attempts"] = min(max(kw.get("attempts", 3), len(daftar)), 6)
+    # Cukup percobaan supaya tiap key DAN tiap model sempat kena giliran saat
+    # satu di antaranya kena rate limit atau sedang penuh. Dibatasi 6 supaya
+    # kegagalan yang sebenarnya (JSON ngawur) tidak diulang belasan kali.
+    kw["attempts"] = min(
+        max(kw.get("attempts", 3), len(daftar), len(kw.get("models") or [])), 6
+    )
 
     pemakai = _Pemakai(pool, pool)
     try:
@@ -140,19 +142,29 @@ def call(
     *,
     endpoint: str,
     get_key,
-    model: str,
+    models: list[str],
     use_schema: bool,
     attempts: int = 3,
     label: str = "llm",
 ):
     """Panggil LLM, kembalikan hasil yang sudah di-parse jadi objek Python.
 
-    `get_key` adalah callable yang dipanggil ULANG di tiap percobaan. Itulah yang
-    membuat rotasi key Gemini bekerja: percobaan gagal karena kena rate limit
-    otomatis memakai key berikutnya, tanpa logika khusus di sini.
+    DUA sumbu rotasi, dan keduanya berputar di tiap percobaan:
+
+    - `get_key` adalah callable yang dipanggil ULANG tiap percobaan, jadi
+      percobaan yang kena rate limit otomatis memakai key berikutnya.
+    - `models` diputar mengikuti nomor percobaan. Kuota gratis Gemini dihitung
+      per model DAN per key, jadi memutar keduanya mengalikan atapnya —
+      sekaligus melewati satu model yang kebetulan sedang 503.
+
+    `models` urut menurut preferensi: yang pertama dipakai di percobaan pertama,
+    jadi jalur normal selalu memakai model terbaik dan sisanya benar-benar cuma
+    cadangan.
     """
+    if not models:
+        raise LLMError(f"{label}: daftar model kosong — isi di halaman Setting")
+
     body = {
-        "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.4,
     }
@@ -176,6 +188,10 @@ def call(
 
     last_err, last_raw = "", ""
     for attempt in range(attempts):
+        model = models[attempt % len(models)]
+        body["model"] = model
+        if len(models) > 1 and attempt:
+            log.info("%s percobaan %d memakai model %s", label, attempt + 1, model)
         if last_err:
             body["messages"] = [
                 {"role": "user", "content": prompt},

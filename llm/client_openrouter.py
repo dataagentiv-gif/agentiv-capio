@@ -17,7 +17,7 @@ def call_llm(prompt: str, response_schema: dict | None = None, attempts: int = 3
         pool="openrouter",
         nama="OpenRouter",
         endpoint=ENDPOINT,
-        model=settings.OPENROUTER_MODEL,
+        models=[settings.OPENROUTER_MODEL],
         # OpenRouter meneruskan response_format json_schema ke provider di
         # belakangnya, dan ini sudah jalur yang dipakai sejak awal.
         use_schema=True,

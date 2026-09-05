@@ -51,15 +51,33 @@ FIELDS = [
     _f("GEMINI_API_KEYS", "Gemini API key", "LLM", secret=True, pool="gemini",
        help="aistudio.google.com/apikey — free tier dibatasi per key, jadi "
             "beberapa key dipakai bergiliran untuk menaikkan atapnya."),
-    _f("GEMINI_MODEL", "Model Gemini", "LLM",
-       help="Pakai nama beralias yang berakhiran -latest — alias selalu "
-            "menunjuk versi terbaru, jadi ia tidak ikut pensiun. Nama berversi "
+    # Diuji sungguhan pada transkrip podcast 27 menit lewat jalur kode
+    # produksi, tiga putaran per model. Yang masuk daftar ini lolos tiga
+    # syarat: balasannya JSON valid tanpa perlu diulang, jumlah segmennya
+    # mendekati yang diminta, dan start_idx-nya cocok dengan hook yang
+    # ditulisnya sendiri di atas 85% kasus.
+    #
+    # Yang sengaja TIDAK masuk, beserta sebabnya:
+    #   gemini-2.5-flash-lite  mengembalikan 42 segmen saat diminta 7
+    #   *-preview              dipensiunkan tanpa pemberitahuan
+    #   kelas pro / omni       tidak punya jatah gratis sama sekali (429)
+    _f("GEMINI_MODELS", "Model Gemini", "LLM", kind="multi",
+       options=["gemini-flash-lite-latest", "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash"],
+       help="Boleh pilih lebih dari satu — dipakai BERGILIRAN, sama seperti "
+            "key. Kuota gratis Gemini dihitung per model, jadi tiap model yang "
+            "dicentang menambah satu jatah yang berdiri sendiri; kalau satu "
+            "model sedang penuh atau habis, percobaan berikutnya pindah ke "
+            "model lain dan job tetap selesai. Urutannya urutan preferensi: "
+            "yang teratas dipakai lebih dulu. Tiga yang pertama cepat (2-3 "
+            "detik); dua yang terakhir lebih teliti tapi 10x lebih lama."),
+    _f("GEMINI_MODEL", "Model Gemini (satuan, lama)", "LLM",
+       help="Hanya dipakai kalau tidak ada satu pun model dicentang di atas. "
+            "Ada demi .env lama yang sudah terlanjur mengisinya. Nama berversi "
             "seperti gemini-2.5-pro dimatikan Google untuk akun baru sementara "
             "akun lama tetap bisa memakainya, jadi setelan yang disalin dari "
-            "mesin lain bisa mati di sini saja. Yang tersedia untuk key gratis: "
-            "gemini-flash-lite-latest (bawaan, paling cepat) dan "
-            "gemini-flash-latest. Model kelas pro tidak punya jatah gratis "
-            "sama sekali. Tekan 'Tes gemini' setelah menggantinya."),
+            "mesin lain bisa mati di sini saja — pakai nama beralias yang "
+            "berakhiran -latest kalau memang harus mengisi kolom ini."),
     _f("OPENROUTER_API_KEYS", "OpenRouter API key", "LLM", secret=True,
        pool="openrouter",
        help="openrouter.ai/keys — beberapa key dipakai bergiliran, sama seperti provider lain."),
@@ -170,6 +188,13 @@ def read_public() -> dict:
     groups: dict[str, list] = {}
     for f in FIELDS:
         raw = str(getattr(settings, f["key"], "") or "")
+        # Kolom yang punya cadangan menampilkan nilai yang BENAR-BENAR dipakai,
+        # bukan isi mentahnya. Kosong di sini bukan berarti tidak ada yang
+        # aktif — GEMINI_MODELS yang kosong tetap jalan lewat GEMINI_MODEL —
+        # dan menampilkannya kosong membuat halaman ini menyatakan sesuatu yang
+        # tidak benar tentang apa yang sedang berjalan.
+        if f["key"] == "GEMINI_MODELS" and not raw:
+            raw = ",".join(settings.gemini_models)
         groups.setdefault(f["group"], []).append(
             {**f, "value": mask(raw) if f["secret"] else raw, "filled": bool(raw)}
         )

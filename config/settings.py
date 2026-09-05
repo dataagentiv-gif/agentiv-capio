@@ -69,6 +69,17 @@ class Settings(BaseSettings):
     # untuk setiap orang yang baru mencobanya, dan gejalanya menyesatkan —
     # kelihatan seperti key yang salah, padahal modelnya yang sudah ditutup.
     GEMINI_MODEL: str = "gemini-flash-lite-latest"
+    # Beberapa model dipisah koma, dicoba BERGILIRAN sama seperti key. Kuota
+    # gratis Gemini dihitung PER MODEL, bukan cuma per key — terbukti saat
+    # kuota yang habis pulih seketika hanya dengan berpindah model, tanpa
+    # menunggu reset harian. Jadi dua sumbu rotasi mengalikan atapnya:
+    # 3 key x 3 model memberi 9 jatah yang berdiri sendiri.
+    #
+    # Bonus yang tidak diduga tapi terukur: saat diuji, gemini-flash-latest dan
+    # gemini-3.8-flash dua-duanya menjawab 503 "experiencing high demand" pada
+    # setiap percobaan. Dengan satu model, itu job yang gagal. Dengan beberapa,
+    # percobaan berikutnya memakai model lain dan job tetap selesai.
+    GEMINI_MODELS: str = ""
 
     # --- Tampilan klip (Stage 5 & 7) ---
     #
@@ -154,6 +165,14 @@ class Settings(BaseSettings):
     @property
     def gemini_keys(self) -> list[str]:
         return self._pecah(self.GEMINI_API_KEYS)
+
+    @property
+    def gemini_models(self) -> list[str]:
+        """Urut menurut PREFERENSI, bukan sekadar daftar. Yang pertama dipakai
+        lebih dulu; sisanya baru kena giliran saat percobaan sebelumnya gagal.
+        Bentuk jamak dulu, bentuk tunggal sebagai cadangan supaya .env lama
+        tetap jalan tanpa disunting."""
+        return self._pecah(self.GEMINI_MODELS) or self._pecah(self.GEMINI_MODEL)
 
     # Bentuk jamak dulu, bentuk tunggal sebagai cadangan. Nama tunggal dibaca
     # supaya .env yang sudah ada tetap jalan tanpa harus disunting — termasuk

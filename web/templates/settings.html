@@ -53,6 +53,20 @@ function fieldHtml(f) {
     input = `<select id="${id}" data-key="${f.key}">` +
       f.options.map(o => `<option value="${o}" ${o === f.value ? 'selected' : ''}>${esc(o)}</option>`).join('') +
       `</select>`;
+  } else if (f.kind === 'multi') {
+    // Disimpan sebagai satu string dipisah koma, persis seperti daftar key —
+    // jadi jalur simpan .env tidak perlu tahu apa-apa soal jenis field ini.
+    // Urutan centang TIDAK menentukan urutan pakai; yang menentukan urutan
+    // pilihan di daftar, dan itu urutan preferensi hasil pengujian.
+    const dipilih = new Set((f.value || '').split(',').map(s => s.trim()).filter(Boolean));
+    input = `<div class="multi" id="${id}" data-key="${f.key}">` +
+      f.options.map((o, i) => `
+        <label class="opsi">
+          <input type="checkbox" value="${esc(o)}" ${dipilih.has(o) ? 'checked' : ''}>
+          <span>${esc(o)}</span>
+          ${i === 0 ? '<em>utama</em>' : ''}
+        </label>`).join('') +
+      `</div>`;
   } else if (f.pool) {
     // Field ber-pool tidak punya input teks sendiri. Dua cara menyunting hal
     // yang sama hanya membingungkan, dan mengetik ulang seluruh key cuma untuk
@@ -313,6 +327,14 @@ async function simpan(btn) {
   const grup = sec.dataset.group;
   const values = {};
   sec.querySelectorAll('[data-key]').forEach(i => { if (i.value !== '') values[i.dataset.key] = i.value; });
+  // Field bercentang banyak dikumpulkan terpisah: <div> tidak punya .value,
+  // jadi baris di atas melewatinya begitu saja. Dikirim walau KOSONG — di sini
+  // kosong berarti "tidak ada yang dicentang", sebuah pilihan yang sah, bukan
+  // "ikut nilai sebelumnya" seperti pada kolom teks.
+  sec.querySelectorAll('.multi[data-key]').forEach(m => {
+    values[m.dataset.key] = [...m.querySelectorAll('input:checked')]
+      .map(c => c.value).join(',');
+  });
   btn.disabled = true;
   try {
     const r = await fetch('/api/settings', {
