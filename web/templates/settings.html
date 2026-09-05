@@ -33,12 +33,13 @@ const INTRO = {
   'Guardrail': 'Batas keras yang tidak boleh dilanggar pipeline. Segmen di luar rentang durasi dibuang sebelum dirender.',
   'Kalibrasi': 'Angka yang diputar kalau titik potong klip terasa belum pas. Penjelasan lengkapnya ada di README.',
   'Infra': 'Alamat database dan antrean. Sengaja tidak bisa diubah dari sini.',
+  'Lisensi': 'Tanpa license key CAPIO tetap jalan normal — hanya memproses video baru yang diblokir. Klip lama tetap bisa diputar, diunduh, dan dihapus.',
 };
 
 const IKON = {
   'Transkrip': 'i-mic', 'LLM': 'i-llm', 'Penyimpanan': 'i-folder',
   'Guardrail': 'i-shield', 'Kalibrasi': 'i-settings', 'Infra': 'i-server',
-  'Tampilan': 'i-results',
+  'Tampilan': 'i-results', 'Lisensi': 'i-shield',
 };
 const ikon = n => `<svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#${IKON[n] || 'i-settings'}"/></svg>`;
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -87,6 +88,54 @@ function fieldHtml(f) {
       ${input}
       ${f.help ? `<p class="sub">${esc(f.help)}</p>` : ''}
     </div>`;
+}
+
+// Dibaca dari token tersimpan, TANPA memanggil server. Yang ditampilkan
+// `license_expires_at`, bukan `exp`: exp dipotong maksimal 14 hari supaya jam
+// sistem yang dimundurkan tidak bisa dipakai selamanya, jadi menampilkannya
+// membuat client yang baru membayar 30 hari melihat "14 hari lagi" lalu
+// menghubungi Agentiv.
+function lisensiHtml(s, wa) {
+  const tgl = s.berlaku_sampai
+    ? new Date(s.berlaku_sampai).toLocaleDateString('id-ID',
+        { day: 'numeric', month: 'long', year: 'numeric' })
+    : '';
+  const kelas = s.aktif ? (s.sisa_hari !== null && s.sisa_hari <= 7 ? 'warn' : 'ok') : 'err';
+  const judul = s.aktif
+    ? (s.sisa_hari !== null && s.sisa_hari <= 7 ? 'Akan segera habis' : 'Aktif')
+    : (s.punya_key ? 'Belum aktif' : 'Belum ada license key');
+
+  const baris = [];
+  if (s.aktif) baris.push(`Berlaku sampai <b>${esc(tgl)}</b> — ${s.sisa_hari} hari lagi`);
+  if (s.pesan) baris.push(esc(s.pesan));
+  if (s.diperiksa) baris.push(`Terakhir diperiksa ${esc(waktu(new Date(s.diperiksa * 1000).toISOString()))}`);
+
+  return `
+    <div class="lisensi ${kelas}">
+      <strong>${esc(judul)}</strong>
+      ${baris.map(b => `<p>${b}</p>`).join('')}
+      <div class="aksi-lisensi">
+        <button type="button" class="btn sm ghost" id="cek-lisensi">Verifikasi ulang</button>
+        <a class="btn sm ghost" href="https://app.agentiv.my.id/cek" target="_blank" rel="noopener">Cek key di portal</a>
+        ${s.aktif ? '' : `<a class="btn sm ghost" href="${esc(wa || '#')}" target="_blank" rel="noopener">Chat WA</a>`}
+      </div>
+    </div>`;
+}
+
+async function segarkanLisensi(paksa = false) {
+  const el = document.getElementById('lisensi-status');
+  if (!el) return;
+  if (paksa) el.innerHTML = '<div class="lisensi"><strong>Memeriksa…</strong></div>';
+  try {
+    const d = paksa
+      ? await (await fetch('/api/lisensi/verifikasi', { method: 'POST' })).json()
+      : await (await fetch('/api/status')).json();
+    const s = paksa ? d.status : d.lisensi;
+    el.innerHTML = lisensiHtml(s, d.wa);
+    document.getElementById('cek-lisensi').onclick = () => segarkanLisensi(true);
+  } catch {
+    el.innerHTML = '<div class="lisensi err"><strong>CAPIO tidak merespons</strong></div>';
+  }
 }
 
 // Preview dirender di server lewat ffmpeg, bukan ditiru dengan CSS. Tiruan akan
@@ -183,7 +232,8 @@ function render() {
     const tes = (TES[g.name] || []).map(p =>
       `<button type="button" class="btn ghost sm" data-test="${p}">Tes ${p}</button>`).join('');
     const isi = g.fields.map(fieldHtml).join('') +
-      (g.name === 'Tampilan' ? previewHtml() : '');
+      (g.name === 'Tampilan' ? previewHtml() : '') +
+      (g.name === 'Lisensi' ? '<div id="lisensi-status"></div>' : '');
     return panelHtml(g.name, isi,
       `<div class="actions">
          <button type="button" class="btn sm" data-save="1">Simpan</button>${tes}
@@ -210,6 +260,7 @@ function render() {
     if (b) simpan(b);
   });
   document.querySelectorAll('[data-test]').forEach(b => b.onclick = () => tes(b));
+  segarkanLisensi();
   // Preview ikut berubah saat knob diputar, tanpa perlu disimpan dulu —
   // mencoba lima warna kalau harus menyimpan dulu berarti lima kali menulis .env.
   document.querySelectorAll('#p-tampilan [data-key]').forEach(el => {

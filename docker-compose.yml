@@ -15,6 +15,7 @@ x-app: &app
     REDIS_URL: redis://redis:6379/0
     WORK_DIR: /work
     CLIPS_DIR: /app/clips
+    DATA_DIR: /app/data
   volumes:
     # Klip mendarat di folder ./clips pada laptop, bukan terkurung di dalam
     # container — bisa dibuka lewat File Explorer, dihapus, atau di-zip.
@@ -28,6 +29,12 @@ x-app: &app
     # di dalam containernya sendiri — unggahannya tersimpan dengan benar, job
     # dibuat dengan benar, lalu gagal dengan "berkas sudah tidak ada".
     - work:/work
+    # install_id dan token lisensi. NAMED VOLUME, bukan bind mount, dan itu
+    # disengaja: bind mount membuat install_id gampang ditemukan lalu disalin ke
+    # mesin lain — persis yang membuat batas perangkat tidak menahan apa pun.
+    # Named volume juga bertahan melewati `up -d` dengan tag image baru, yang
+    # merupakan jalur update normal; hanya `down -v` yang menghapusnya.
+    - capiodata:/app/data
   depends_on:
     postgres: {condition: service_healthy}
     redis: {condition: service_healthy}
@@ -83,10 +90,16 @@ services:
       # Tanpa ini, API_PORT=8080 di .env membuat container mendengar di 8080
       # sementara Docker meneruskan ke 8000 — dan tidak ada yang nyambung.
       API_PORT: 8000
+      # Empat baris di bawah adalah SALINAN dari anchor, dan harus begitu:
+      # `environment:` yang ditulis ulang di sini MENGGANTI milik anchor, bukan
+      # menambahinya. Menambah variabel di anchor tanpa menyalinnya ke sini
+      # berarti variabel itu tidak pernah sampai ke container API — dan
+      # gejalanya jauh dari sebabnya.
       DATABASE_URL: postgresql+psycopg://clipper:clipper@postgres:5432/clipper
       REDIS_URL: redis://redis:6379/0
       WORK_DIR: /work
       CLIPS_DIR: /app/clips
+      DATA_DIR: /app/data
     # Port di dalam container tetap 8000; yang bisa diubah pengguna adalah sisi
     # host lewat HOST_PORT di .env — bentrokan port itu hal biasa.
     # Awalan 127.0.0.1 membatasi ke laptop sendiri; jangan dihapus tanpa
@@ -106,3 +119,4 @@ volumes:
   pgdata:
   redisdata:
   work:
+  capiodata:

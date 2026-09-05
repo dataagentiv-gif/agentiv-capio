@@ -62,6 +62,45 @@ def client():
         yield c
 
 
+# --- gerbang lisensi ---
+
+@pytest.mark.tanpa_lisensi
+def test_submit_tanpa_lisensi_ditolak_di_endpoint(client, bersihkan, monkeypatch):
+    """Tombol yang di-disable di halaman bisa dilewati dengan satu perintah
+    curl. Gerbangnya harus ada di endpoint, dan inilah yang membuktikannya."""
+    import license as lisensi
+
+    monkeypatch.setattr(lisensi, "boleh_submit", lambda: (False, "Lisensi belum aktif."))
+    r = client.post("/jobs", json={"url": URL, "target_clips": 2})
+    assert r.status_code == 403
+    assert "Lisensi" in r.text
+
+
+@pytest.mark.tanpa_lisensi
+def test_lisensi_diperiksa_sebelum_api_key(client, bersihkan, monkeypatch):
+    """Keduanya menggagalkan submit, tapi menyuruh orang mengisi API key
+    padahal yang kurang lisensinya cuma membuang waktunya."""
+    import license as lisensi
+
+    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
+    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
+    monkeypatch.setattr(lisensi, "boleh_submit", lambda: (False, "Lisensi belum aktif."))
+    r = client.post("/jobs", json={"url": URL, "target_clips": 2})
+    assert r.status_code == 403
+
+
+@pytest.mark.tanpa_lisensi
+def test_halaman_tetap_terbuka_tanpa_lisensi(client, monkeypatch):
+    """Aturan yang paling mudah dilanggar: kalau aplikasi menolak melayani
+    halaman Setting, license key tidak akan pernah bisa dimasukkan sama sekali.
+    Buntu total."""
+    import license as lisensi
+
+    monkeypatch.setattr(lisensi, "boleh_submit", lambda: (False, "Lisensi belum aktif."))
+    for jalur in ("/", "/settings", "/results", "/process"):
+        assert client.get(jalur).status_code == 200, jalur
+
+
 # --- konfigurasi bolong ---
 
 def test_tanpa_key_transkrip_ditolak(client, monkeypatch):

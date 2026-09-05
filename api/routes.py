@@ -27,6 +27,7 @@ from config import env_store
 from config.settings import settings
 from db import jobs, models
 from jobqueue.client import enqueue
+import license as lisensi
 from llm import rute
 from pipeline import layout as layout_mod
 import storage
@@ -62,6 +63,17 @@ templates.env.globals["v"] = _cap_aset()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     models.init()
+    # Verifikasi saat start, dan kegagalannya TIDAK PERNAH menjatuhkan aplikasi.
+    # Tanpa key, halaman Setting harus tetap terbuka — di situlah key
+    # dimasukkan. Menolak start berarti key tidak akan pernah bisa dimasukkan.
+    if (settings.LICENSE_KEY or "").strip():
+        try:
+            lisensi.verifikasi()
+        except Exception as e:  # noqa: BLE001
+            log.warning("verifikasi lisensi saat start gagal: %s", e)
+    else:
+        log.info("LICENSE_KEY belum diisi — aplikasi jalan normal, submit job "
+                 "diblokir sampai key dimasukkan di halaman Setting")
     # Peringatan ini ada karena kesalahan yang paling mungkin terjadi bukan
     # serangan canggih, melainkan seseorang mengubah API_HOST agar bisa dibuka
     # dari HP-nya, lalu lupa bahwa /settings memajang status seluruh kredensial.
@@ -174,6 +186,10 @@ def read_settings():
 @app.post("/api/settings")
 def save_settings(payload: dict):
     changed = env_store.write(payload.get("values") or {})
+    # Key baru diverifikasi SEKARANG, bukan menunggu restart. Hasilnya harus
+    # tampil dalam hitungan detik — sesi setup remote ditutup dengan melihatnya.
+    if "LICENSE_KEY" in changed:
+        lisensi.verifikasi()
     if changed:
         # Hasil render lama tidak lagi mewakili setelan yang berlaku.
         preview.bersihkan_cache()
@@ -210,6 +226,18 @@ def hapus_key(pool: str, index: int):
         raise HTTPException(404, pesan)
     log.info("key %s dihapus: %s", pool, pesan)
     return {"pesan": pesan, **keypool.status(pool)}
+
+
+@app.post("/api/lisensi/verifikasi")
+def verifikasi_lisensi():
+    """Tanya server lisensi sekarang juga, lalu kembalikan keadaan terbaru.
+
+    Dipakai tombol Verifikasi ulang, dan dipanggil sendiri setiap kali
+    LICENSE_KEY baru disimpan — tanpa itu, sesi setup remote harus ditutup
+    tanpa kepastian, dan itu tidak bisa diterima.
+    """
+    hasil = lisensi.verifikasi()
+    return {**hasil, "status": lisensi.status(), "wa": lisensi.tautan_wa()}
 
 
 @app.post("/api/settings/test/{provider}")
@@ -303,7 +331,9 @@ def config_status():
         # dibuat sendiri. Tetap dilaporkan supaya strip status di halaman
         # Submit menampilkan ketiga bagian pipeline secara utuh.
         "storage": {"provider": "local", "ok": True},
-        "ready": asr_ok and llm_ok,
+        "lisensi": lisensi.status(),
+        "wa": lisensi.tautan_wa(),
+        "ready": asr_ok and llm_ok and lisensi.boleh_submit()[0],
         # Jumlah job yang belum selesai. Dipakai titik penanda di dock, supaya
         # dari halaman mana pun terlihat bahwa masih ada yang berjalan — orang
         # submit lalu pindah halaman, dan sebelumnya tidak ada satu pun tanda.
@@ -406,6 +436,14 @@ def create_job(payload: JobCreate):
     # baru berhenti di stage transkrip. Halaman Submit sudah mematikan
     # tombolnya, tapi itu penjaga di browser saja: permintaan langsung ke API
     # tetap bisa membuat job yang sejak awal pasti gagal.
+    # Gerbang lisensi ada DI SINI, bukan cuma di tombol halaman Submit: tombol
+    # yang di-disable bisa dilewati dengan satu perintah curl. Dibaca dari token
+    # tersimpan, tanpa memanggil server — submit tidak boleh pernah menunggu
+    # jaringan.
+    boleh, alasan = lisensi.boleh_submit()
+    if not boleh:
+        raise HTTPException(403, alasan)
+
     kurang = _kurang_konfigurasi()
     if kurang:
         raise HTTPException(

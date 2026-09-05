@@ -412,10 +412,28 @@ async function drawStatus() {
       `<span class="stat ${o.ok ? 'ok' : 'off'}">
          <svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#${ikon}"/></svg>
          ${label}: <b>${esc(o.provider)}</b></span>`;
+    const lis = s.lisensi || {};
+    alasanLisensi = '';
+    if (!lis.aktif) {
+      alasanLisensi = lis.punya_key
+        ? (lis.pesan || 'Lisensi belum aktif. Buka halaman Setting untuk memeriksanya.')
+        : 'CAPIO butuh license key untuk memproses video. Buka halaman Setting untuk memasukkannya.';
+    }
+    // Strip lisensi hanya muncul saat PERLU PERHATIAN — tidak aktif, atau sisa
+    // 7 hari ke bawah. Peringatan permanen "23 hari lagi" berubah jadi
+    // wallpaper, dan waktu akhirnya berbunyi "2 hari lagi" tidak ada yang
+    // melihat lagi.
+    let strip = '';
+    if (!lis.aktif) {
+      strip = `<a class="stat warn" href="/settings">Lisensi belum aktif &rarr;</a>`;
+    } else if (lis.sisa_hari !== null && lis.sisa_hari <= 7) {
+      strip = `<a class="stat warn" href="/settings">Lisensi habis ${lis.sisa_hari} hari lagi &rarr;</a>`;
+    } else if (!s.ready) {
+      strip = `<a class="stat warn" href="/settings">Belum siap dipakai &mdash; isi API key &rarr;</a>`;
+    }
     document.getElementById('status').innerHTML =
       item('Transkrip', 'i-mic', s.asr) + item('LLM', 'i-llm', s.llm) +
-      item('Storage', 'i-folder', s.storage) +
-      (s.ready ? '' : `<a class="stat warn" href="/settings">Belum siap dipakai &mdash; isi API key &rarr;</a>`);
+      item('Storage', 'i-folder', s.storage) + strip;
     document.getElementById('durasi').textContent =
       `Tiap klip ${s.min_sec}–${s.max_sec} detik. Ubah di halaman Setting.`;
     if (!Number(n.value)) n.value = s.default_clips;
@@ -435,7 +453,8 @@ const f = document.getElementById('f'), out = document.getElementById('out'), go
 // pesannya baru muncul setelah tombol ditekan.
 const POLA_YT = /^https:\/\/((www|m)\.youtube\.com\/|youtube\.com\/|youtu\.be\/)/;
 
-let siapProses = true;   // diisi drawStatus() dari /api/status
+let siapProses = true;      // diisi drawStatus() dari /api/status
+let alasanLisensi = '';     // kosong = lisensi tidak menghalangi
 
 function cekForm() {
   const jumlah = Number(n.value);
@@ -455,6 +474,10 @@ function cekForm() {
   if (!layoutPilih) return 'Pilih dulu salah satu tampilan klip.';
   // Konfigurasi yang bolong membuat job gagal di tengah pipeline, belasan menit
   // setelah submit — dan penyebabnya sudah bisa diketahui sekarang.
+  // Lisensi diperiksa SEBELUM API key: keduanya membuat submit gagal, tapi
+  // menyuruh orang mengisi API key padahal yang kurang lisensinya cuma
+  // membuang waktunya.
+  if (alasanLisensi) return alasanLisensi;
   if (!siapProses)
     return 'CAPIO belum siap dipakai: API key-nya belum diisi. Buka halaman Setting dulu.';
   return null;

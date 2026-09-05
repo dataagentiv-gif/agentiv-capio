@@ -80,6 +80,13 @@ FIELDS = [
             "dan sesekali perlu diperbarui saat versinya dipensiunkan. Tekan "
             "'Tes openrouter' setelah menggantinya."),
 
+    _f("LICENSE_KEY", "License key", "Lisensi",
+       help="Ditempel dari email pembelian, bentuknya seperti "
+            "AGV-CAP-SG-K7M2QX4P. Begitu disimpan, key langsung diverifikasi ke "
+            "server dan hasilnya tampil di bawah. Tanpa key, CAPIO tetap jalan "
+            "normal — hanya memproses video baru yang diblokir; klip lama tetap "
+            "bisa dibuka dan diunduh."),
+
     _f("CLIPS_DIR", "Folder klip", "Penyimpanan",
        help="Klip jadi disimpan di sini sebagai file mp4 biasa — bisa dibuka, "
             "dihapus, dan disalin lewat file manager. Tidak ada storage cloud."),

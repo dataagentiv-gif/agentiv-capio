@@ -31,6 +31,14 @@ httpx>=0.27
 # pin itu berantem dengan dep lain di venv ini. 1.0.1 tidak memaksa apa pun.
 mediapipe==1.0.1
 
+# --- Lisensi ---
+# Verifikasi tanda tangan RS256 pada token lisensi. Sengaja TIDAK ditulis
+# sendiri: verifikasi PKCS#1 v1.5 punya kelas bug forgery yang terkenal
+# (Bleichenbacher 2006) saat parsing padding-nya longgar, dan kegagalannya
+# senyap — token palsu diterima tanpa satu pun tanda. Ini menjaga pendapatan,
+# bukan tempat berhemat satu dependensi.
+cryptography>=42.0
+
 # --- Test ---
 pytest>=8.0
 

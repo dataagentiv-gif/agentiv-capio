@@ -952,6 +952,36 @@ input:focus {
   font-weight: 500;
 }
 
+/* ---------- Status lisensi (halaman Setting) ---------- */
+
+.lisensi {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: var(--radius-inputs);
+  border-left: 3px solid var(--color-ash);
+  background: var(--surface-soft);
+}
+
+.lisensi.ok { background: var(--success-bg); border-left-color: var(--success-fg); }
+.lisensi.warn { background: var(--color-accent-soft); border-left-color: var(--color-accent); }
+.lisensi.err { background: var(--danger-bg); border-left-color: var(--danger-fg); }
+
+.lisensi strong { display: block; font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.lisensi.ok strong { color: var(--success-fg); }
+.lisensi.warn strong { color: var(--color-accent-fg); }
+.lisensi.err strong { color: var(--danger-fg); }
+
+.lisensi p {
+  margin: 3px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-body);
+  max-width: 70ch;
+}
+
+.aksi-lisensi { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+.aksi-lisensi .btn { margin-top: 0; }
+
 /* ---------- Pemilih sumber video (halaman Submit) ---------- */
 
 .tabs.kecil { margin-bottom: 14px; gap: 18px; }
