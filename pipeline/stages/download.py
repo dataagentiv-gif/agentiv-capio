@@ -4,6 +4,7 @@ Input  : ctx[url], ctx[workdir], ctx[deadline]
 Output : source.mp4, audio.ogg (16kHz mono opus), meta.json
 """
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from config.settings import settings
 from utils.ffmpeg_helpers import ffmpeg, probe
 from utils.ffmpeg_helpers import run as ff
 from utils.logging import get
+import unggah
 from utils.retry import retry
 
 log = get(__name__)
@@ -124,17 +126,51 @@ def _sebab(teks: str) -> str:
     return "Download gagal."
 
 
+def _pindahkan(ident: str, tujuan: Path) -> None:
+    """Pindahkan berkas unggahan ke workdir job.
+
+    DIPINDAH, bukan disalin: berkas sumber bisa berukuran giga, dan menyalinnya
+    berarti dua salinan hidup berdampingan sepanjang job berjalan — di volume
+    yang sama, pada mesin yang mungkin cuma punya 20 GB kosong.
+
+    Namanya jadi source.mp4 apa pun wadah aslinya. ffmpeg menentukan format dari
+    ISI berkas, bukan dari ekstensinya, jadi .mov dan .mkv tetap terbaca — dan
+    seluruh stage sesudah ini sudah menyebut nama itu.
+    """
+    asal = unggah.berkas(ident)
+    if tujuan.exists():
+        return  # sudah dipindah di percobaan sebelumnya
+    if not asal.is_file():
+        raise RuntimeError(
+            "Berkas yang diunggah sudah tidak ada. Kemungkinan besar terhapus "
+            "penyapu berkas lama sebelum job ini sempat berjalan — unggah ulang."
+        )
+    shutil.move(str(asal), str(tujuan))
+    log.info("sumber dari unggahan: %s (%.1f MB)",
+             unggah.nama_asli(ident) or ident, tujuan.stat().st_size / 1e6)
+    unggah.bersihkan(ident)
+
+
 def run(ctx: dict) -> dict:
     workdir: Path = ctx["workdir"]
     deadline = ctx["deadline"]
     source = workdir / "source.mp4"
     audio = workdir / "audio.ogg"
 
-    # Retry 2x backoff 30s (PRD Bagian 6).
-    try:
-        retry(attempts=3, backoff=30.0)(_ytdlp)(ctx["url"], workdir, deadline)
-    except Exception as e:
-        raise RuntimeError(f"{_sebab(str(e))} Detail: {e}") from e
+    # Berkas yang diunggah melewati yt-dlp sepenuhnya. Ini bukan cuma jalan
+    # pintas: yt-dlp bagian paling rapuh di seluruh pipeline — bot-detection
+    # YouTube, cookies yang basi sendiri, dan gagalnya di tahap paling awal
+    # setelah orang menunggu. Sumber yang sudah ada di disk tidak melewati satu
+    # pun dari itu.
+    ident = unggah.sumber(ctx["url"])
+    if ident:
+        _pindahkan(ident, source)
+    else:
+        # Retry 2x backoff 30s (PRD Bagian 6).
+        try:
+            retry(attempts=3, backoff=30.0)(_ytdlp)(ctx["url"], workdir, deadline)
+        except Exception as e:
+            raise RuntimeError(f"{_sebab(str(e))} Detail: {e}") from e
 
     if not source.exists():
         found = list(workdir.glob("source.*"))
@@ -159,7 +195,10 @@ def run(ctx: dict) -> dict:
     raw = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {}
     v = probe(source, deadline)
     meta = {
-        "title": raw.get("title", ""),
+        # Nama berkas dipakai sebagai judul untuk sumber unggahan. Tanpa itu
+        # judulnya kosong, dan stage metadata kehilangan satu-satunya petunjuk
+        # tentang isi video selain transkripnya sendiri.
+        "title": raw.get("title", "") or unggah.nama_asli(ident or ""),
         "channel": raw.get("uploader", ""),
         "duration": v["duration"] or float(raw.get("duration", 0)),
         "width": v["width"],

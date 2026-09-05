@@ -22,6 +22,12 @@ x-app: &app
     # .env ikut di-mount supaya halaman Setting bisa menulis ke file yang sama
     # dengan yang dibaca saat start, dan isinya bertahan setelah container mati.
     - ./.env:/app/.env
+    # Dipasang di KEDUA service, bukan cuma worker. API yang menerima berkas
+    # unggahan dan menuliskannya ke /work/unggah; worker yang membacanya saat
+    # job jalan. Tanpa volume bersama, keduanya menulis ke /work masing-masing
+    # di dalam containernya sendiri — unggahannya tersimpan dengan benar, job
+    # dibuat dengan benar, lalu gagal dengan "berkas sudah tidak ada".
+    - work:/work
   depends_on:
     postgres: {condition: service_healthy}
     redis: {condition: service_healthy}
@@ -91,13 +97,10 @@ services:
   worker:
     <<: *app
     command: ["python", "main.py", "worker"]
-    volumes:
-      - ./clips:/app/clips
-      - ./.env:/app/.env
-      # Video mentah tinggal di dalam container, TIDAK di-bind-mount. File
-      # source bisa ratusan MB dan dibaca berulang kali oleh ffmpeg; lewat
-      # bind-mount Docker Desktop di Windows, itu lambatnya terasa.
-      - work:/work
+    # Volume-nya diwarisi dari anchor di atas. Dulu ditulis ulang di sini, dan
+    # daftar yang ditulis ulang MENIMPA daftar induknya — jadi menambah volume
+    # di anchor tidak berpengaruh apa-apa untuk service ini. Persis itu yang
+    # bikin berkas unggahan tidak terlihat oleh worker.
 
 volumes:
   pgdata:

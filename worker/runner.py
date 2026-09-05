@@ -8,6 +8,7 @@ from config.settings import settings
 from db import jobs
 from jobqueue.client import QUEUE_NAME, connection
 import storage
+import unggah
 from utils.ffmpeg_helpers import rmtree_stale
 from utils.logging import get, setup
 
@@ -26,6 +27,11 @@ def main() -> None:
     # Workdir job yang gagal sengaja ditinggal untuk diperiksa, jadi disapu di
     # sini supaya tidak tumbuh tanpa batas — isinya source video mentah.
     rmtree_stale(settings.WORK_DIR)
+
+    # Berkas unggahan yang tidak pernah jadi job. Orang membatalkan submit
+    # setelah berkasnya terlanjur terunggah, dan yang tertinggal berukuran giga.
+    if (sisa := unggah.sapu_lama()):
+        log.info("%d berkas unggahan tak terpakai disapu", sisa)
 
     # Job yang tertinggal di status berjalan dari proses sebelumnya. Ini
     # satu-satunya saat kita tahu pasti tidak ada job yang sedang dikerjakan,

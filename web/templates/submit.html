@@ -2,16 +2,38 @@
 {% set page = 'submit' %}
 {% block main_class %}narrow{% endblock %}
 {% block heading %}Ubah video panjang jadi klip siap posting.{% endblock %}
-{% block lede %}Tempel satu link YouTube, dapat beberapa klip tegak siap unggah — teksnya sudah menempel di videonya, lengkap dengan judul dan hashtag.{% endblock %}
+{% block lede %}Tempel link YouTube atau unggah berkas videomu sendiri — hasilnya beberapa klip tegak siap unggah, teksnya sudah menempel di videonya, lengkap dengan judul dan hashtag.{% endblock %}
 
 {% block content %}
 <div id="status" class="status-strip"></div>
 
 <div class="card">
   <form id="f">
+    {# Dua sumber video, dan berkas bukan pelengkap. Operator jasa clipper
+       umumnya punya rekamannya sendiri — podcast, Zoom, kamera — bukan link
+       YouTube. Unggahan juga melewati yt-dlp sepenuhnya, jadi ia lolos dari
+       bagian pipeline yang paling sering gagal. #}
     <div class="field">
-      <label for="url">Link YouTube</label>
-      <input type="text" id="url" placeholder="https://www.youtube.com/watch?v=..." required>
+      <div class="tabs kecil" id="tab-sumber">
+        <a href="#" data-sumber="link" class="on">Link YouTube</a>
+        <a href="#" data-sumber="berkas">Unggah berkas</a>
+      </div>
+
+      <div id="s-link">
+        <input type="text" id="url" placeholder="https://www.youtube.com/watch?v=...">
+      </div>
+
+      <div id="s-berkas" hidden>
+        <label class="jatuh" id="jatuh">
+          <input type="file" id="berkas" accept="video/*,audio/*" hidden>
+          <span class="jatuh-teks">
+            <strong>Pilih berkas video</strong>
+            <em>atau seret ke sini — MP4, MOV, MKV, WEBM</em>
+          </span>
+        </label>
+        <div class="bar unggah" hidden id="bar-unggah"><i></i></div>
+        <p class="sub" id="ket-berkas"></p>
+      </div>
     </div>
 
     <div class="field">
@@ -101,6 +123,93 @@
 <script>
 const n = document.getElementById('n');
 const PRESET = [3, 5, 8, 10];
+
+// --- sumber video: link atau berkas ---
+//
+// Berkas diunggah DULU, terpisah dari submit, dan job baru dibuat setelah
+// servernya memegang berkasnya. Digabung jadi satu permintaan, seluruh
+// parameter job ikut tersandera selama unggahan berjalan — dan unggahan
+// berukuran giga berlangsung menit-menitan tanpa satu pun tanda kemajuan.
+let sumberBerkas = null;   // "unggah:<uuid>" setelah unggahan selesai
+let sedangUnggah = false;
+
+function modeSumber() {
+  return document.querySelector('#tab-sumber a.on').dataset.sumber;
+}
+
+document.querySelectorAll('#tab-sumber a').forEach(a => a.onclick = (e) => {
+  e.preventDefault();
+  document.querySelectorAll('#tab-sumber a').forEach(x => x.classList.remove('on'));
+  a.classList.add('on');
+  document.getElementById('s-link').hidden = a.dataset.sumber !== 'link';
+  document.getElementById('s-berkas').hidden = a.dataset.sumber !== 'berkas';
+  segarkanTombol();
+});
+
+const jatuh = document.getElementById('jatuh');
+const inputBerkas = document.getElementById('berkas');
+const ketBerkas = document.getElementById('ket-berkas');
+const barUnggah = document.getElementById('bar-unggah');
+
+['dragover', 'dragenter'].forEach(ev => jatuh.addEventListener(ev, e => {
+  e.preventDefault();
+  jatuh.classList.add('siap');
+}));
+['dragleave', 'drop'].forEach(ev => jatuh.addEventListener(ev, e => {
+  e.preventDefault();
+  jatuh.classList.remove('siap');
+}));
+jatuh.addEventListener('drop', e => {
+  if (e.dataTransfer.files[0]) kirimBerkas(e.dataTransfer.files[0]);
+});
+inputBerkas.onchange = () => { if (inputBerkas.files[0]) kirimBerkas(inputBerkas.files[0]); };
+
+const ukuran = b => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.round(b / 1e6)} MB`;
+
+function kirimBerkas(f) {
+  // XMLHttpRequest, bukan fetch: fetch belum bisa melaporkan kemajuan UNGGAHAN
+  // di browser mana pun. Untuk berkas 2 GB, bilah kemajuan bukan hiasan — tanpa
+  // itu halaman terlihat menggantung bermenit-menit dan orang menutupnya.
+  sumberBerkas = null;
+  sedangUnggah = true;
+  segarkanTombol();
+  barUnggah.hidden = false;
+  barUnggah.querySelector('i').style.width = '0%';
+  ketBerkas.textContent = `Mengunggah ${f.name} (${ukuran(f.size)})…`;
+
+  const data = new FormData();
+  data.append('berkas', f);
+  const x = new XMLHttpRequest();
+  x.open('POST', '/api/unggah');
+  x.upload.onprogress = e => {
+    if (!e.lengthComputable) return;
+    const persen = Math.round(e.loaded / e.total * 100);
+    barUnggah.querySelector('i').style.width = persen + '%';
+    ketBerkas.textContent = `Mengunggah ${f.name} — ${persen}%`;
+  };
+  x.onload = () => {
+    sedangUnggah = false;
+    barUnggah.hidden = true;
+    let d = {};
+    try { d = JSON.parse(x.responseText); } catch {}
+    if (x.status === 201) {
+      sumberBerkas = d.sumber;
+      ketBerkas.innerHTML = `<b>${esc(f.name)}</b> siap diproses (${ukuran(d.bytes || f.size)}).`;
+      jatuh.classList.add('terisi');
+    } else {
+      ketBerkas.textContent = d.detail || 'Berkas gagal diunggah.';
+      jatuh.classList.remove('terisi');
+    }
+    segarkanTombol();
+  };
+  x.onerror = () => {
+    sedangUnggah = false;
+    barUnggah.hidden = true;
+    ketBerkas.textContent = 'Berkas gagal diunggah — koneksi ke CAPIO terputus.';
+    segarkanTombol();
+  };
+  x.send(data);
+}
 
 function drawChips() {
   document.getElementById('chips').innerHTML = PRESET.map(v =>
@@ -329,12 +438,18 @@ const POLA_YT = /^https:\/\/((www|m)\.youtube\.com\/|youtube\.com\/|youtu\.be\/)
 let siapProses = true;   // diisi drawStatus() dari /api/status
 
 function cekForm() {
-  const url = document.getElementById('url').value.trim();
   const jumlah = Number(n.value);
 
-  if (!url) return 'Tempel dulu link YouTube-nya di kotak di atas.';
-  if (!POLA_YT.test(url))
-    return 'Link ini bukan dari YouTube. Salin link dari YouTube (yang diawali https://), lalu tempel lagi.';
+  if (modeSumber() === 'berkas') {
+    if (sedangUnggah) return 'Tunggu unggahan berkasnya selesai dulu.';
+    if (!sumberBerkas) return 'Pilih dulu berkas videonya.';
+  } else {
+    const url = document.getElementById('url').value.trim();
+    if (!url) return 'Tempel dulu link YouTube-nya di kotak di atas.';
+    if (!POLA_YT.test(url))
+      return 'Link ini bukan dari YouTube. Salin link dari YouTube (yang diawali https://), lalu tempel lagi.';
+  }
+
   if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > 20)
     return 'Jumlah klip harus antara 1 sampai 20.';
   if (!layoutPilih) return 'Pilih dulu salah satu tampilan klip.';
@@ -366,7 +481,9 @@ f.addEventListener('submit', async (e) => {
   try {
     const r = await fetch('/jobs', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ url: document.getElementById('url').value,
+      body: JSON.stringify({ url: modeSumber() === 'berkas'
+                                    ? sumberBerkas
+                                    : document.getElementById('url').value,
                              target_clips: Number(n.value),
                              layout: layoutPilih, gaya: nilaiGaya() })
     });
@@ -377,7 +494,14 @@ f.addEventListener('submit', async (e) => {
       out.innerHTML = `<div class="note err">${esc(msg)}</div>`;
     } else {
       out.innerHTML = `<div class="note ok">Videonya masuk antrean &mdash; <a href="/process">lihat prosesnya</a></div>`;
+      // Sumbernya dikosongkan, bukan cuma kotak linknya: berkas yang sudah
+      // dipakai satu job sudah PINDAH ke workdir job itu, jadi menekan Proses
+      // sekali lagi akan mengirim penanda yang berkasnya sudah tidak ada.
       document.getElementById('url').value = '';
+      sumberBerkas = null;
+      inputBerkas.value = '';
+      jatuh.classList.remove('terisi');
+      ketBerkas.textContent = '';
     }
   } catch (err) {
     out.innerHTML = `<div class="note err">${esc(err)}</div>`;

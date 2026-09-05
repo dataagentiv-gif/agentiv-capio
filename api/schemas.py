@@ -46,6 +46,15 @@ class JobCreate(BaseModel):
     @classmethod
     def _youtube_only(cls, v: str) -> str:
         v = v.strip()
+        # Berkas yang sudah diunggah dirujuk sebagai "unggah:<uuid>". Bentuknya
+        # dikunci ke UUID di unggah/ — bukan sekadar "bukan URL YouTube" —
+        # karena nilai ini ikut menyusun path di disk. Yang lolos di sini TIDAK
+        # PERNAH sampai ke yt-dlp: stage download bercabang lebih dulu.
+        from unggah import sumber
+
+        if sumber(v):
+            return v
+
         # Batas kepercayaan: yang masuk sini langsung jadi argumen subprocess
         # yt-dlp. Dibatasi ke host YouTube supaya field ini tidak bisa dipakai
         # menyuruh yt-dlp mengambil URL sembarangan.
@@ -58,7 +67,10 @@ class JobCreate(BaseModel):
                 "https://youtu.be/",
             )
         ):
-            raise ValueError("URL harus link YouTube (youtube.com atau youtu.be)")
+            raise ValueError(
+                "Link harus dari YouTube (youtube.com atau youtu.be). "
+                "Punya berkas videonya sendiri? Pakai tab Unggah berkas."
+            )
         return v
 
 

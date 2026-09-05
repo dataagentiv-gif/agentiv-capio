@@ -952,6 +952,59 @@ input:focus {
   font-weight: 500;
 }
 
+/* ---------- Pemilih sumber video (halaman Submit) ---------- */
+
+.tabs.kecil { margin-bottom: 14px; gap: 18px; }
+.tabs.kecil a { font-size: 14px; padding-bottom: 8px; }
+
+/* Area jatuh berkas. Dibuat <label> yang membungkus <input type=file>, jadi
+   seluruh kotaknya bisa diklik tanpa satu baris JS — dan tetap bisa difokus
+   lewat keyboard, yang hilang kalau dibuat <div> dengan onclick. */
+.jatuh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 116px;
+  padding: 20px;
+  margin-bottom: 0;
+  text-align: center;
+  border: 1.5px dashed var(--color-ash);
+  border-radius: var(--radius-inputs);
+  background: var(--surface-soft);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+
+.jatuh:hover { border-color: var(--color-action); }
+
+/* Saat berkas diseret melintas. Tanpa umpan balik ini, tidak ada cara tahu
+   apakah kotaknya benar-benar menerima seretan sebelum melepas. */
+.jatuh.siap {
+  border-color: var(--color-action);
+  border-style: solid;
+  background: var(--surface-tinted);
+}
+
+.jatuh.terisi { border-color: var(--success-fg); background: var(--success-bg); }
+
+.jatuh-teks strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+  margin-bottom: 4px;
+}
+
+.jatuh-teks em {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+/* Bilah kemajuan unggahan. Memakai ulang .bar milik halaman Proses — dua bilah
+   kemajuan dengan gaya berbeda di satu aplikasi cuma bikin ragu. */
+.bar.unggah { margin-top: 10px; border-radius: var(--radius-full); }
+
 /* ---------- Chip jumlah klip ---------- */
 
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }

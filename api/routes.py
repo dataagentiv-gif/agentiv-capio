@@ -10,7 +10,7 @@ import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Header, HTTPException, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Request, Response, UploadFile
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -30,6 +30,7 @@ from jobqueue.client import enqueue
 from llm import rute
 from pipeline import layout as layout_mod
 import storage
+import unggah
 from utils.ffmpeg_helpers import rmtree_retry
 from utils.logging import get
 
@@ -429,6 +430,51 @@ def create_job(payload: JobCreate):
         jobs.fail(job["id"], f"Gagal push ke queue: {e}")
         raise HTTPException(503, f"Queue tidak bisa dihubungi: {e}") from e
     return JobCreated(job_id=job["id"], status=job["status"])
+
+
+@app.post("/api/unggah", status_code=201)
+async def unggah_berkas(berkas: UploadFile):
+    """Terima satu berkas video, kembalikan penandanya untuk dipakai submit.
+
+    Dipisah dari POST /jobs, bukan digabung jadi satu form multipart. Unggahan
+    berkas berukuran giga memakan waktu menit-menitan, dan menggabungkannya
+    berarti seluruh parameter job ikut tersandera selama itu — sementara
+    halaman Submit ingin menampilkan kemajuan unggahan lebih dulu, baru
+    mengirim job saat berkasnya sudah aman di server.
+
+    Ditulis MENGALIR per potongan, tidak dibaca sekaligus: satu berkas 2 GB
+    yang dibaca utuh ke memori akan menjatuhkan proses API di mesin dengan RAM
+    pas-pasan — dan itu justru mesin yang dipakai orang menjalankan ini.
+    """
+    nama = Path(berkas.filename or "video").name
+    if Path(nama).suffix.lower() not in unggah.EKSTENSI:
+        raise HTTPException(
+            400,
+            f"Format {Path(nama).suffix or 'ini'} tidak didukung. Pakai video "
+            "biasa seperti MP4, MOV, MKV, atau WEBM.",
+        )
+
+    ident, tujuan = unggah.baru()
+    besar = 0
+    try:
+        with tujuan.open("wb") as keluar:
+            while potong := await berkas.read(4 * 1024 * 1024):
+                besar += len(potong)
+                keluar.write(potong)
+    except Exception as e:  # noqa: BLE001
+        # Berkas separuh jalan tidak boleh ditinggal: ia tidak akan pernah jadi
+        # job, dan ukurannya justru paling besar saat gagal di tengah.
+        unggah.bersihkan(ident)
+        log.warning("unggahan %s gagal: %s", nama, e)
+        raise HTTPException(500, f"Berkas gagal disimpan: {e}") from e
+
+    if besar == 0:
+        unggah.bersihkan(ident)
+        raise HTTPException(400, "Berkasnya kosong.")
+
+    unggah.catat_nama(ident, nama)
+    log.info("unggahan diterima: %s (%.1f MB)", nama, besar / 1e6)
+    return {"sumber": f"{unggah.AWALAN}{ident}", "nama": nama, "bytes": besar}
 
 
 @app.delete("/jobs/{job_id}", status_code=204)

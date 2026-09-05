@@ -1,8 +1,12 @@
 # CAPIO
 
-Ubah satu link YouTube panjang jadi beberapa klip pendek 9:16 siap posting —
-lengkap dengan caption karaoke yang terbakar di video, judul, caption, dan
-hashtag.
+Ubah video panjang jadi beberapa klip pendek 9:16 siap posting — lengkap dengan
+caption karaoke yang terbakar di video, judul, caption, dan hashtag.
+
+Sumbernya boleh **link YouTube** atau **berkas video sendiri** yang diunggah
+lewat halaman Submit (MP4, MOV, MKV, WEBM, dan wadah lain yang bisa dibaca
+ffmpeg). Berkas yang diunggah melewati yt-dlp sepenuhnya, jadi ia tidak
+tersentuh bot-detection YouTube maupun urusan cookies.
 
 Semua pemrosesan berat berjalan di mesin sendiri. Klip jadi mendarat sebagai
 file mp4 biasa di folder `clips/`, bukan di storage cloud mana pun.
@@ -143,7 +147,22 @@ project, jadi bisa juga disunting manual kalau lebih suka.
 | Provider | Biaya | Catatan |
 |---|---|---|
 | **ElevenLabs** Scribe — *default* | ada tier gratis | Akurat untuk Bahasa Indonesia termasuk yang bercampur istilah Inggris. Tanpa blokir IP. Mengeja angka, tapi `asr/angka.py` mengubahnya kembali jadi digit. |
-| **Groq** Whisper | free tier 8 jam audio/hari | Sangat cepat — 15 menit audio selesai dalam ~4 detik. Aman untuk konten Indonesia murni. Menolak IP datacenter/VPN dengan 403. |
+| **Groq** Whisper | free tier 8 jam audio/hari | Sangat cepat — 15 menit audio selesai dalam ~4 detik. Aman untuk konten Indonesia murni. **Menolak IP datacenter/VPN dengan 403** — lihat peringatan di bawah. |
+
+> ### Groq memblokir IP datacenter, dan gejalanya menyesatkan
+>
+> Groq menolak permintaan dari IP datacenter dengan **HTTP 403** — VPS, cloud,
+> dan sebagian besar VPN termasuk di dalamnya. Yang bikin mahal: 403 terbaca
+> seperti "API key salah", jadi orang membuat key baru berkali-kali padahal
+> key-nya tidak pernah bermasalah.
+>
+> **Cara mengenalinya:** tombol *Tes groq* di halaman Setting menjawab
+> `Ditolak (403). Groq memblokir IP datacenter — matikan VPN kalau menyala.`
+> Kalau pesan itu muncul, jangan sentuh key-nya.
+>
+> **Jalan keluarnya:** matikan VPN, atau pakai ElevenLabs (default) yang tidak
+> memblokir IP mana pun. Ini juga alasan CAPIO ditujukan untuk laptop atau PC
+> sendiri, bukan VPS.
 
 Ini pilihan yang paling terasa hasilnya, karena **caption terbakar permanen di
 video**. Transkrip yang meleset kelihatan oleh penonton dan tidak bisa
@@ -329,18 +348,29 @@ diperkirakan.
   Diuji pada satu tutorial Excel: teks menu dan label angka terpotong di tengah
   kata. Job-nya tetap selesai, jadi worker mencatat peringatan `TIDAK ADA WAJAH`
   ketika seluruh klip jatuh ke center — periksa hasilnya sebelum diposting.
-- **Video sangat panjang** (di atas ~2 jam) membuat LLM kehilangan ketepatan
-  index: pada podcast 2,4 jam, ketiga kandidat menunjuk posisi yang meleset
-  11–45 detik dari kalimat yang dikutipnya sendiri. Sistem mendeteksi dan
-  membetulkannya dengan mempercayai kutipan di atas angka, tapi jumlah kandidat
-  juga menyusut — 3 dari target 5, sementara video 15 menit biasanya 7–9.
+- **Jumlah kandidat menyusut pada video sangat panjang** — 3 dari target 5 pada
+  podcast 2,4 jam, sementara video 15 menit biasanya 7–9.
+
+  Catatan penting: gejala kedua yang dulu tercatat di sini — index meleset
+  11–45 detik dari kalimat yang dikutip model sendiri — **ternyata bukan soal
+  panjang video, dan sudah diperbaiki.** Penyebabnya label index di transkrip
+  yang kita kirim sendiri: `_anchors` membuang duplikat lewat `set()`, jadi
+  begitu dua kalimat jatuh di kata yang sama, seluruh label sesudahnya
+  menempel pada kalimat berikutnya. Terukur pada podcast 27 menit: 540 kalimat,
+  538 anchor, **518 dari 540 baris salah label**. Sesudah diperbaiki, ketepatan
+  index naik dari 0/7 jadi 8/9 pada transkrip dan model yang sama.
+
+  Penyusutan jumlah kandidat belum diukur ulang sesudah perbaikan itu — bisa
+  jadi ikut membaik, bisa jadi sebab yang berbeda.
 - **Source lebih sempit dari 9:16** (misalnya 9:20) akan ter-stretch vertikal.
   Perbaikannya mode `fit` dengan latar blur; worker memperingatkannya di log.
 - **Satu crop per klip, bukan per shot.** Memadai untuk talking-head satu orang.
   Pada video wawancara yang berpindah kamera antar pembicara, **wajah utama
-  berada di luar bingkai sekitar 18% waktu** — diukur pada satu video 7 menit,
-  120 frame sampel, memakai jendela per 60 detik persis seperti cara crop
-  bekerja. Klipnya tetap jadi; yang hilang cuma wajah orang yang sedang bicara.
+  berada di luar bingkai sekitar 18% waktu** — **diukur SEKALI, pada satu video
+  7 menit**, 120 frame sampel, memakai jendela per 60 detik persis seperti cara
+  crop bekerja. Perlakukan 18% sebagai satu pengamatan, bukan sebagai laju yang
+  berlaku umum. Klipnya tetap jadi; yang hilang cuma wajah orang yang sedang
+  bicara.
 - **Chunking transkrip** memotong tepat di menit ke-20 tanpa menyesuaikan ke
   jeda bicara. Cabang itu baru aktif di atas ~2,3 jam audio, dan sudah
   diverifikasi end-to-end pada podcast 2,44 jam.

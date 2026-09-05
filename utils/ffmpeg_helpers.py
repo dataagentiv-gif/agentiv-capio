@@ -2,6 +2,7 @@
 dipasang: batas waktu yang terikat deadline job, -nostdin, dan decoding UTF-8.
 """
 import json
+import re
 import shutil
 import subprocess
 import time
@@ -136,8 +137,16 @@ def rmtree_stale(root: Path, keep: int = 20) -> None:
     """
     if not root.exists():
         return
+    # Hanya folder yang BENAR-BENAR workdir job yang disapu. Namanya delapan
+    # karakter heksadesimal pertama dari job id, dan pola itu yang dipakai
+    # sebagai penanda kepemilikan.
+    #
+    # Tanpa saringan ini, folder lain di /work ikut jadi kandidat hapus dan
+    # bersaing memperebutkan `keep` slot yang sama — termasuk /work/unggah yang
+    # berisi berkas yang baru saja diunggah orang dan belum sempat jadi job.
     dirs = sorted(
-        (d for d in root.iterdir() if d.is_dir()),
+        (d for d in root.iterdir()
+         if d.is_dir() and re.fullmatch(r"[0-9a-f]{8}", d.name)),
         key=lambda d: d.stat().st_mtime,
         reverse=True,
     )
