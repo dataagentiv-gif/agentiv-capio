@@ -51,33 +51,25 @@ FIELDS = [
     _f("GEMINI_API_KEYS", "Gemini API key", "LLM", secret=True, pool="gemini",
        help="aistudio.google.com/apikey — free tier dibatasi per key, jadi "
             "beberapa key dipakai bergiliran untuk menaikkan atapnya."),
-    # Diuji sungguhan pada transkrip podcast 27 menit lewat jalur kode
-    # produksi, tiga putaran per model. Yang masuk daftar ini lolos tiga
-    # syarat: balasannya JSON valid tanpa perlu diulang, jumlah segmennya
-    # mendekati yang diminta, dan start_idx-nya cocok dengan hook yang
-    # ditulisnya sendiri di atas 85% kasus.
-    #
-    # Yang sengaja TIDAK masuk, beserta sebabnya:
-    #   gemini-2.5-flash-lite  mengembalikan 42 segmen saat diminta 7
-    #   *-preview              dipensiunkan tanpa pemberitahuan
-    #   kelas pro / omni       tidak punya jatah gratis sama sekali (429)
-    _f("GEMINI_MODELS", "Model Gemini", "LLM", kind="multi",
-       options=["gemini-flash-lite-latest", "gemini-3.5-flash-lite",
-                "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash"],
-       help="Boleh pilih lebih dari satu — dipakai BERGILIRAN, sama seperti "
-            "key. Kuota gratis Gemini dihitung per model, jadi tiap model yang "
-            "dicentang menambah satu jatah yang berdiri sendiri; kalau satu "
-            "model sedang penuh atau habis, percobaan berikutnya pindah ke "
-            "model lain dan job tetap selesai. Urutannya urutan preferensi: "
-            "yang teratas dipakai lebih dulu. Tiga yang pertama cepat (2-3 "
-            "detik); dua yang terakhir lebih teliti tapi 10x lebih lama."),
+    # Urutan tier DIPAKU di llm/rute.py, tidak bisa disetel dari sini. Yang di
+    # bawah ini jalan keluar untuk yang memang tahu apa yang dilakukannya —
+    # kosong berarti ikut tier bawaan.
+    _f("GEMINI_MODELS", "Model Gemini (timpa urutan bawaan)", "LLM", kind="multi",
+       options=["gemini-3.5-flash", "gemini-3.5-flash-lite",
+                "gemini-flash-lite-latest", "gemini-3.1-flash-lite",
+                "gemini-3.7-flash"],
+       help="Biarkan kosong kecuali ada alasan khusus. Urutan bawaannya sudah "
+            "berjenjang: model terbaik dipakai terus di SELURUH key, dan baru "
+            "turun ke model berikutnya setelah kuotanya habis di semua key. "
+            "Tanda habis berumur satu jam, jadi model teratas dicoba lagi "
+            "dengan sendirinya begitu kuotanya pulih — tanpa penjadwalan. "
+            "Kalau diisi, daftar ini menggantikan urutan bawaan sepenuhnya."),
     _f("GEMINI_MODEL", "Model Gemini (satuan, lama)", "LLM",
-       help="Hanya dipakai kalau tidak ada satu pun model dicentang di atas. "
-            "Ada demi .env lama yang sudah terlanjur mengisinya. Nama berversi "
-            "seperti gemini-2.5-pro dimatikan Google untuk akun baru sementara "
-            "akun lama tetap bisa memakainya, jadi setelan yang disalin dari "
-            "mesin lain bisa mati di sini saja — pakai nama beralias yang "
-            "berakhiran -latest kalau memang harus mengisi kolom ini."),
+       help="Hanya dipakai kalau kolom di atas kosong. Ada demi .env lama yang "
+            "sudah terlanjur mengisinya. Nama berversi seperti gemini-2.5-pro "
+            "dimatikan Google untuk akun baru sementara akun lama tetap bisa "
+            "memakainya, jadi setelan yang disalin dari mesin lain bisa mati "
+            "di sini saja."),
     _f("OPENROUTER_API_KEYS", "OpenRouter API key", "LLM", secret=True,
        pool="openrouter",
        help="openrouter.ai/keys — beberapa key dipakai bergiliran, sama seperti provider lain."),
@@ -194,7 +186,9 @@ def read_public() -> dict:
         # dan menampilkannya kosong membuat halaman ini menyatakan sesuatu yang
         # tidak benar tentang apa yang sedang berjalan.
         if f["key"] == "GEMINI_MODELS" and not raw:
-            raw = ",".join(settings.gemini_models)
+            from llm import rute
+
+            raw = ",".join(rute.TIER)
         groups.setdefault(f["group"], []).append(
             {**f, "value": mask(raw) if f["secret"] else raw, "filled": bool(raw)}
         )

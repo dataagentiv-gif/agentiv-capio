@@ -167,10 +167,14 @@ class Settings(BaseSettings):
         return self._pecah(self.GEMINI_API_KEYS)
 
     @property
-    def gemini_models(self) -> list[str]:
-        """Urut menurut PREFERENSI, bukan sekadar daftar. Yang pertama dipakai
-        lebih dulu; sisanya baru kena giliran saat percobaan sebelumnya gagal.
-        Bentuk jamak dulu, bentuk tunggal sebagai cadangan supaya .env lama
+    def gemini_models_kustom(self) -> list[str]:
+        """Daftar model yang DITULIS SENDIRI di .env, kosong kalau tidak ada.
+
+        Urutan bawaannya dipaku di llm/rute.py TIER dan tidak bisa disetel dari
+        UI — itu hasil pengujian, dan setelan yang bisa diputar sembarangan
+        hanya menurunkan mutu klip tanpa ada yang tahu. Kolom ini tetap
+        dihormati sebagai jalan keluar untuk yang memang tahu apa yang
+        dilakukannya, dan supaya .env lama yang sudah mengisi GEMINI_MODEL
         tetap jalan tanpa disunting."""
         return self._pecah(self.GEMINI_MODELS) or self._pecah(self.GEMINI_MODEL)
 

@@ -11,6 +11,7 @@ import httpx
 
 import keypool
 from config.settings import settings
+from llm import rute
 from utils.logging import get
 
 log = get(__name__)
@@ -100,7 +101,7 @@ PROBES = {
         # Model yang BENAR-BENAR dipakai job, bukan kolom satuan yang lama.
         # Menguji nama lain dari yang dipakai membuat tombol ini berbohong
         # persis di kasus yang paling ingin ditangkapnya: nama model yang mati.
-        json={"model": (settings.gemini_models or ["gemini-flash-lite-latest"])[0],
+        json={"model": rute.daftar()[0],
               "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1},
         timeout=TIMEOUT)),
 }

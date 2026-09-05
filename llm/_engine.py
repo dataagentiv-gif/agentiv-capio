@@ -13,6 +13,7 @@ import time
 import httpx
 
 import keypool
+from llm import rute
 from utils.logging import get
 
 log = get(__name__)
@@ -41,22 +42,27 @@ def _tunggu(sementara: bool, attempt: int, label: str) -> None:
 
 
 class _Pemakai:
-    """Mengambil key dari pool dan mengingat indeksnya.
+    """Memilih pasangan (key, model) untuk tiap percobaan, dan mengingat mana
+    yang sedang dipakai supaya hasilnya bisa dilaporkan balik.
 
-    Indeksnya perlu diingat supaya hasil panggilan bisa dilaporkan balik ke
-    keypool, sementara `get_key` milik call() tidak boleh berubah tanda
-    tangannya. Satu instance per panggilan, jadi tidak ada state yang menetap
-    antar panggilan maupun antar thread.
+    Urutannya sudah ditentukan `rute.urutan`: seluruh key untuk tier teratas
+    lebih dulu, baru turun tier. Satu instance per panggilan, jadi tidak ada
+    state yang menetap antar panggilan maupun antar thread.
     """
 
-    def __init__(self, pool: str, label: str):
-        self.pool, self.label, self.idx = pool, label, -1
+    def __init__(self, pool: str, keys: list[str], urut: list[tuple[str, int]]):
+        self.pool, self.keys, self.urut = pool, keys, urut
+        self.idx, self.model = -1, ""
 
-    def __call__(self) -> str:
-        self.idx, key = keypool.ambil(self.pool)
+    def __call__(self, attempt: int) -> tuple[str, str]:
+        self.model, self.idx = self.urut[attempt % len(self.urut)]
         # Yang di-log indeksnya, tidak pernah key-nya.
-        log.debug("%s pakai key #%d", self.label, self.idx + 1)
-        return key
+        log.debug("%s pakai key #%d model %s", self.pool, self.idx + 1, self.model)
+        return self.keys[self.idx], self.model
+
+    def tandai_habis(self) -> None:
+        if self.idx >= 0:
+            rute.tandai_habis(self.pool, self.model, self.idx)
 
 
 def call_pool(prompt, response_schema, *, pool: str, nama: str, **kw):
@@ -71,16 +77,19 @@ def call_pool(prompt, response_schema, *, pool: str, nama: str, **kw):
     if not daftar:
         raise LLMError(f"{nama} API key kosong — isi di halaman Setting")
 
-    # Cukup percobaan supaya tiap key DAN tiap model sempat kena giliran saat
-    # satu di antaranya kena rate limit atau sedang penuh. Dibatasi 6 supaya
-    # kegagalan yang sebenarnya (JSON ngawur) tidak diulang belasan kali.
-    kw["attempts"] = min(
-        max(kw.get("attempts", 3), len(daftar), len(kw.get("models") or [])), 6
-    )
+    models = kw.pop("models", None) or []
+    urut = rute.urutan(pool, models, len(daftar))
 
-    pemakai = _Pemakai(pool, pool)
+    # Cukup percobaan supaya tier berikutnya sempat kena giliran saat tier
+    # teratas habis di semua key. Dibatasi 6 supaya kegagalan yang sebenarnya
+    # (JSON ngawur) tidak diulang belasan kali — dan karena urutannya sudah
+    # menaruh pasangan yang bertanda habis di belakang, enam percobaan pertama
+    # hampir selalu yang paling menjanjikan.
+    kw["attempts"] = min(max(kw.get("attempts", 3), len(daftar), len(models)), 6)
+
+    pemakai = _Pemakai(pool, daftar, urut)
     try:
-        hasil = call(prompt, response_schema, get_key=pemakai, label=pool, **kw)
+        hasil = call(prompt, response_schema, pemakai=pemakai, label=pool, **kw)
     except Exception as e:
         if pemakai.idx >= 0:
             keypool.lapor(pool, pemakai.idx, False, f"{type(e).__name__}: {e}")
@@ -141,29 +150,18 @@ def call(
     response_schema: dict | None,
     *,
     endpoint: str,
-    get_key,
-    models: list[str],
+    pemakai,
     use_schema: bool,
     attempts: int = 3,
     label: str = "llm",
 ):
     """Panggil LLM, kembalikan hasil yang sudah di-parse jadi objek Python.
 
-    DUA sumbu rotasi, dan keduanya berputar di tiap percobaan:
-
-    - `get_key` adalah callable yang dipanggil ULANG tiap percobaan, jadi
-      percobaan yang kena rate limit otomatis memakai key berikutnya.
-    - `models` diputar mengikuti nomor percobaan. Kuota gratis Gemini dihitung
-      per model DAN per key, jadi memutar keduanya mengalikan atapnya —
-      sekaligus melewati satu model yang kebetulan sedang 503.
-
-    `models` urut menurut preferensi: yang pertama dipakai di percobaan pertama,
-    jadi jalur normal selalu memakai model terbaik dan sisanya benar-benar cuma
-    cadangan.
+    `pemakai(attempt)` mengembalikan pasangan (key, model) untuk percobaan itu.
+    Urutannya sudah diputuskan di luar sini — seluruh key untuk tier teratas
+    lebih dulu, baru turun tier — jadi fungsi ini tidak perlu tahu apa pun soal
+    kuota, tier, maupun pool.
     """
-    if not models:
-        raise LLMError(f"{label}: daftar model kosong — isi di halaman Setting")
-
     body = {
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.4,
@@ -188,10 +186,11 @@ def call(
 
     last_err, last_raw = "", ""
     for attempt in range(attempts):
-        model = models[attempt % len(models)]
+        key, model = pemakai(attempt)
         body["model"] = model
-        if len(models) > 1 and attempt:
-            log.info("%s percobaan %d memakai model %s", label, attempt + 1, model)
+        if attempt:
+            log.info("%s percobaan %d: model %s, key #%d",
+                     label, attempt + 1, model, pemakai.idx + 1)
         if last_err:
             body["messages"] = [
                 {"role": "user", "content": prompt},
@@ -208,7 +207,7 @@ def call(
         try:
             r = httpx.post(
                 endpoint,
-                headers={"Authorization": f"Bearer {get_key()}"},
+                headers={"Authorization": f"Bearer {key}"},
                 json=body,
                 timeout=180.0,
             )
@@ -221,9 +220,17 @@ def call(
             badan = e.response.text
             last_err, last_raw = f"HTTP {code}", ""
             log.warning(
-                "%s percobaan %d/%d gagal: HTTP %d %s",
-                label, attempt + 1, attempts, code, badan[:200],
+                "%s percobaan %d/%d gagal (model %s, key #%d): HTTP %d %s",
+                label, attempt + 1, attempts, model, pemakai.idx + 1,
+                code, badan[:200],
             )
+            # Kuota pasangan ini dicatat habis supaya job BERIKUTNYA langsung
+            # turun tier tanpa mengulangi panggilan yang sudah pasti gagal.
+            # Hanya untuk kuota yang benar-benar habis: rate limit sesaat pulih
+            # dalam hitungan detik, dan menandainya sejam membuang tier teratas
+            # untuk masalah yang sudah beres sebelum job berikutnya mulai.
+            if _kuota_habis(code, badan):
+                pemakai.tandai_habis()
             if attempt == attempts - 1:
                 raise LLMError(
                     f"{label} gagal setelah {attempts}x: {_pesan(code, badan)}"

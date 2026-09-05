@@ -47,15 +47,19 @@ def test_kosong_menghasilkan_list_kosong(keys):
 # diuji adalah sambungannya: client Gemini benar-benar memakai keypool, dan
 # indeks yang diambil dilaporkan balik supaya panel status terisi.
 
-def test_client_mengambil_key_lewat_keypool(keys, monkeypatch):
-    import keypool
+def test_pemakai_mengambil_pasangan_sesuai_urutan(keys):
+    """Sejak rotasi jadi berjenjang, urutan (key, model) diputuskan
+    llm/rute.py — bukan penghitung putar di keypool. Yang diuji di sini
+    sambungannya: _Pemakai benar-benar menuruti urutan itu dan mengingat
+    indeksnya supaya hasilnya bisa dilaporkan balik ke panel status."""
     from llm._engine import _Pemakai
 
     keys("a,b,c")
-    monkeypatch.setattr(keypool, "ambil", lambda pool: (1, "b"))
-    pemakai = _Pemakai("gemini", "gemini")
-    assert pemakai() == "b"
+    pemakai = _Pemakai("gemini", ["a", "b", "c"], [("m1", 1), ("m2", 2)])
+    assert pemakai(0) == ("b", "m1")
     assert pemakai.idx == 1
+    assert pemakai(1) == ("c", "m2")
+    assert pemakai.idx == 2
 
 
 @pytest.mark.parametrize("pool,nama,field", [
@@ -72,7 +76,7 @@ def test_key_kosong_ditolak_dengan_pesan_jelas(monkeypatch, pool, nama, field):
         monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "")
     with pytest.raises(LLMError, match=f"{nama} API key kosong"):
         call_pool("halo", None, pool=pool, nama=nama,
-                  endpoint="http://x", model="m", use_schema=False)
+                  endpoint="http://x", models=["m"], use_schema=False)
 
 
 def test_rotasi_dipakai_kedua_provider_llm(monkeypatch):
@@ -81,12 +85,14 @@ def test_rotasi_dipakai_kedua_provider_llm(monkeypatch):
     import httpx
 
     import keypool
-    from llm import client_gemini, client_openrouter
+    from llm import client_gemini, client_openrouter, rute
 
     for field in ("GEMINI_API_KEYS", "OPENROUTER_API_KEYS"):
         monkeypatch.setattr(settings, field, "k1,k2")
     dipakai = []
-    monkeypatch.setattr(keypool, "ambil", lambda p: (dipakai.append(p) or (0, "k1")))
+    asli = rute.urutan
+    monkeypatch.setattr(rute, "urutan",
+                        lambda pool, m, n: dipakai.append(pool) or asli(pool, m, n))
     monkeypatch.setattr(keypool, "lapor", lambda *a, **k: None)
     monkeypatch.setattr(httpx, "post", _fake_post({}))
 

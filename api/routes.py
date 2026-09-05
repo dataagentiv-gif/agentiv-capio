@@ -27,6 +27,7 @@ from config import env_store
 from config.settings import settings
 from db import jobs, models
 from jobqueue.client import enqueue
+from llm import rute
 from pipeline import layout as layout_mod
 import storage
 from utils.ffmpeg_helpers import rmtree_retry
@@ -286,7 +287,17 @@ def config_status():
     llm_ok = bool(keypool.keys(settings.LLM_PROVIDER))
     return {
         "asr": {"provider": settings.ASR_PROVIDER, "ok": asr_ok},
-        "llm": {"provider": settings.LLM_PROVIDER, "ok": llm_ok},
+        # Model yang sedang dipakai ikut dilaporkan. Tanpa itu, turunnya tier
+        # karena kuota habis benar-benar tidak terlihat dari mana pun: klipnya
+        # tetap keluar, cuma dari model yang lebih rendah — persis kelas
+        # perubahan yang paling sulit disadari.
+        "llm": {
+            "provider": settings.LLM_PROVIDER,
+            "ok": llm_ok,
+            **({"model": rute.status(
+                "gemini", rute.daftar(), len(keypool.keys("gemini")))}
+               if settings.LLM_PROVIDER == "gemini" else {}),
+        },
         # Penyimpanan lokal tidak pernah "belum dikonfigurasi" — foldernya
         # dibuat sendiri. Tetap dilaporkan supaya strip status di halaman
         # Submit menampilkan ketiga bagian pipeline secara utuh.

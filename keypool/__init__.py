@@ -73,11 +73,22 @@ def status(pool: str) -> dict:
     if not daftar:
         return {"pool": pool, "jumlah": 0, "keys": []}
 
+    # Key mana yang dipakai berikutnya ditanyakan ke ROUTER, bukan dihitung
+    # dari penghitung putar lama. Sejak pemilihan pasangan (key, model) pindah
+    # ke llm/rute.py, penghitung itu tidak pernah maju lagi — dan panel ini akan
+    # menunjuk key #1 selamanya sambil terlihat meyakinkan.
     berikut, catatan = 0, {}
     try:
+        from llm import rute
+
+        urut = rute.urutan(pool, rute.daftar() if pool == "gemini" else [""],
+                           len(daftar))
+        berikut = urut[0][1] if urut else 0
+    except Exception as e:  # noqa: BLE001
+        log.debug("keypool %s tidak bisa menanyakan urutan: %s", pool, e)
+
+    try:
         r = _redis()
-        n = int(r.get(f"keypool:{pool}:n") or 0)
-        berikut = n % len(daftar)
         for i in range(len(daftar)):
             mentah = r.get(f"keypool:{pool}:{i}")
             if mentah:

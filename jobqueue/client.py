@@ -17,8 +17,35 @@ QUEUE_NAME = "clips"
 JOB_FUNC = "worker.orchestrator.run"
 
 
+#: Worker RQ yang menganggur memblokir di BLPOP selama 405 detik
+#: (DEFAULT_WORKER_TTL 420 dikurangi 15). Batas soket HARUS lebih longgar dari
+#: itu, kalau tidak soketnya kedaluwarsa lebih dulu, redis-py melempar
+#: TimeoutError, dan RQ menanggapinya dengan "Redis connection timeout,
+#: quitting..." lalu keluar.
+#:
+#: Terlihat di log sungguhan: worker mati dan di-restart tiap 6 menit 45 detik
+#: — persis 405 detik — sepanjang jam-jam menganggur. Tidak ada job yang gagal
+#: karenanya (timeout ini hanya berdenyut saat tidak ada pekerjaan), tapi tiap
+#: restart menjalankan bereskan_gantung(), dan itu menandai gagal setiap job
+#: yang berstatus berjalan. Job yang mengantre di detik yang salah akan
+#: dinyatakan yatim padahal baru saja dimulai.
+BLOKIR_DEQUEUE = 405
+SOKET_TIMEOUT = BLOKIR_DEQUEUE + 45
+
+
 def connection() -> Redis:
-    return Redis.from_url(settings.REDIS_URL)
+    return Redis.from_url(
+        settings.REDIS_URL,
+        socket_timeout=SOKET_TIMEOUT,
+        # Docker memutus koneksi TCP yang diam terlalu lama. Tanpa keepalive,
+        # soket yang menganggur tujuh menit sudah mati saat balasan BLPOP
+        # akhirnya datang — dan gejalanya sama persis dengan timeout di atas.
+        socket_keepalive=True,
+        # Diperiksa berkala saat menganggur, jadi koneksi yang sudah putus
+        # ketahuan dan diganti sebelum dipakai, bukan saat sedang dibutuhkan.
+        health_check_interval=30,
+        retry_on_timeout=True,
+    )
 
 
 def get_queue() -> Queue:
