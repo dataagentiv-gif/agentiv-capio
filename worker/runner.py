@@ -4,6 +4,7 @@ menjalankan lebih banyak proses, tanpa ubah kode.
 from rq import Queue, SimpleWorker
 
 import asr
+from config import env_store
 from config.settings import settings
 from db import jobs
 from jobqueue.client import QUEUE_NAME, connection
@@ -17,6 +18,21 @@ log = get(__name__)
 
 def main() -> None:
     setup()
+    # WAJIB sebelum check_config, dan alasannya sama persis dengan yang ditulis
+    # di docstring env_store.reload(): compose memuat .env ke environment
+    # container saat container DIBUAT, dan pydantic-settings memprioritaskan
+    # environment di atas isi file.
+    #
+    # Sisi API sudah memanggil ini saat halaman Setting menyimpan; worker
+    # terlewat, dan akibatnya baru terlihat di mesin yang key-nya mulai dari
+    # kosong — yaitu setiap pemasangan baru. Di sana worker membaca nilai kosong
+    # dari saat container lahir, check_config melempar, `restart: unless-stopped`
+    # mengulanginya selamanya, dan mengisi key lewat halaman Setting TIDAK
+    # menyembuhkannya: tulisannya masuk ke file, worker tetap membaca environment
+    # lama. Satu-satunya obatnya `docker compose up -d` sekali lagi, dan tidak
+    # ada pengguna yang akan menebak itu.
+    env_store.reload()
+
     # Diperiksa SEBELUM worker menerima job: folder klip dibuat sekarang, dan
     # key transkrip yang bolong ketahuan di detik pertama — bukan setelah
     # download dan render selesai, yang berarti belasan menit terbuang untuk
