@@ -1564,11 +1564,14 @@ select:focus {
   transition: border-color .15s, color .15s;
 }
 
-.layout-opt img {
+/* `contain`, bukan `cover`. Contoh layout "Asli" sengaja 16:9 — memotongnya
+   jadi 9:16 menghapus justru satu-satunya hal yang membedakannya dari layout
+   lain. Bilah hitam di atas-bawahnya itu isi pesannya. */
+.layout-opt video {
   display: block;
   width: 96px;
   height: 171px;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 4px;
   background: var(--color-ink);
 }
@@ -1648,7 +1651,11 @@ select:focus {
 }
 
 .gaya-grid .field { margin-bottom: 0; }
-.gaya-grid .pratinjau { flex: none; }
+/* Lebarnya DITETAPKAN, bukan diwarisi dari bingkai HP di dalamnya. Untuk layout
+   tanpa caption bingkainya disembunyikan dan diganti satu kalimat, dan kolom
+   yang lebarnya bergantung isi ikut menciut sampai label di kolom sebelahnya
+   saling menabrak. Angkanya sama dengan .hp.kecil. */
+.gaya-grid .pratinjau { flex: none; width: 168px; }
 
 .gaya-grid select,
 .gaya-grid input[type=text],

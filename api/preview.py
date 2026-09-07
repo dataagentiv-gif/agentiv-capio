@@ -1,4 +1,4 @@
-"""Contoh tampilan klip, dirender lewat jalur yang sama persis dengan produksi.
+"""Contoh gaya caption, dirender lewat jalur yang sama persis dengan produksi.
 
 Bukan tiruan HTML, dan itu bukan soal kerapian. Tiruan CSS akan merender pakai
 font milik BROWSER, sementara video dirender libass pakai font di dalam
@@ -11,10 +11,14 @@ Alasan adanya sama sekali: tanpa ini, melihat akibat satu perubahan warna
 menuntut menjalankan job penuh — 3 menit sampai satu jam. Itu yang membuat knob
 apa pun tidak pernah terpakai.
 
-Preview besar berupa VIDEO, bukan gambar diam: yang paling menentukan dari gaya
-caption adalah sorotan kata yang berpindah, dan itu tidak ada di satu frame.
-Deretan pilihan di halaman Submit tetap gambar diam — di sana yang dibandingkan
-bentuk kotaknya, dan tiga video yang berputar bersamaan cuma bikin berat.
+Yang ditanya panel ini cuma SATU: "caption dengan setelanku kelihatan seperti
+apa?" Pertanyaan yang satunya lagi — "layout ini bentuknya seperti apa?" —
+dijawab contoh hasil sungguhan di web/static/contoh/, dan itu jawaban yang jauh
+lebih jujur daripada apa pun yang bisa dirender di sini. Karena itu latarnya
+polos: gambar bergerak di belakang teks justru menutupi hal yang sedang dinilai.
+
+Tetap VIDEO, bukan gambar diam: yang paling menentukan dari gaya caption adalah
+sorotan kata yang berpindah, dan itu tidak ada di satu frame.
 """
 import hashlib
 import json
@@ -29,12 +33,14 @@ from utils.logging import get
 
 log = get(__name__)
 
-ROOT = Path(__file__).resolve().parent.parent
-#: Video contoh yang ikut di dalam repo. Diutamakan di atas klip milik pengguna:
-#: klip terbaru berubah tiap job baru, dan di instalasi yang belum pernah
-#: memproses apa pun ia tidak ada sama sekali — preview jadi tidak konsisten
-#: persis saat orang pertama kali menilai tampilannya.
-CONTOH_MP4 = ROOT / "assets" / "preview.mp4"
+# Abu-abu netral, dan angkanya bukan selera. Di atas hitam, garis luar caption
+# ikut hilang; di atas putih, isi hurufnya yang hilang. Keduanya membuat
+# pratinjau berbohong tepat di hal yang paling ingin diperiksa orang.
+LATAR = "0x3a3f47"
+# 16:9 seperti sumber sungguhan, bukan 9:16 keluaran: geometri layout dihitung
+# DARI ukuran sumber, jadi memberinya rentang yang lain berarti kotak dan
+# gradasinya jatuh di tempat yang tidak sama dengan hasil aslinya.
+SRC_W, SRC_H = 1920, 1080
 
 # Kalimat contoh sengaja memuat kata panjang dan angka: dua hal yang paling
 # sering bikin caption pecah baris atau meluber, dan tidak akan ketahuan dari
@@ -52,89 +58,24 @@ def _kata_contoh() -> list[dict]:
             for i, w in enumerate(kata)]
 
 
-def _sumber(kerja: Path) -> tuple[str, int, int, bool]:
-    """(nama berkas di kerja, lebar, tinggi, apakah bergerak).
-
-    Urutan: video contoh bawaan -> klip pengguna terbaru -> pola sintetis.
-    """
-    if CONTOH_MP4.exists():
-        p = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x",
-             str(CONTOH_MP4)],
-            capture_output=True, text=True, check=True)
-        w, h = (int(x) for x in p.stdout.strip().split("x")[:2])
-        subprocess.run(
-            ["ffmpeg", "-nostdin", "-y", "-v", "error", "-t", str(DETIK),
-             "-i", str(CONTOH_MP4), "-an", "-c:v", "copy", str(kerja / "src.mp4")],
-            check=True, timeout=180)
-        return "src.mp4", w, h, True
-
-    mp4 = sorted(settings.CLIPS_DIR.glob("*/c*.mp4"),
-                 key=lambda p: p.stat().st_mtime, reverse=True)
-    if mp4:
-        # Klip jadi BUKAN sumber mendatar: ia sudah ter-crop jadi 9:16 dan
-        # sudah punya caption terbakar. Memakainya mentah menghasilkan caption
-        # bertumpuk dua lapis, dan wajah yang di-crop ulang sampai terpotong.
-        #
-        # TIDAK ADA potongan yang menang di dua sisi, dan itu sudah dicoba:
-        # caption klip duduk di tempat berbeda tergantung layout yang dipakai
-        # saat merendernya (tengah-bawah untuk penuh dan kotak, tengah-kanan
-        # untuk samping), sementara potongan yang menghindari semuanya selalu
-        # merusak pembingkaian wajah. Dipilih yang pembingkaiannya paling baik
-        # dan caption yang sesekali ikut terbawa diterima apa adanya —
-        # assets/preview.mp4 adalah jawaban sebenarnya, karena ia bebas caption
-        # sejak awal.
-        subprocess.run(
-            ["ffmpeg", "-nostdin", "-y", "-v", "error", "-ss", "2",
-             "-i", str(mp4[0]), "-frames:v", "1",
-             "-vf", "crop=1080:1080:0:120,scale=1080:1080,"
-                    "pad=1920:1080:(ow-iw)/2:0:black",
-             str(kerja / "src.png")],
-            check=True, timeout=120)
-        return "src.png", 1920, 1080, False
-
-    subprocess.run(
-        ["ffmpeg", "-nostdin", "-y", "-v", "error", "-f", "lavfi",
-         "-i", "testsrc2=size=1920x1080:rate=1:duration=1",
-         "-frames:v", "1", str(kerja / "src.png")],
-        check=True, timeout=120)
-    return "src.png", 1920, 1080, False
-
-
-def render(nama_layout: str | None = None, knob_tambahan: dict | None = None,
-           kecil: bool = False) -> tuple[bytes, str]:
-    """(isi berkas, media type). MP4 kalau sumbernya bergerak, PNG kalau tidak.
-
-    `kecil` mengecilkan keluaran dan memaksa gambar diam, untuk deretan pilihan
-    di halaman Submit — tiga video yang berputar bersamaan cuma bikin berat
-    tanpa membantu membandingkan bentuk kotak.
-    """
+def render(nama_layout: str | None = None,
+           knob_tambahan: dict | None = None) -> tuple[bytes, str]:
+    """(isi berkas, media type)."""
     lay = layout.ambil(nama_layout or settings.CLIP_LAYOUT)
     knob = {**knob_dari_settings(), **(knob_tambahan or {})}
 
-    # Render ffmpeg butuh beberapa detik; setelan yang sama pasti menghasilkan
-    # berkas yang sama, jadi tidak ada gunanya menghitung ulang saat orang
-    # bolak-balik antar layout.
-    # Jejak video contoh ikut masuk kunci. Tanpa itu, menambah atau mengganti
-    # assets/preview.mp4 tidak mengubah apa pun sampai proses di-restart —
-    # persis kelas kegagalan yang paling membingungkan: berkasnya sudah benar,
-    # yang tampil masih yang lama, dan tidak ada satu pun error.
-    contoh = (
-        f"{CONTOH_MP4.stat().st_mtime_ns}:{CONTOH_MP4.stat().st_size}"
-        if CONTOH_MP4.exists() else "kosong"
-    )
+    # Render ffmpeg butuh waktu; setelan yang sama pasti menghasilkan berkas
+    # yang sama, jadi tidak ada gunanya menghitung ulang saat orang bolak-balik
+    # antar layout.
     kunci = hashlib.sha1(
-        json.dumps([lay.nama, knob, kecil, contoh], sort_keys=True,
-                   default=str).encode()
+        json.dumps([lay.nama, knob], sort_keys=True, default=str).encode()
     ).hexdigest()
     if kunci in _CACHE:
         return _CACHE[kunci]
 
     with tempfile.TemporaryDirectory() as td:
         kerja = Path(td)
-        src, sw, sh, gerak = _sumber(kerja)
-        gerak = gerak and not kecil
+        sw, sh = SRC_W, SRC_H
 
         teks = layout.pakai_caption(lay, knob)
         if teks:
@@ -164,36 +105,20 @@ def render(nama_layout: str | None = None, knob_tambahan: dict | None = None,
             vf = (f"scale={layout.OUT_W}:{layout.OUT_H}"
                   ":force_original_aspect_ratio=decrease,"
                   f"pad={layout.OUT_W}:{layout.OUT_H}:(ow-iw)/2:(oh-ih)/2:black")
-        if kecil:
-            # Dikecilkan SETELAH seluruh rantai: caption dirender pada resolusi
-            # penuh dulu supaya ukuran dan ketebalan hurufnya sebanding dengan
-            # hasil sungguhan.
-            vf += ",scale=270:480"
-
-        if gerak:
-            keluar, tipe = "preview.mp4", "video/mp4"
-            argumen = [
-                "-i", src, "-t", str(DETIK), "-vf", vf, "-an",
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
-                "-pix_fmt", "yuv420p", "-movflags", "+faststart", keluar,
-            ]
-        else:
-            keluar, tipe = "preview.png", "image/png"
-            argumen = ["-i", src, "-vf", vf, "-frames:v", "1", keluar]
-
+        # Satu perintah ffmpeg, dan sumbernya dibangkitkan lavfi — tidak ada
+        # video yang di-decode sama sekali.
         subprocess.run(
-            ["ffmpeg", "-nostdin", "-y", "-v", "error", *argumen],
+            ["ffmpeg", "-nostdin", "-y", "-v", "error",
+             "-f", "lavfi", "-i", f"color=c={LATAR}:s={sw}x{sh}:r=15",
+             "-t", str(DETIK), "-vf", vf, "-an",
+             "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
+             "-pix_fmt", "yuv420p", "-movflags", "+faststart", "preview.mp4"],
             check=True, cwd=kerja, timeout=300)
 
-        hasil = ((kerja / keluar).read_bytes(), tipe)
+        hasil = ((kerja / "preview.mp4").read_bytes(), "video/mp4")
 
     _CACHE[kunci] = hasil
     return hasil
-
-
-def pakai_contoh_bawaan() -> bool:
-    """True kalau pratinjau memakai video contoh di repo, bukan klip pengguna."""
-    return CONTOH_MP4.exists()
 
 
 def bersihkan_cache() -> None:

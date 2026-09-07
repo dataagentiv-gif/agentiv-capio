@@ -97,11 +97,15 @@
         {# `memuat` sejak awal: pratinjau pertama baru dipanggil setelah jeda
            tunda 350ms, dan tanpa ini bingkainya sempat tampil hitam kosong —
            terbaca sebagai pratinjau yang gagal, bukan yang sedang dimuat. #}
-        <div class="hp kecil memuat">
+        <div class="hp kecil memuat" id="pv-hp">
           <video id="pv-v" autoplay loop muted playsinline hidden></video>
           <img id="pv-i" alt="Pratinjau tampilan klip" hidden>
           <div class="hp-spin"><span class="spin"></span></div>
         </div>
+        {# Untuk layout tanpa caption, yang ditampilkan penjelasan — bukan
+           bingkai kosong yang cuma memancing pertanyaan "kenapa pratinjaunya
+           kosong?" #}
+        <p class="sub" id="pv-catatan" hidden></p>
       </div>
     </div>
 
@@ -243,8 +247,14 @@ async function drawLayouts() {
     el.innerHTML = d.layouts.map(l => `
       <button type="button" class="layout-opt ${l.nama === layoutPilih ? 'on' : ''}"
               data-l="${esc(l.nama)}" title="${esc(l.keterangan)}">
-        <img src="/api/preview.png?layout=${encodeURIComponent(l.nama)}&kecil=1"
-             alt="" loading="lazy">
+        {# `#t=0.1` bukan hiasan. Dengan preload="metadata" saja, browser
+           mengambil metadata tapi TIDAK melukis satu frame pun — yang tidak
+           dipilih tampil sebagai kotak hitam, dan tidak ada error apa pun yang
+           memberitahu. Fragmen waktu memaksanya mengambil dan menampilkan frame
+           di detik itu; `preload="auto"` juga menyembuhkannya, tapi dengan
+           mengunduh tiga megabyte video yang belum tentu dilihat. #}
+        <video src="/static/contoh/${encodeURIComponent(l.nama)}.mp4#t=0.1"
+               muted loop playsinline preload="metadata" tabindex="-1"></video>
         <span>${esc(l.judul)}</span>
       </button>`).join('');
     el.querySelectorAll('.layout-opt').forEach(b => b.onclick = () => {
@@ -259,28 +269,46 @@ async function drawLayouts() {
         font.value = l.font_saran;
       }
       segarkanCaption();
-      drawLayouts();
+      tandaiLayout();
       segarkanPratinjau();
     });
-    const aktif = d.layouts.find(l => l.nama === layoutPilih);
-    let ket = aktif ? aktif.keterangan : '';
-    // Tanpa video contoh bawaan, pratinjau memakai klip pengguna terbaru — yang
-    // sudah punya caption terbakar sendiri. Disebutkan supaya caption dobel
-    // yang muncul di pratinjau tidak dikira akan ikut di hasil aslinya.
-    if (d.contoh_bawaan === false) {
-      ket += ' · Pratinjau memakai potongan klip terakhirmu, jadi caption '
-           + 'lamanya bisa ikut terlihat. Taruh assets/preview.mp4 untuk contoh '
-           + 'yang bersih dan bergerak.';
-    }
-    document.getElementById('ket-layout').textContent = ket;
+    tandaiLayout();
     // Juga di sini, bukan cuma di onclick: kalau default di Setting kebetulan
     // layout tanpa caption, knobnya harus sudah mati sejak halaman dibuka.
     segarkanCaption();
+    // Dan pratinjaunya digambar ULANG di sini, bukan cuma sekali saat halaman
+    // siap. Pemanggilan pertama berlomba dengan fetch ini: kalau ia menang,
+    // layoutData masih kosong dan pratinjau tidak tahu layout yang dipilih
+    // ternyata tanpa caption — yang tampil bidang polos tanpa penjelasan.
+    segarkanPratinjau();
   } catch {
     // Preview gagal jangan menghalangi submit — layout tetap bisa dipilih
     // lewat default di Setting.
     el.innerHTML = '<p class="sub">Preview tampilan tidak bisa dimuat.</p>';
   }
+}
+
+// Menandai pilihan tanpa menggambar ulang daftarnya. Menggambar ulang berarti
+// keempat videonya dibuat dari nol tiap klik — berkedip, dan memutar balik yang
+// sedang dilihat orang.
+//
+// Hanya yang terpilih yang berputar: empat video yang jalan bersamaan membebani
+// tanpa membantu membandingkan, dan yang lain justru lebih terbaca sebagai
+// pembanding kalau diam di frame pertamanya.
+function tandaiLayout() {
+  document.querySelectorAll('.layout-opt').forEach(b => {
+    const pilih = b.dataset.l === layoutPilih;
+    b.classList.toggle('on', pilih);
+    const v = b.querySelector('video');
+    if (!v) return;
+    // Atribut `muted` di HTML saja tidak cukup — sebagian browser baru
+    // mengizinkan play() otomatis kalau PROPERTI ini sudah true.
+    v.muted = true;
+    if (pilih) v.play().catch(() => {});
+    else { v.pause(); v.currentTime = 0; }
+  });
+  const aktif = layoutData.find(l => l.nama === layoutPilih);
+  document.getElementById('ket-layout').textContent = aktif ? aktif.keterangan : '';
 }
 
 // Knob tampilan diisi dari default di Setting, lalu boleh diubah untuk video
@@ -368,6 +396,25 @@ function segarkanPratinjau() {
   const vid = document.getElementById('pv-v');
   const img = document.getElementById('pv-i');
   if (!vid) return;
+  const hp = document.getElementById('pv-hp');
+  const catatan = document.getElementById('pv-catatan');
+  const lay = layoutData.find(l => l.nama === layoutPilih);
+
+  // Layout mentahan tidak pernah punya caption, jadi tidak ada yang bisa
+  // ditunjukkan panel ini. Dijawab dengan kalimat, dan ffmpeg tidak usah
+  // dijalankan sama sekali.
+  if (lay && lay.teks === false) {
+    clearTimeout(pvTimer);
+    vid.pause();
+    hp.hidden = true;
+    catatan.textContent = 'Layout ini memang tanpa teks — videonya cuma '
+                        + 'dipotong, jadi tidak ada caption yang bisa diatur.';
+    catatan.hidden = false;
+    return;
+  }
+  hp.hidden = false;
+  catatan.hidden = true;
+
   clearTimeout(pvTimer);
   pvTimer = setTimeout(async () => {
     const q = new URLSearchParams();
@@ -378,8 +425,7 @@ function segarkanPratinjau() {
     for (const [k, param] of Object.entries(peta)) {
       if (g[k] !== undefined) q.set(param, g[k]);
     }
-    const hp = vid.closest('.hp');
-    hp?.classList.add('memuat');
+    hp.classList.add('memuat');
     try {
       const r = await fetch(`/api/preview.png?${q}`);
       if (!r.ok) throw new Error(String(r.status));
@@ -395,7 +441,7 @@ function segarkanPratinjau() {
     } catch {
       vid.hidden = true; img.hidden = true;
     } finally {
-      hp?.classList.remove('memuat');
+      hp.classList.remove('memuat');
     }
   }, 350);
 }

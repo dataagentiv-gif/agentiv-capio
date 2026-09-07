@@ -262,11 +262,6 @@ def daftar_layout():
              "font_saran": l.font_saran, "teks": l.teks}
             for l in layout_mod.LAYOUTS.values()
         ],
-        # Tanpa video contoh bawaan, pratinjau memakai klip pengguna terbaru —
-        # yang sudah punya caption terbakar sendiri. UI perlu tahu supaya bisa
-        # menyebutkan batas itu, bukan membiarkan orang mengira hasil aslinya
-        # akan punya caption dobel.
-        "contoh_bawaan": preview.pakai_contoh_bawaan(),
     }
 
 
@@ -274,8 +269,8 @@ def daftar_layout():
 def preview_tampilan(layout: str | None = None, font: str | None = None,
                      ukuran: int | None = None, warna: str | None = None,
                      kata: int | None = None, upper: bool | None = None,
-                     caption: bool | None = None, kecil: bool = False):
-    """Satu frame contoh dengan setelan tampilan yang sedang dipilih.
+                     caption: bool | None = None):
+    """Contoh caption dengan setelan tampilan yang sedang dipilih.
 
     Parameternya opsional supaya halaman Setting bisa menampilkan akibat sebuah
     knob SEBELUM disimpan — kalau harus menyimpan dulu, mencoba lima warna
@@ -286,7 +281,7 @@ def preview_tampilan(layout: str | None = None, font: str | None = None,
         ("kata", kata), ("upper", upper), ("caption", caption),
     ) if v is not None}
     try:
-        isi, tipe = preview.render(layout, knob, kecil=kecil)
+        isi, tipe = preview.render(layout, knob)
     except Exception as e:  # noqa: BLE001 — preview gagal jangan menjatuhkan halaman
         log.warning("preview gagal: %s", e)
         raise HTTPException(500, f"Preview gagal dibuat: {e}") from e

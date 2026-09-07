@@ -147,24 +147,36 @@ function previewHtml() {
   return `
     <div class="field preview-blok">
       <label>Preview</label>
-      <p class="sub">Frame sungguhan dari klip terbaru, dirender lewat jalur
-        yang sama dengan produksi. Berubah tiap setelan diputar — tidak perlu
-        disimpan dulu.</p>
-      <div class="hp">
-        {# Dua elemen, satu tampil bergantian. Preview jadi VIDEO kalau ada
-           berkas contoh bawaan (assets/preview.mp4) — sorotan kata yang
-           berpindah adalah bagian paling menentukan dari gaya caption, dan itu
-           tidak ada di gambar diam. Tanpa berkas itu, jatuh ke gambar. #}
+      <p class="sub">Caption sungguhan, dirender lewat jalur yang sama dengan
+        produksi — di atas bidang polos supaya yang dinilai teksnya, bukan
+        videonya. Berubah tiap setelan diputar, tidak perlu disimpan dulu.</p>
+      <div class="hp" id="pv-hp">
+        {# Video, bukan gambar diam: sorotan kata yang berpindah adalah bagian
+           paling menentukan dari gaya caption, dan itu tidak ada di satu frame.
+           <img> dipertahankan sebagai jaring pengaman — tipe balasan diperiksa
+           dari blob-nya, jadi kalau suatu saat endpoint ini mengirim gambar
+           lagi, halamannya tidak jadi kosong tanpa sebab. #}
         <video id="pv-v" autoplay loop muted playsinline hidden></video>
         <img id="pv-i" alt="Preview tampilan klip" hidden>
         <div class="hp-spin"><span class="spin"></span></div>
       </div>
+      <p class="sub" id="pv-catatan" hidden></p>
     </div>`;
 }
 
 // Debounce: memutar slider ukuran bisa memicu puluhan permintaan, dan tiap satu
 // menjalankan ffmpeg. Yang ditunggu cuma jeda singkat setelah orang berhenti
 // mengubah.
+// Layout mana yang memang tidak memakai caption. Diambil dari API, bukan
+// ditulis ulang di sini: daftar layout hidup di pipeline/layout.py, dan salinan
+// kedua pasti akan berbeda suatu saat tanpa ada yang menyadarinya.
+let layoutsJanji = null;
+async function tanpaTeks(nama) {
+  layoutsJanji ||= fetch('/api/layouts').then(r => r.json()).catch(() => null);
+  const d = await layoutsJanji;
+  return d?.layouts?.find(l => l.nama === nama)?.teks === false;
+}
+
 let pvTimer = null;
 function segarkanPreview() {
   const vid = document.getElementById('pv-v');
@@ -183,12 +195,29 @@ function segarkanPreview() {
       // Nol berarti "ikut bawaan layout", jadi jangan dikirim sebagai angka.
       if (v !== '' && v !== '0') q.set(param, v);
     }
-    const hp = vid.closest('.hp');
-    hp?.classList.add('memuat');
+    const hp = document.getElementById('pv-hp');
+    const catatan = document.getElementById('pv-catatan');
+
+    // Layout mentahan tidak pernah punya caption, jadi tidak ada yang bisa
+    // ditunjukkan — bidang polos tanpa teks cuma memancing pertanyaan "kenapa
+    // preview-nya kosong?". Dijawab dengan kalimat, dan ffmpeg tidak usah
+    // dijalankan sama sekali.
+    if (await tanpaTeks(q.get('layout'))) {
+      vid.pause();
+      hp.hidden = true;
+      catatan.textContent = 'Layout ini memang tanpa teks — videonya cuma '
+                          + 'dipotong, jadi setelan caption di atas tidak '
+                          + 'terpakai untuknya.';
+      catatan.hidden = false;
+      return;
+    }
+    hp.hidden = false;
+    catatan.hidden = true;
+
+    hp.classList.add('memuat');
     try {
-      // Diambil sebagai blob supaya tipenya bisa diperiksa: server mengirim
-      // video kalau ada berkas contoh bawaan, gambar kalau tidak. Menebak dari
-      // URL tidak mungkin — endpoint-nya satu.
+      // Diambil sebagai blob supaya tipenya bisa diperiksa, bukan ditebak dari
+      // URL — endpoint-nya satu untuk video maupun gambar.
       const r = await fetch(`/api/preview.png?${q}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const blob = await r.blob();
@@ -206,7 +235,7 @@ function segarkanPreview() {
       vid.hidden = true;
       img.hidden = true;
     } finally {
-      hp?.classList.remove('memuat');
+      hp.classList.remove('memuat');
     }
   }, 350);
 }
