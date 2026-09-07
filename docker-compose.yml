@@ -6,7 +6,16 @@
 # ElevenLabs dan yt-dlp perlu cookies.
 
 x-app: &app
-  build: .
+  # Client menarik image jadi dari Docker Hub, bukan membangun dari source —
+  # mereka tidak pernah memegang kode ini. Update-nya `docker compose pull`
+  # lalu `up -d`, tanpa build ulang apa pun.
+  #
+  # `latest` dipilih daripada tag versi tetap: update jadi satu perintah tanpa
+  # client perlu tahu nomor rilisnya. Konsekuensinya satu image rusak yang
+  # ter-push ke `latest` kena ke semua client sekaligus — makanya tiap rilis
+  # tetap dipush dengan tag versi juga (mis. `1.2.0`), supaya ada versi
+  # terakhir yang terbukti baik untuk dijadikan pegangan kalau itu terjadi.
+  image: agentiv/capio:latest
   env_file: .env
   environment:
     # Menimpa nilai di .env yang menunjuk localhost. Di dalam jaringan compose,
