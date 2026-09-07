@@ -38,7 +38,18 @@ from utils.logging import get
 
 log = get(__name__)
 
-SERVER = "https://app.agentiv.my.id"
+#: Alamat bawaan server lisensi. Bisa ditimpa lewat `LICENSE_SERVER` di .env —
+#: dibutuhkan untuk staging dan untuk menguji alur lisensi sebelum DNS produksi
+#: ada, karena tanpa itu tidak ada satu pun cara mencobanya dari mesin sendiri.
+#:
+#: Ini TIDAK melemahkan gerbangnya, dan bedanya dengan public key di bawah itu
+#: penting: public key sengaja tidak bisa disetel, karena siapa pun yang bisa
+#: menggantinya tinggal menandatangani token palsu miliknya sendiri. Alamat
+#: server tidak begitu — server palsu tetap tidak bisa menghasilkan tanda tangan
+#: yang lolos verifikasi, jadi mengarahkannya ke mana pun tidak menghasilkan
+#: lisensi yang diterima. Mengarahkannya ke alamat mati pun tidak memberi apa-apa
+#: yang tidak bisa dilakukan dengan memblokir domainnya di firewall.
+SERVER_BAWAAN = "https://app.agentiv.my.id"
 PRODUCT_ID = "capio"
 
 #: Toleransi selisih jam sistem saat membandingkan `exp`. Jam laptop yang
@@ -212,7 +223,10 @@ def verifikasi() -> dict:
 
     try:
         r = httpx.post(
-            f"{SERVER}/api/license/verify",
+            # Dibaca saat dipanggil, bukan saat modul diimpor: halaman Setting
+            # bisa mengubah .env kapan saja, dan nilai yang dibekukan saat start
+            # membuat perubahannya tidak pernah berlaku.
+            f"{(settings.LICENSE_SERVER or SERVER_BAWAAN).rstrip('/')}/api/license/verify",
             json={
                 "license_key": key,
                 "product_id": PRODUCT_ID,

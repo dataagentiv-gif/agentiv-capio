@@ -123,6 +123,10 @@ class Settings(BaseSettings):
     VERSI: str = "1.1.0"
     AGENTIV_WA: str = "6285843570782"
 
+    # Kosong = pakai alamat produksi yang tertulis di license/__init__.py.
+    # Diisi hanya untuk staging atau pengujian dari mesin sendiri.
+    LICENSE_SERVER: str = ""
+
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"
 
