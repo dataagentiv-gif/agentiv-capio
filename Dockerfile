@@ -46,8 +46,18 @@ RUN mkdir -p /usr/share/fonts/truetype/capio \
 
 # Berjalan sebagai non-root. Kalau container jebol, penyerang tidak langsung
 # dapat root di dalamnya.
+# /app/data WAJIB ikut dibuat di sini, bukan dibiarkan muncul sendiri saat
+# volume dipasang. Kalau direktorinya tidak ada di dalam image, Docker yang
+# membuat titik mount-nya saat container start — dan miliknya root, sementara
+# proses berjalan sebagai clipper. Akibatnya verifikasi lisensi jatuh dengan
+# PermissionError pada /app/data/license.json, muncul sebagai HTTP 500 di
+# halaman Setting, di SETIAP pemasangan baru.
+#
+# Tidak pernah ketahuan selama pengembangan karena satu-satunya yang menulis ke
+# sana adalah verifikasi lisensi, dan itu belum pernah benar-benar berjalan di
+# dalam container sebelum alamat server bisa ditimpa.
 RUN useradd -m -u 1000 clipper \
-    && mkdir -p /work /app/clips \
+    && mkdir -p /work /app/clips /app/data \
     && chown -R clipper:clipper /app /work
 USER clipper
 
