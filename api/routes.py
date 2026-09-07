@@ -58,6 +58,10 @@ def _cap_aset() -> str:
 
 
 templates.env.globals["v"] = _cap_aset()
+# Fungsinya, bukan hasilnya: license key bisa diisi dari halaman Setting kapan
+# saja, dan tautan yang dihitung sekali saat start akan membawa key lama
+# seumur proses.
+templates.env.globals["wa"] = lisensi.tautan_wa
 
 
 @asynccontextmanager

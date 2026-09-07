@@ -67,6 +67,13 @@
     <g id="i-download" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       <path d="M8 2.4v7.2M8 9.6 5 6.6M8 9.6l3-3"/><path d="M2.6 10.6v2a1 1 0 0 0 1 1h8.8a1 1 0 0 0 1-1v-2"/>
     </g>
+    {# Lambang WhatsApp: geometri resminya, di-skala 16/24 supaya masuk viewBox
+       sprite ini. Versi gambar-tangan sebelumnya gagang telepon-nya menabrak
+       cincin gelembungnya — jarak antar bagian di lambang ini terlalu ketat
+       untuk diperkirakan, jadi angkanya tidak boleh ditaksir sendiri. #}
+    <g id="i-wa" fill="currentColor" transform="scale(.66667)">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0 0 20.885 3.488"/>
+    </g>
   </defs>
 </svg>
 
@@ -76,15 +83,35 @@
       {# Simbol CAPIO: dua kurung yang saling mengunci membentuk bingkai
          tangkap, dengan palang di tengahnya. Ditulis inline dan bukan <img>
          supaya ikut ukuran teks dan tidak menambah satu request lagi. #}
+      {# Sikunya digambar sekali lalu dipakai dua kali dengan putaran 180°:
+         di gambar acuan kedua siku itu tidak persis kembar (yang bawah 6-15%
+         lebih besar), dan itu memang tidak disengaja — versi simetris ini yang
+         dipilih. Warnanya memakai nilai token, bukan nilai piksel PNG-nya;
+         selisihnya tak kasat mata sedangkan --color-action menentukan warna
+         setiap tombol dan tautan di seluruh aplikasi serta sudah disalin ke dua
+         repo lain. #}
       <svg class="mark" width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
-        <g fill="none" stroke="#1868db" stroke-width="5"
-           stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6.5 17.5V11.5a5 5 0 0 1 5-5h6"/>
-          <path d="M25.5 14.5v6a5 5 0 0 1-5 5h-6"/>
+        <defs>
+          <path id="capio-siku" d="M5.81 0H19.02a.59.59 0 0 1 .59.59v4.86a.59.59 0 0 1-.59.59H7.11v7.95a.59.59 0 0 1-.59.59H1.66a.59.59 0 0 1-.59-.59V4.74A4.74 4.74 0 0 1 5.81 0Z"/>
+        </defs>
+        <g fill="#1868db">
+          <use href="#capio-siku"/>
+          <use href="#capio-siku" transform="rotate(180 16 16)"/>
         </g>
-        <rect x="13.6" y="9.5" width="4.8" height="13" rx="2.4" fill="#ff564d"/>
+        <rect x="12.39" y="9.42" width="7.23" height="13.16" rx=".77" fill="#ff564d"/>
       </svg>
       <span class="brand-name">CAPIO</span>
+    </a>
+    {# Atribusi, bukan co-branding — yang dijual CAPIO, Agentiv yang membuatnya.
+       Karena itu sengaja jauh lebih kecil dari lambang CAPIO dan dipisah garis:
+       kalau ukurannya sepadan, keduanya terbaca sebagai satu produk gabungan.
+       PNG dan bukan SVG seperti lambang CAPIO: yang ini dipakai pada satu
+       ukuran kecil saja, tidak pernah jadi favicon, dan wordmark "agentiv"
+       punya bentuk huruf khas yang men-trace-nya tidak sepadan hasilnya.
+       alt-nya "Agentiv" saja, bukan "by Agentiv" — "by"-nya sudah ada sebagai
+       teks di sebelahnya dan pembaca layar akan membacanya dua kali. #}
+    <a class="oleh" href="https://agentiv.my.id" target="_blank" rel="noopener">
+      by <img src="/static/agentiv.png?v={{ v }}" alt="Agentiv" width="400" height="93">
     </a>
     {# Dock gelap dengan lekukan di bawah item aktif. Bentuk docknya digambar
        satu path SVG oleh app.js; kalau JS mati, CSS memberi latar pil biasa
@@ -120,6 +147,17 @@
   </div>
   {% block content %}{% endblock %}
 </main>
+
+{# Tombol bantuan melayang, di semua halaman. Tautannya dari lisensi.tautan_wa()
+   dan BUKAN wa.me yang ditulis ulang di sini: fungsi itu menyisipkan license
+   key ke dalam pesannya, sehingga percakapan tidak selalu dimulai dengan
+   menanyakan key-nya. Dipanggil sebagai fungsi, bukan nilai yang dihitung
+   sekali saat start, karena key bisa diisi dari halaman Setting kapan saja
+   tanpa aplikasi di-restart — tautan yang dibekukan akan membawa key lama. #}
+<a class="bantuan" href="{{ wa() }}" target="_blank" rel="noopener"
+   aria-label="Bantuan lewat WhatsApp" title="Bantuan lewat WhatsApp">
+  <svg width="28" height="28" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-wa"/></svg>
+</a>
 
 <script src="/static/app.js?v={{ v }}"></script>
 {% block script %}{% endblock %}

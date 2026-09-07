@@ -117,8 +117,11 @@ class Settings(BaseSettings):
     # atau 3 perangkat habis sendiri tanpa penggunanya berbuat apa-apa.
     DATA_DIR: Path = ROOT / "data"
 
-    VERSI: str = "1.0.0"
-    AGENTIV_WA: str = "628999999999"
+    # VERSI ikut terkirim ke server lisensi sebagai agent_version dan tersimpan
+    # di tabel activations — satu-satunya cara tahu versi berapa yang dipakai
+    # client saat mereka melaporkan masalah. Naikkan bersamaan dengan tag image.
+    VERSI: str = "1.1.0"
+    AGENTIV_WA: str = "6285843570782"
 
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"

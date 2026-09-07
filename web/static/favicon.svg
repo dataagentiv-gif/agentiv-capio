@@ -1,12 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <!-- Versi app icon: simbol putih di atas bidang biru, seperti pada panduan
        brand. Dibuat SVG supaya tetap tajam di tab retina tanpa perlu beberapa
-       ukuran PNG. -->
+       ukuran PNG. Bentuk sikunya sama persis dengan lambang di nav, cuma
+       diperkecil 0,75 supaya ada jarak ke tepi ubinnya. -->
   <rect width="32" height="32" rx="7.5" fill="#1868db"/>
-  <g fill="none" stroke="#ffffff" stroke-width="3.9"
-     stroke-linecap="round" stroke-linejoin="round">
-    <path d="M9 18V13a4 4 0 0 1 4-4h5"/>
-    <path d="M23 14v5a4 4 0 0 1-4 4h-5"/>
+  <defs>
+    <path id="siku" d="M5.81 0H19.02a.59.59 0 0 1 .59.59v4.86a.59.59 0 0 1-.59.59H7.11v7.95a.59.59 0 0 1-.59.59H1.66a.59.59 0 0 1-.59-.59V4.74A4.74 4.74 0 0 1 5.81 0Z"/>
+  </defs>
+  <g transform="translate(4 4) scale(.75)">
+    <g fill="#ffffff">
+      <use href="#siku"/>
+      <use href="#siku" transform="rotate(180 16 16)"/>
+    </g>
+    <rect x="12.39" y="9.42" width="7.23" height="13.16" rx=".77" fill="#ff564d"/>
   </g>
-  <rect x="14.1" y="10.5" width="3.8" height="11" rx="1.9" fill="#ff564d"/>
 </svg>

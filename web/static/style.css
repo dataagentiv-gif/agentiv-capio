@@ -186,6 +186,29 @@ a { color: var(--color-action); }
    bidang gelap, jadi tanpa ini ia terlihat menempel ke wordmark. */
 .brand .mark { margin-right: 1px; }
 
+/* Atribusi Agentiv. Ukurannya sengaja jauh di bawah lambang CAPIO dan dipisah
+   garis: ini keterangan siapa yang membuat, bukan merek kedua yang setara. */
+.oleh {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(13, 23, 38, .14);
+  color: var(--color-muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+/* Tinggi yang ditetapkan, lebar ikut: rasionya 4,3 : 1 dan memaksa lebar akan
+   memipihkannya. */
+.oleh img { display: block; height: 13px; width: auto; }
+
+.oleh:hover { color: var(--color-ink); }
+
+/* Di layar sempit dock sudah memakan seluruh baris; atribusi yang paling
+   pertama boleh mengalah. */
+@media (max-width: 720px) { .oleh { display: none; } }
+
 /* ---------- Dock navigasi ----------
    Item aktif diangkat ke lingkaran putih yang menyembul di atas dock, dan
    docknya melekuk mengikuti lingkaran itu.
@@ -340,6 +363,34 @@ a { color: var(--color-action); }
 .dock a.on:hover .ikon { background: #ff6b63; }
 
 .dock a.on .ic { width: 20px; height: 20px; }
+
+/* ---------- Tombol bantuan melayang ----------
+   Kanan bawah, dan itu satu-satunya sudut yang benar-benar kosong: nav dan
+   dock keduanya ada di atas, dan tidak ada elemen `position: fixed` lain di
+   berkas ini. Hijau WhatsApp, tanpa label: bentuk bulat hijau di pojok kanan
+   bawah sudah jadi konvensi yang dikenali tanpa dibaca, dan karena warnanya
+   milik WhatsApp ia tidak mengambil peran warna apa pun di palet aplikasi.
+   Labelnya diganti aria-label + title supaya pembaca layar dan tooltip tetap
+   dapat namanya. */
+.bantuan {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: var(--radius-full);
+  background: #25d366;
+  color: var(--color-white);
+  text-decoration: none;
+  box-shadow: 0 10px 24px rgba(16, 18, 20, .28);
+}
+
+.bantuan:hover { background: #1fb855; }
+.bantuan svg { display: block; }
 
 /* ---------- Layout ---------- */
 
