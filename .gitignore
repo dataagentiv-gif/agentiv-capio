@@ -15,6 +15,13 @@ work/
 *.ogg
 *.ass
 
+# Kecuali satu: video contoh untuk pratinjau tampilan. Ini ASET PRODUK, bukan
+# artefak job — tanpa dia, pratinjau di halaman Submit jatuh ke potongan klip
+# terakhir pengguna yang caption-nya sudah terbakar. Kalau tidak ikut di-commit,
+# ia cuma ada di mesin yang membuatnya: clone baru menghasilkan image yang
+# pratinjaunya diam-diam lebih buruk, tanpa satu pun tanda bahwa ada yang hilang.
+!assets/preview.mp4
+
 *.log
 .DS_Store
 
