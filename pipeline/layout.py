@@ -120,7 +120,12 @@ LAYOUTS = {
         margin_r=70,
         # Satu baris mendatar, bukan ditumpuk — mengikuti referensi.
         tumpuk=False,
-        sorot=False,
+        # Sorotan warna kata aktif TETAP NYALA — kalau mau polos seperti
+        # referensi awal, samakan saja warna aktif dengan putih lewat knob
+        # Submit (warna_pasif). Dulu ini dimatikan permanen di sini, tapi
+        # mematikannya di layout mengunci SEMUA video ke satu pilihan; orang
+        # yang justru mau sorotan warna di layout ini tidak punya jalan keluar
+        # sama sekali selain mengedit kode.
         tebal=False,
         font_saran="Lora",
         kata=3,

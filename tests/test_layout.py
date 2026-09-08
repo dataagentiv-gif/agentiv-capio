@@ -206,10 +206,12 @@ def test_samping_satu_baris_bukan_ditumpuk():
     assert L.ambil("samping").tumpuk is False
 
 
-def test_samping_tidak_menyorot_kata():
-    """Sorotan menarik mata mengikuti ucapan, tapi pada tipografi serif yang
-    kalem ia justru terasa ramai."""
-    assert L.ambil("samping").sorot is False
+def test_samping_bisa_menyorot_kata():
+    """Dulu sorotan dimatikan permanen di layout ini (serif yang kalem
+    dianggap keramaian). Sekarang dibiarkan menyala sama seperti layout lain
+    — yang mau tampilan polos seperti referensi awal tinggal menyamakan warna
+    aktif dengan putih lewat knob Submit, bukan dipaku di kode."""
+    assert L.ambil("samping").sorot is True
 
 
 def test_samping_tidak_tebal():
@@ -244,7 +246,7 @@ def test_header_tetap_tebal_untuk_layout_sans():
 
 def test_layout_bersorot_tetap_punya_warna_aktif():
     """Perbaikan untuk samping jangan sampai mematikan sorotan di layout lain."""
-    for nama in ("penuh", "kotak"):
+    for nama in ("penuh", "kotak", "samping"):
         assert L.ambil(nama).sorot is True
 
 
