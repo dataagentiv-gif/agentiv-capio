@@ -1,7 +1,7 @@
 """CRUD tabel jobs. Satu fungsi = satu operasi, tanpa logic pipeline."""
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from db.models import Job, Status, session_scope
 from utils.logging import get
@@ -57,10 +57,13 @@ def _update(job_id: str | uuid.UUID, **fields) -> None:
             setattr(job, k, v)
 
 
-def update_status(job_id, status: str, progress: int | None = None) -> None:
+def update_status(job_id, status: str, progress: int | None = None,
+                   worker_id: str | None = None) -> None:
     fields = {"status": status}
     if progress is not None:
         fields["progress"] = progress
+    if worker_id is not None:
+        fields["worker_id"] = worker_id
     _update(job_id, **fields)
 
 
@@ -74,7 +77,7 @@ def fail(job_id, error: str) -> None:
     _update(job_id, status=Status.FAILED, error=error[-2000:])
 
 
-def bereskan_gantung() -> int:
+def bereskan_gantung(worker_id: str = "slot-0") -> int:
     """Tandai job yang tertinggal di status berjalan sebagai gagal.
 
     SimpleWorker menjalankan job DI DALAM prosesnya sendiri, jadi kalau
@@ -84,19 +87,26 @@ def bereskan_gantung() -> int:
     tabel ini, jadi job itu terlihat masih berjalan SELAMANYA di UI.
 
     Dipanggil saat worker start: satu-satunya saat kita tahu pasti tidak ada
-    job yang sedang dikerjakan.
+    job MILIK WORKER INI yang sedang dikerjakan.
 
-    ponytail: benar selama worker cuma satu. Dengan dua worker, yang baru
-    menyala akan menggagalkan job milik worker lain yang masih sehat —
-    perbaikannya menyimpan identitas worker di baris job dan hanya
-    membereskan milik sendiri.
+    Sekarang HANYA membereskan milik `worker_id` sendiri, plus job dari
+    sebelum kolom worker_id ada (NULL) supaya job lama dari versi sebelum
+    mode multi tidak menggantung selamanya setelah upgrade. Dulu ini
+    membereskan SEMUA job berjalan tanpa peduli siapa pemiliknya — benar
+    selama worker cuma satu, tapi di mode multi worker B yang baru menyala
+    akan menggagalkan job worker A yang masih sehat kalau tidak dibatasi.
     """
     with session_scope() as s:
-        rows = s.scalars(select(Job).where(Job.status.in_(Status.BERJALAN))).all()
+        rows = s.scalars(
+            select(Job).where(
+                Job.status.in_(Status.BERJALAN),
+                or_(Job.worker_id == worker_id, Job.worker_id.is_(None)),
+            )
+        ).all()
         for job in rows:
             tahap = job.status
-            log.warning("job %s tertinggal di status '%s' — ditandai gagal",
-                        job.id, tahap)
+            log.warning("job %s (worker %s) tertinggal di status '%s' — ditandai gagal",
+                        job.id, worker_id, tahap)
             job.status = Status.FAILED
             job.error = (
                 f"Worker berhenti saat job masih di tahap '{tahap}'. "

@@ -123,6 +123,19 @@ FIELDS = [
     _f("MAX_CLIP_SEC", "Durasi klip maksimum (detik)", "Guardrail", kind="number"),
     _f("JOB_TIMEOUT_SEC", "Batas waktu per job (detik)", "Guardrail", kind="number"),
 
+    _f("WORKER_MODE", "Mode worker", "Kinerja", kind="select",
+       options=["single", "multi"],
+       help="single (bawaan): satu job diproses sekaligus — aman untuk VPS kecil. "
+            "multi: beberapa job diproses BERSAMAAN, lebih cepat kalau CPU-nya "
+            "cukup — tapi tiap job menjalankan ffmpeg yang memakai SEMUA core "
+            "yang ada, tanpa batas. Di VPS kecil, dua job x264 berebut core yang "
+            "sama bisa membuat KEDUANYA lebih lambat daripada diproses satu-satu. "
+            "Butuh restart container worker (docker compose up -d) supaya "
+            "perubahannya berlaku."),
+    _f("WORKER_COUNT", "Jumlah worker (mode multi)", "Kinerja", kind="number",
+       help="Berapa job diproses bersamaan saat mode di atas 'multi'. Mulai dari "
+            "2 dan naikkan bertahap sambil memperhatikan beban CPU-nya."),
+
     _f("SILENCE_NOISE_DB", "Ambang hening (dB)", "Kalibrasi", kind="number",
        help="-30 untuk podcast bersih. Kalau source ada musik latar, NAIKKAN "
             "ke -20 — jangan diturunkan. Musik menaikkan lantai kebisingan, "

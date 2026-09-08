@@ -72,6 +72,11 @@ class Job(Base):
     progress: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     clips: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Slot worker yang sedang/terakhir mengerjakan job ini (mis. "slot-0").
+    # Dipakai bereskan_gantung() supaya worker yang baru menyala di mode multi
+    # cuma membereskan job miliknya sendiri, bukan job worker lain yang masih
+    # sehat. Bukan untuk ditampilkan — tidak masuk as_dict().
+    worker_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -135,5 +140,6 @@ def init() -> None:
         for kolom in (
             "layout VARCHAR(20) NOT NULL DEFAULT 'penuh'",
             "gaya JSONB",
+            "worker_id VARCHAR(64)",
         ):
             c.execute(text(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {kolom}"))

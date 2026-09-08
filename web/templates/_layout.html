@@ -140,6 +140,18 @@
   </div>
 </header>
 
+{# Banner update tersedia, di semua halaman. Kosong/hidden sejak render —
+   app.js yang menyalakannya lewat /api/status, sama seperti titik penanda
+   job berjalan di dock. status() murni baca file lokal, jadi tidak ada
+   risiko halaman menunggu jaringan untuk ini. #}
+<div class="banner-update-wrap">
+  <div class="lisensi warn" id="update-banner" hidden>
+    <strong>Versi baru CAPIO tersedia<span id="update-versi"></span></strong>
+    <p>Jalankan <code>docker compose pull</code> lalu
+       <code>docker compose up -d</code> di folder instalasi untuk memperbaruinya.</p>
+  </div>
+</div>
+
 <main class="{% block main_class %}{% endblock %}">
   <div class="page-head">
     <h1 class="display">{% block heading %}{% endblock %}</h1>

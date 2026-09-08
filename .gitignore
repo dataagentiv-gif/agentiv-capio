@@ -33,3 +33,7 @@ tests/fixtures/sample.mp4
 
 # Klip hasil render saat STORAGE_PROVIDER=local.
 clips/
+
+# install_id dan license.json lokal (DATA_DIR) — data perangkat, bukan kode.
+# Named volume di Docker, bind mount kalau dijalankan langsung tanpa compose.
+data/

@@ -31,6 +31,7 @@ const INTRO = {
   'Penyimpanan': 'Klip jadi disimpan sebagai file mp4 biasa. Tidak ada storage cloud di project ini.',
   'Tampilan': 'Bentuk klip dan gaya caption. Layout dipilih utuh — posisi teks dan geometri video harus sepakat, jadi tidak dipreteli jadi setelan terpisah. Preview di bawah dirender lewat jalur yang sama persis dengan produksi, bukan tiruan CSS.',
   'Guardrail': 'Batas keras yang tidak boleh dilanggar pipeline. Segmen di luar rentang durasi dibuang sebelum dirender.',
+  'Kinerja': 'Berapa banyak video diproses bersamaan. Lebih banyak bisa lebih cepat, tapi lebih berat di CPU.',
   'Kalibrasi': 'Angka yang diputar kalau titik potong klip terasa belum pas. Penjelasan lengkapnya ada di README.',
   'Infra': 'Alamat database dan antrean. Sengaja tidak bisa diubah dari sini.',
   'Lisensi': 'Tanpa license key CAPIO tetap jalan normal — hanya memproses video baru yang diblokir. Klip lama tetap bisa diputar, diunduh, dan dihapus.',
@@ -39,6 +40,7 @@ const INTRO = {
 const IKON = {
   'Transkrip': 'i-mic', 'LLM': 'i-llm', 'Penyimpanan': 'i-folder',
   'Guardrail': 'i-shield', 'Kalibrasi': 'i-settings', 'Infra': 'i-server',
+  'Kinerja': 'i-process',
   'Tampilan': 'i-results', 'Lisensi': 'i-shield',
 };
 const ikon = n => `<svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#${IKON[n] || 'i-settings'}"/></svg>`;

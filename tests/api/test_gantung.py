@@ -43,10 +43,10 @@ def buat():
 
     dibuat = []
 
-    def _buat(status: str) -> str:
+    def _buat(status: str, worker_id: str | None = None) -> str:
         with session_scope() as s:
             j = Job(url="https://www.youtube.com/watch?v=uji", target_clips=3,
-                    status=status)
+                    status=status, worker_id=worker_id)
             s.add(j)
             s.flush()
             dibuat.append(j.id)
@@ -145,3 +145,31 @@ def test_tanpa_job_gantung_tidak_melakukan_apa_apa(buat):
 
     jobs.bereskan_gantung()
     assert jobs.bereskan_gantung() == 0
+
+
+# --- mode multi: dibatasi per worker_id ---
+
+def test_hanya_membereskan_milik_worker_sendiri(buat):
+    """Worker slot-a yang baru menyala tidak boleh menggagalkan job yang
+    sedang dikerjakan slot-b dengan sehat."""
+    from db import jobs
+
+    jobs.bereskan_gantung("slot-a")
+    jobs.bereskan_gantung("slot-b")
+    milik_a = buat("rendering", worker_id="slot-a")
+    milik_b = buat("rendering", worker_id="slot-b")
+
+    jobs.bereskan_gantung("slot-a")
+
+    assert _status(milik_a) == "failed"
+    assert _status(milik_b) == "rendering"
+
+
+def test_worker_id_kosong_dari_versi_lama_ikut_dibereskan(buat):
+    """Job dari sebelum kolom worker_id ada (NULL) tidak boleh menggantung
+    selamanya setelah upgrade ke mode multi."""
+    from db import jobs
+
+    jid = buat("rendering", worker_id=None)
+    jobs.bereskan_gantung("slot-apa-saja")
+    assert _status(jid) == "failed"

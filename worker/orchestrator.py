@@ -113,16 +113,23 @@ def run(job_id: str) -> None:
     # terlampaui" sehingga terlihat seperti pipeline yang rusak.
     lama: dict[str, float] = {}
 
+    # Import di sini, bukan top-level: WORKER_ID disetel runner.main() saat
+    # proses worker mulai, dan import top-level akan membekukan nilai lama
+    # ("") yang dibaca sebelum itu terjadi.
+    from worker.runner import WORKER_ID as _worker_id
+
     try:
         for i, (status, stage) in enumerate(STAGES):
             ctx["deadline"].check(status)
-            jobs.update_status(job_id, status, progress=int(i / TOTAL_STEPS * 100))
+            jobs.update_status(job_id, status, progress=int(i / TOTAL_STEPS * 100),
+                                worker_id=_worker_id)
             log.info("stage %s", status)
             t0 = time.monotonic()
             ctx.update(stage.run(ctx))
             lama[status] = time.monotonic() - t0
 
-        jobs.update_status(job_id, Status.UPLOADING, progress=int(8 / TOTAL_STEPS * 100))
+        jobs.update_status(job_id, Status.UPLOADING, progress=int(8 / TOTAL_STEPS * 100),
+                            worker_id=_worker_id)
         t0 = time.monotonic()
         clips = _build_clips(ctx, str(job_id))
         lama[Status.UPLOADING] = time.monotonic() - t0

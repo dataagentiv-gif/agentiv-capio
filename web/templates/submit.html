@@ -7,6 +7,8 @@
 {% block content %}
 <div id="status" class="status-strip"></div>
 
+<div class="submit-layout" id="submit-layout">
+<div class="submit-col">
 <div class="card">
   <form id="f">
     {# Dua sumber video, dan berkas bukan pelengkap. Operator jasa clipper
@@ -92,21 +94,8 @@
         </select>
       </div>
      </div>
-      <div class="field pratinjau">
-        <label>Pratinjau</label>
-        {# `memuat` sejak awal: pratinjau pertama baru dipanggil setelah jeda
-           tunda 350ms, dan tanpa ini bingkainya sempat tampil hitam kosong —
-           terbaca sebagai pratinjau yang gagal, bukan yang sedang dimuat. #}
-        <div class="hp kecil memuat" id="pv-hp">
-          <video id="pv-v" autoplay loop muted playsinline hidden></video>
-          <img id="pv-i" alt="Pratinjau tampilan klip" hidden>
-          <div class="hp-spin"><span class="spin"></span></div>
-        </div>
-        {# Untuk layout tanpa caption, yang ditampilkan penjelasan — bukan
-           bingkai kosong yang cuma memancing pertanyaan "kenapa pratinjaunya
-           kosong?" #}
-        <p class="sub" id="pv-catatan" hidden></p>
-      </div>
+      {# .field.pratinjau dipindah ke luar sebagai #submit-preview — panel di
+         samping halaman, bukan di dalam .gaya-grid. Lihat aside di bawah. #}
     </div>
 
     <div class="actions">
@@ -121,6 +110,31 @@
   Pengerjaannya jalan sendiri di belakang layar — halaman ini boleh ditutup. Video 15 menit biasanya selesai sekitar 4&ndash;5 menit.
   Pantau tahapannya di halaman <a href="/process">Proses</a>.
 </p>
+</div>
+
+{# Panel pratinjau, di samping halaman — cuma muncul begitu satu tampilan
+   dipilih di pemilih layout. Sebelum itu halaman tetap satu kolom sempit
+   seperti sekarang, dan panel ini `hidden` supaya tidak menyisakan ruang
+   kosong. `.hp` polos (bukan `.kecil`): begitu berpindah ke sini ukurannya
+   boleh sebesar pratinjau di halaman Setting. #}
+<aside class="submit-preview" id="submit-preview" hidden>
+  <div class="field pratinjau">
+    <label>Pratinjau</label>
+    {# `memuat` sejak awal: pratinjau pertama baru dipanggil setelah jeda
+       tunda 350ms, dan tanpa ini bingkainya sempat tampil hitam kosong —
+       terbaca sebagai pratinjau yang gagal, bukan yang sedang dimuat. #}
+    <div class="hp memuat" id="pv-hp">
+      <video id="pv-v" autoplay loop muted playsinline hidden></video>
+      <img id="pv-i" alt="Pratinjau tampilan klip" hidden>
+      <div class="hp-spin"><span class="spin"></span></div>
+    </div>
+    {# Untuk layout tanpa caption, yang ditampilkan penjelasan — bukan
+       bingkai kosong yang cuma memancing pertanyaan "kenapa pratinjaunya
+       kosong?" #}
+    <p class="sub" id="pv-catatan" hidden></p>
+  </div>
+</aside>
+</div>
 {% endblock %}
 
 {% block script %}
@@ -237,6 +251,12 @@ function drawChips() {
 let layoutPilih = null;
 let fontDisentuh = false;
 let layoutData = [];
+// Beda dari layoutPilih: layoutPilih SELALU ke-default begitu drawLayouts()
+// selesai (lihat di bawah), jadi tidak pernah ada state "belum dipilih" yang
+// sesungguhnya. Flag ini murni menandai klik eksplisit, dipakai untuk
+// menampilkan panel pratinjau — sebelum diklik, panelnya tetap tersembunyi
+// dan halaman tetap satu kolom sempit seperti sekarang.
+let layoutDisentuh = false;
 
 async function drawLayouts() {
   const el = document.getElementById('layouts');
@@ -259,6 +279,7 @@ async function drawLayouts() {
       </button>`).join('');
     el.querySelectorAll('.layout-opt').forEach(b => b.onclick = () => {
       layoutPilih = b.dataset.l;
+      layoutDisentuh = true;
       // Tiap layout punya font yang paling cocok — serif untuk yang tenang,
       // sans padat untuk yang tegas. Dipasang sebagai nilai awal saja: begitu
       // font disentuh sendiri, pilihan itu menang dan tidak ditimpa lagi.
@@ -271,6 +292,7 @@ async function drawLayouts() {
       segarkanCaption();
       tandaiLayout();
       segarkanPratinjau();
+      segarkanPanel();
     });
     tandaiLayout();
     // Juga di sini, bukan cuma di onclick: kalau default di Setting kebetulan
@@ -309,6 +331,18 @@ function tandaiLayout() {
   });
   const aktif = layoutData.find(l => l.nama === layoutPilih);
   document.getElementById('ket-layout').textContent = aktif ? aktif.keterangan : '';
+}
+
+// Halaman melebar dan panel pratinjau muncul di kanan HANYA setelah satu
+// tampilan diklik — sebelum itu, satu kolom sempit apa adanya. `display:grid`
+// dipasang/dilepas lewat kelas, bukan grid statis yang kolomnya cuma
+// disembunyikan: grid tetap mereservasi track eksplisit walau child-nya
+// [hidden], jadi grid statis akan menyisakan ruang 320px walau panelnya
+// tersembunyi.
+function segarkanPanel() {
+  document.querySelector('main').classList.toggle('narrow', !layoutDisentuh);
+  document.getElementById('submit-layout').classList.toggle('picked', layoutDisentuh);
+  document.getElementById('submit-preview').hidden = !layoutDisentuh;
 }
 
 // Knob tampilan diisi dari default di Setting, lalu boleh diubah untuk video
@@ -586,5 +620,6 @@ go.disabled = true;
 drawStatus();
 drawLayouts();
 isiGaya().then(segarkanPratinjau);
+segarkanPanel();
 </script>
 {% endblock %}

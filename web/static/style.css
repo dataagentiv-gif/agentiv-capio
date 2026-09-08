@@ -402,6 +402,8 @@ main {
 
 main.narrow { max-width: 760px; }
 
+.banner-update-wrap { max-width: var(--page-max); margin: 24px auto 0; padding: 0 24px; }
+
 .page-head { margin-bottom: 40px; }
 
 /* Weight 700, bukan 800. Style guide-nya menempatkan Charlie Display di bobot
@@ -1584,6 +1586,33 @@ select:focus {
   font-weight: 500;
 }
 
+/* ---------- Panel pratinjau di halaman Submit ---------- */
+
+.submit-layout { display: block; }   /* bawaan: satu kolom, panel [hidden] */
+
+.submit-layout.picked {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 32px;
+  align-items: start;
+}
+
+.submit-preview {
+  position: sticky;
+  top: calc(var(--nav-h) + 20px);   /* pola sama dengan .settings-sisi */
+  display: flex;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  main:not(.narrow) { transition: max-width .25s ease; }
+}
+
+@media (max-width: 900px) {
+  .submit-layout.picked { grid-template-columns: 1fr; }
+  .submit-preview { position: static; }
+}
+
 /* ---------- Tab halaman Proses ---------- */
 
 .tabs {
@@ -1651,11 +1680,6 @@ select:focus {
 }
 
 .gaya-grid .field { margin-bottom: 0; }
-/* Lebarnya DITETAPKAN, bukan diwarisi dari bingkai HP di dalamnya. Untuk layout
-   tanpa caption bingkainya disembunyikan dan diganti satu kalimat, dan kolom
-   yang lebarnya bergantung isi ikut menciut sampai label di kolom sebelahnya
-   saling menabrak. Angkanya sama dengan .hp.kecil. */
-.gaya-grid .pratinjau { flex: none; width: 168px; }
 
 .gaya-grid select,
 .gaya-grid input[type=text],
@@ -1688,8 +1712,6 @@ select:focus {
   text-transform: uppercase;
 }
 
-.hp.kecil { width: 168px; margin-top: 0; border-width: 6px; border-radius: 20px; }
-
 /* Saklar caption memayungi lima knob di bawahnya, jadi ia menempati kedua
    kolom kontrol — bukan berdiri sejajar dengan yang dikendalikannya. */
 .gaya-knob .saklar { grid-column: 1 / -1; }
@@ -1716,9 +1738,9 @@ select:focus {
 .gaya-grid .field.mati { opacity: .4; }
 
 @media (max-width: 720px) {
-  /* Pratinjau turun ke bawah knobnya. Berdampingan, keduanya tinggal ~120px
-     masing-masing dan tidak ada yang tersisa untuk dibaca. */
-  .gaya-grid { flex-direction: column; }
+  /* .gaya-grid sekarang cuma berisi .gaya-knob (pratinjau sudah pindah jadi
+     panel level halaman) — dua kolom knob-nya sendiri yang diciutkan jadi
+     satu supaya tidak sempit di layar HP. */
   .gaya-knob { width: 100%; grid-template-columns: 1fr; }
 }
 

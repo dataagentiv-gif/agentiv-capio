@@ -275,6 +275,10 @@ function idJob(id) {
 // seluruh isi job beserta klipnya.
 (function penandaJalan() {
   const titik = document.querySelector('.dock .titik');
+  // Banner update dipasang di poller yang sama, bukan poller kedua — dua-
+  // duanya cuma butuh /api/status yang sudah difetch di sini.
+  const banner = document.querySelector('#update-banner');
+  const versiEl = document.getElementById('update-versi');
   if (!titik) return;
 
   async function cek() {
@@ -282,10 +286,15 @@ function idJob(id) {
       const s = await (await fetch('/api/status')).json();
       titik.hidden = !s.jalan;
       titik.title = s.jalan ? `${s.jalan} video sedang diproses` : '';
+      const lis = s.lisensi || {};
+      if (banner) {
+        banner.hidden = !lis.update_tersedia;
+        if (lis.update_tersedia && versiEl) versiEl.textContent = ` (${lis.versi_terbaru})`;
+      }
     } catch {
-      // API tidak terjangkau bukan berarti tidak ada job berjalan. Titiknya
-      // dibiarkan apa adanya, bukan dimatikan — mematikannya adalah pernyataan
-      // yang tidak bisa dibuktikan.
+      // API tidak terjangkau bukan berarti tidak ada job berjalan atau tidak
+      // ada update. Titik dan banner dibiarkan apa adanya, bukan dimatikan —
+      // mematikannya adalah pernyataan yang tidak bisa dibuktikan.
     }
   }
 

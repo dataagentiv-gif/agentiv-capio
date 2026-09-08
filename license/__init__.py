@@ -267,7 +267,8 @@ def verifikasi() -> dict:
                 "pesan": "Token dari server tidak bisa diverifikasi. "
                          "Hubungi Agentiv — ini masalah di sisi kami."}
 
-    _simpan(token, {"diperiksa": time.time(), "alasan": "", "pesan": ""})
+    _simpan(token, {"diperiksa": time.time(), "alasan": "", "pesan": "",
+                     "versi_terbaru": d.get("latest_version")})
     log.info("lisensi terverifikasi")
     return {"ok": True, "alasan": "", "terhubung": True, "pesan": "Lisensi aktif."}
 
@@ -291,6 +292,8 @@ def status() -> dict:
         "gagal_sejak": catatan.get("gagal_sejak"),
         "alasan": catatan.get("alasan", ""),
         "pesan": catatan.get("pesan", ""),
+        "versi_terbaru": catatan.get("versi_terbaru"),
+        "update_tersedia": _lebih_baru(catatan.get("versi_terbaru"), settings.VERSI),
     }
     if not dasar["punya_key"]:
         dasar["pesan"] = "License key belum diisi."
@@ -323,6 +326,23 @@ def _sisa_hari(iso: str) -> int | None:
     except ValueError:
         return None
     return max(0, round((t - datetime.now(timezone.utc)).total_seconds() / 86400))
+
+
+def _lebih_baru(versi_terbaru: str | None, versi_sekarang: str) -> bool:
+    """True kalau versi_terbaru semver lebih baru dari versi_sekarang.
+
+    Dibandingkan sebagai tuple angka, bukan string — "1.9.0" > "1.10.0" secara
+    string padahal salah. Versi yang tidak bisa di-parse dianggap "tidak ada
+    update", bukan error: field ini diisi manual oleh admin, jadi typo harus
+    gagal senyap — status() wajib 100% bebas jaringan dan tidak boleh melempar.
+    """
+    if not versi_terbaru:
+        return False
+    try:
+        return tuple(int(x) for x in versi_terbaru.split(".")) > \
+               tuple(int(x) for x in versi_sekarang.split("."))
+    except (ValueError, AttributeError):
+        return False
 
 
 def boleh_submit() -> tuple[bool, str]:

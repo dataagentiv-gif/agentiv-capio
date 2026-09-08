@@ -168,6 +168,15 @@ class Settings(BaseSettings):
     MAX_CLIP_SEC: float = 90.0
     TARGET_CLIPS_DEFAULT: int = 8
 
+    # --- Konkurensi worker ---
+    #
+    # multi menjalankan beberapa proses worker sekaligus lewat subprocess.Popen
+    # di dalam container yang sama (worker/runner.py) — bukan replika container
+    # terpisah, supaya bisa diganti dari halaman Setting tanpa menyentuh
+    # docker-compose.yml.
+    WORKER_MODE: str = "single"   # single | multi
+    WORKER_COUNT: int = 2          # dipakai hanya kalau WORKER_MODE = multi
+
     # --- Kalibrasi pipeline (lihat README bagian Kalibrasi) ---
     # Threshold silencedetect. -30dB cocok untuk podcast bersih; source ber-musik
     # latar butuh -35dB. Kalau daftar silence balik kosong, refine tidak nge-snap
