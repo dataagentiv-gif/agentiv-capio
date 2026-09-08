@@ -95,7 +95,7 @@ venv/Scripts/python main.py worker
 
 | Halaman | Isi |
 |---|---|
-| **Submit** `/` | Link YouTube atau unggah berkas sendiri, jumlah klip, pemilih layout dengan contoh videonya, dan knob gaya caption — semuanya per video. Strip di atas menunjukkan provider aktif, status lisensi, dan apakah konfigurasi sudah lengkap, jadi yang bolong ketahuan *sebelum* submit, bukan belasan menit kemudian. |
+| **Submit** `/` | Link YouTube atau unggah berkas sendiri, jumlah klip, pemilih layout dengan contoh videonya, dan knob gaya caption — semuanya per video. Begitu satu layout dipilih, halaman melebar dan panel pratinjau caption (dirender lewat jalur yang sama dengan produksi, bukan tiruan CSS) muncul di sebelah kanan. Strip di atas menunjukkan provider aktif, status lisensi, dan apakah konfigurasi sudah lengkap, jadi yang bolong ketahuan *sebelum* submit, bukan belasan menit kemudian. |
 | **Proses** `/process` | Job berjalan dengan penanda 9 tahap, plus job gagal beserta error-nya. Tiap job bisa dihapus. |
 | **Hasil** `/results` | Klip jadi, bisa diputar, diunduh, atau dihapus — satu per satu maupun sekaligus per job. |
 | **Setting** `/settings` | Semua konfigurasi (termasuk license key), dengan tombol tes per provider. |
@@ -106,6 +106,12 @@ manager — tidak perlu lewat aplikasi.
 Tombol **Hapus** membuang berkasnya dari disk, bukan sekadar barisnya dari
 layar. Menghapus job juga membersihkan folder kerjanya, yang menyimpan video
 sumber mentah dan biasanya jadi penyebab utama disk penuh.
+
+Dua hal muncul di **semua halaman**, bukan cuma satu: nomor versi yang
+terpasang (`vX.Y.Z`, kecil di sebelah logo Agentiv di nav — buat
+troubleshooting, bukan branding) dan banner "versi baru tersedia" kalau
+Agentiv sudah mengumumkan rilis lebih baru dari yang sedang berjalan.
+Keduanya cuma informasi; tidak ada yang diblokir kalau belum update.
 
 ---
 
