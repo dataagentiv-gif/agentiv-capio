@@ -1,0 +1,22 @@
+# Override untuk PENGEMBANGAN LOKAL saja — TIDAK ikut ke paket client.
+#
+# docker-compose.yml (yang dikirim ke client) sengaja tanpa `build:` sejak
+# dd1c44e: client menarik image jadi dari Docker Hub, tidak pernah memegang
+# source. Tapi itu berarti `docker compose up -d --build` di REPO INI juga
+# ikut berhenti membangun apa pun — compose cuma memakai image yang sudah ada
+# (lokal atau ke-pull dari Hub), dan perubahan kode lokal tidak pernah
+# terpakai TANPA satu pun error yang bilang begitu. Persis kelas kegagalan
+# senyap yang paling sering ketemu di project ini.
+#
+# Compose membaca file ini otomatis (tanpa flag apa pun) kalau namanya persis
+# `docker-compose.override.yml` dan berada di folder yang sama. `build: .` di
+# sini digabung dengan `image: agentiv/capio:latest` yang sudah ada di
+# anchor x-app: Compose membangun dari source lalu MEN-TAG hasilnya dengan
+# nama image itu — jadi tetap satu image yang dipakai api dan worker, dan
+# `docker compose up -d --build` di README kembali berfungsi seperti yang
+# tertulis.
+services:
+  api:
+    build: .
+  worker:
+    build: .

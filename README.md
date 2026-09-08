@@ -61,6 +61,11 @@ memakai image lama dan perubahan tidak terpakai — tanpa error, cuma perilaku
 yang tidak berubah. Ubah **konfigurasi** lewat halaman Setting tidak perlu
 rebuild: worker membaca ulang `.env` di awal tiap job.
 
+`docker-compose.yml` yang dikirim ke client tidak punya `build:` sama sekali
+(mereka menarik image jadi dari Docker Hub). `docker-compose.override.yml` di
+repo ini yang mengembalikannya untuk pengembangan lokal — dibaca Compose
+otomatis, tidak perlu flag tambahan, dan tidak ikut ke paket client.
+
 ### Tanpa Docker
 
 Butuh **Python 3.12** dan **ffmpeg** di PATH.
@@ -90,10 +95,10 @@ venv/Scripts/python main.py worker
 
 | Halaman | Isi |
 |---|---|
-| **Submit** `/` | Link YouTube dan jumlah klip. Strip di atas menunjukkan provider aktif dan apakah konfigurasi sudah lengkap — jadi key yang bolong ketahuan *sebelum* submit, bukan belasan menit kemudian. |
+| **Submit** `/` | Link YouTube atau unggah berkas sendiri, jumlah klip, pemilih layout dengan contoh videonya, dan knob gaya caption — semuanya per video. Strip di atas menunjukkan provider aktif, status lisensi, dan apakah konfigurasi sudah lengkap, jadi yang bolong ketahuan *sebelum* submit, bukan belasan menit kemudian. |
 | **Proses** `/process` | Job berjalan dengan penanda 9 tahap, plus job gagal beserta error-nya. Tiap job bisa dihapus. |
 | **Hasil** `/results` | Klip jadi, bisa diputar, diunduh, atau dihapus — satu per satu maupun sekaligus per job. |
-| **Setting** `/settings` | Semua konfigurasi, dengan tombol tes per provider. |
+| **Setting** `/settings` | Semua konfigurasi (termasuk license key), dengan tombol tes per provider. |
 
 Klip juga bisa diambil langsung dari folder `clips/<job-id>/` lewat file
 manager — tidak perlu lewat aplikasi.
@@ -190,6 +195,35 @@ untuk konten yang murni Bahasa Indonesia.
 
 Pipeline memakai **dua panggilan LLM per video**, jadi kuota gratis Gemini
 (1.000 permintaan/hari) setara sekitar 500 video per hari.
+
+### Lisensi
+
+CAPIO butuh **license key** untuk memproses video baru — diisi lewat halaman
+**Setting**, bagian Lisensi. Kosong atau tidak aktif berarti aplikasi tetap
+jalan normal: klip yang sudah ada tetap bisa dibuka, diputar, dan diunduh,
+cuma submit job **baru** yang diblokir sampai key-nya terverifikasi.
+
+Gerbangnya satu fungsi (`license.boleh_submit()`), disengaja begitu —
+lihat komentar di `license/__init__.py` sebelum menyentuhnya. Verifikasi
+tidak pernah memblokir halaman Setting sendiri: kalau iya, key tidak akan
+pernah bisa dimasukkan sama sekali.
+
+### Tampilan
+
+Empat bentuk klip (`penuh`, `kotak`, `samping`, `ori`) plus gaya caption
+(font, ukuran, warna kata aktif, jumlah kata per tampilan, huruf besar) —
+dipilih **per video** di halaman Submit, bukan sekali untuk semua video.
+Nilai di halaman Setting cuma jadi nilai awal yang tampil pertama kali.
+Detail tiap layout ada di `pipeline/layout.py`.
+
+### Kinerja
+
+Satu job diproses sekaligus secara bawaan (`WORKER_MODE=single`). Bisa
+diganti ke `multi` di halaman Setting untuk memproses beberapa job
+bersamaan — lebih cepat kalau CPU-nya cukup, tapi setiap job menjalankan
+ffmpeg yang memakai semua core tanpa batas, jadi di mesin kecil job
+paralel bisa membuat semuanya lebih lambat, bukan lebih cepat. Naikkan
+`WORKER_COUNT` bertahap sambil memperhatikan beban CPU.
 
 ---
 
@@ -380,4 +414,7 @@ diperkirakan.
 
 ## Lisensi
 
-Belum ditentukan.
+Produk berbayar milik Agentiv, bukan open source — didistribusikan ke client
+sebagai image Docker (`agentiv/capio`), bukan lewat source ini. Mekanisme
+teknisnya (bukan syarat legalnya — itu keputusan bisnis, di luar cakupan
+dokumen ini) ada di `license/__init__.py`.
