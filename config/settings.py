@@ -120,7 +120,16 @@ class Settings(BaseSettings):
     # VERSI ikut terkirim ke server lisensi sebagai agent_version dan tersimpan
     # di tabel activations — satu-satunya cara tahu versi berapa yang dipakai
     # client saat mereka melaporkan masalah. Naikkan bersamaan dengan tag image.
-    VERSI: str = "1.1.0"
+    #
+    # 1.3.0, bukan 1.2.0: tag Docker Hub sempat naik ke 1.2.0 tanpa VERSI di
+    # kode ikut naik (push image adalah langkah manual di luar repo ini, lihat
+    # README bagian rilis), jadi angka ini sudah telat satu rilis SEBELUM tiga
+    # fitur baru commit ini (notifikasi update, mode worker, panel pratinjau)
+    # ditambahkan. Membiarkannya di 1.1.0 juga merusak fitur notifikasi update
+    # yang baru ditambahkan sendiri: _lebih_baru() akan terus membandingkan ke
+    # angka basi ini, dan banner "ada update" tidak akan pernah berhenti
+    # muncul ke client yang sebenarnya sudah di versi terbaru.
+    VERSI: str = "1.3.0"
     AGENTIV_WA: str = "6285843570782"
 
     # Kosong = pakai alamat produksi yang tertulis di license/__init__.py.
