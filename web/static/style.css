@@ -209,6 +209,20 @@ a { color: var(--color-action); }
    pertama boleh mengalah. */
 @media (max-width: 720px) { .oleh { display: none; } }
 
+/* Nomor versi terpasang. Sengaja seukuran keterangan kecil, bukan badge atau
+   warna aksen — ini alat troubleshooting/support, bukan sesuatu yang perlu
+   menarik perhatian di setiap halaman. */
+.versi-terpasang {
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(13, 23, 38, .14);
+  color: var(--color-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) { .versi-terpasang { display: none; } }
+
 /* ---------- Dock navigasi ----------
    Item aktif diangkat ke lingkaran putih yang menyembul di atas dock, dan
    docknya melekuk mengikuti lingkaran itu.

@@ -62,6 +62,10 @@ templates.env.globals["v"] = _cap_aset()
 # saja, dan tautan yang dihitung sekali saat start akan membawa key lama
 # seumur proses.
 templates.env.globals["wa"] = lisensi.tautan_wa
+# Nilai, bukan fungsi: VERSI tidak bisa diubah dari halaman Setting (tidak ada
+# di FIELDS env_store.py) dan cuma berubah lewat build image baru — sama
+# seperti `v`, aman dihitung sekali saat start.
+templates.env.globals["versi"] = settings.VERSI
 
 
 @asynccontextmanager

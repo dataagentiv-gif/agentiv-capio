@@ -113,6 +113,12 @@
     <a class="oleh" href="https://agentiv.my.id" target="_blank" rel="noopener">
       by <img src="/static/agentiv.png?v={{ v }}" alt="Agentiv" width="400" height="93">
     </a>
+    {# Nomor versi terpasang, kecil dan tidak mencolok — ini bukan branding,
+       cuma buat troubleshooting/support: biar client bisa langsung bandingin
+       ke versi yang disebut di banner "ada update" tanpa buka Setting dulu.
+       Ditaruh di semua halaman lewat _layout.html, sama seperti atribusi
+       Agentiv di sebelahnya. #}
+    <span class="versi-terpasang" title="Versi CAPIO yang terpasang">v{{ versi }}</span>
     {# Dock gelap dengan lekukan di bawah item aktif. Bentuk docknya digambar
        satu path SVG oleh app.js; kalau JS mati, CSS memberi latar pil biasa
        sehingga navigasinya tetap terbaca dan bisa dipakai — cuma tanpa
