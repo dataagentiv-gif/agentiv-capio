@@ -70,6 +70,13 @@ templates.env.globals["versi"] = settings.VERSI
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # WAJIB pertama, sama seperti worker/runner.py: compose memuat .env ke
+    # environment container saat container DIBUAT, dan pydantic-settings
+    # memprioritaskan environment di atas isi file .env. Tanpa ini, key yang
+    # disimpan lewat halaman Setting lalu "hilang lagi" begitu container API
+    # di-restart/recreate — file-nya tetap benar, tapi proses baru membaca
+    # environment beku dari saat container lahir, bukan file yang sekarang.
+    env_store.reload()
     models.init()
     # Verifikasi saat start, dan kegagalannya TIDAK PERNAH menjatuhkan aplikasi.
     # Tanpa key, halaman Setting harus tetap terbuka — di situlah key
