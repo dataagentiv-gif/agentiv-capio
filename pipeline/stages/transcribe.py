@@ -5,7 +5,7 @@ Output : words.json     -> [{"i", "w", "s", "e"}]        caption karaoke (Stage 
          sentences.json -> [{"text", "s", "e"}]          bahan LLM (Stage 3)
 
 Provider mana yang dipakai ditentukan ASR_PROVIDER di .env; stage ini tidak
-tahu-menahu soal Groq maupun ElevenLabs.
+tahu-menahu soal ElevenLabs maupun Gemini secara spesifik.
 """
 import json
 import math
@@ -24,10 +24,13 @@ CHUNK_SEC = 1200.0  # 20 menit
 def _chunks(audio: Path, workdir: Path, duration: float, deadline) -> tuple[list, list]:
     """Cabang untuk audio melebihi batas provider.
 
-    Pada Groq (25MB, opus 24kbps) ini baru kena di ~2.3 jam audio; pada Scribe
-    (3GB) praktis tidak pernah. Karena itu sengaja dibiarkan sederhana: potong
-    tepat 20 menit tanpa menyesuaikan ke jeda bicara. Satu kata terpotong di
-    batas chunk tiap 20 menit tidak mengubah hasil seleksi momen.
+    CHUNK_SEC dipatok ke batas TERKETAT yang ada: Gemini menolak word timestamp
+    di atas 30 menit per request, jadi 20 menit menyisakan margin aman.
+    ElevenLabs (2GB) baru kena batas ukuran di berjam-jam audio — untuk provider
+    itu cabang ini nyaris tidak pernah jalan. Karena itu sengaja dibiarkan
+    sederhana: potong tepat 20 menit tanpa menyesuaikan ke jeda bicara. Satu
+    kata terpotong di batas chunk tiap 20 menit tidak mengubah hasil seleksi
+    momen.
     """
     words: list[dict] = []
     sentences: list[dict] = []

@@ -112,9 +112,8 @@ def test_tes_koneksi_membedakan_tanpa_jatah_gratis_dari_kuota_habis():
 
 def test_penyedia_disebut_namanya():
     """"Kuota habis" tanpa menyebut kuota MILIK SIAPA tidak bisa ditindaklanjuti
-    — ada empat penyedia dan masing-masing punya halaman key sendiri."""
-    for kunci, nama in (("groq", "Groq"), ("openrouter", "OpenRouter"),
-                        ("gemini", "Gemini")):
+    — tiap penyedia punya halaman key sendiri."""
+    for kunci, nama in (("elevenlabs", "ElevenLabs"), ("gemini", "Gemini")):
         m = pesan.terjemah(f"RuntimeError: {kunci} HTTP 429 quota_exceeded")
         assert nama in m["judul"]
 

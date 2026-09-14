@@ -61,8 +61,8 @@ def _kata_contoh() -> list[dict]:
 def render(nama_layout: str | None = None,
            knob_tambahan: dict | None = None) -> tuple[bytes, str]:
     """(isi berkas, media type)."""
-    lay = layout.ambil(nama_layout or settings.CLIP_LAYOUT)
     knob = {**knob_dari_settings(), **(knob_tambahan or {})}
+    lay = layout.terapkan_knob(layout.ambil(nama_layout or settings.CLIP_LAYOUT), knob)
 
     # Render ffmpeg butuh waktu; setelan yang sama pasti menghasilkan berkas
     # yang sama, jadi tidak ada gunanya menghitung ulang saat orang bolak-balik

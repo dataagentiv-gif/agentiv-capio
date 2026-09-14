@@ -23,10 +23,13 @@ rq>=2.0
 
 # --- Pipeline ---
 yt-dlp>=2024.8
-groq>=0.11
-# Dipakai untuk OpenRouter. Bukan SDK openai: yang dibutuhkan cuma satu endpoint
-# chat/completions, dan satu POST httpx lebih ringan daripada satu SDK penuh.
+# Dipakai untuk ElevenLabs dan Gemini. Bukan SDK: yang dibutuhkan cuma beberapa
+# endpoint HTTP, dan satu POST httpx lebih ringan daripada satu SDK penuh.
 httpx>=0.27
+# Lebar kata dalam piksel untuk gaya kata aktif "blok" (pipeline/metrik.py).
+# Sudah ikut transitif, tapi ditulis sendiri: yang dipakai langsung jangan
+# bergantung pada dependency orang lain yang suatu saat bisa berhenti menariknya.
+fonttools>=4.40
 # Pin eksak. mediapipe 0.10.x memaksa numpy<2 + protobuf<5 dan menarik jax —
 # pin itu berantem dengan dep lain di venv ini. 1.0.1 tidak memaksa apa pun.
 mediapipe==1.0.1

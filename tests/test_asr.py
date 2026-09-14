@@ -69,19 +69,25 @@ def test_satu_kalimat_utuh_tidak_dipaksa_pecah():
 
 # --- pemilihan provider ---
 
-def test_provider_tidak_dikenal_ditolak(monkeypatch):
-    monkeypatch.setattr(settings, "ASR_PROVIDER", "deepgram")
-    with pytest.raises(RuntimeError, match="tidak dikenal"):
+@pytest.mark.parametrize("nama", ["groq", " Groq ", "deepgram"])
+def test_provider_lama_atau_asing_jatuh_ke_yang_ada(monkeypatch, nama):
+    """Groq sudah dibuang, tapi .env client yang update lewat `docker compose
+    pull` masih bisa berisi ASR_PROVIDER=groq. Menolaknya membuat worker gagal
+    start dan diulang `restart: unless-stopped` selamanya."""
+    monkeypatch.setattr(settings, "ASR_PROVIDER", nama)
+    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
+    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
+    assert asr.nama() == "elevenlabs"
+    # Sampai ke client ElevenLabs (gagal karena key kosong), bukan ditolak
+    # dispatcher.
+    with pytest.raises(RuntimeError, match="ElevenLabs API key kosong"):
         asr.check_config()
 
 
-@pytest.mark.parametrize("nama", ["groq", "GROQ", " Groq "])
+@pytest.mark.parametrize("nama", ["elevenlabs", "ELEVENLABS", " ElevenLabs "])
 def test_nama_provider_tidak_peduli_huruf_besar_kecil(monkeypatch, nama):
     monkeypatch.setattr(settings, "ASR_PROVIDER", nama)
-    monkeypatch.setattr(settings, "GROQ_API_KEYS", "")
-    monkeypatch.setattr(settings, "GROQ_API_KEY", "")
-    with pytest.raises(RuntimeError, match="Groq API key"):
-        asr.check_config()
+    assert asr.nama() == "elevenlabs"
 
 
 def test_key_elevenlabs_kosong_ditolak_dengan_pesan_jelas(monkeypatch):
@@ -102,12 +108,3 @@ def test_key_gemini_kosong_ditolak_dengan_pesan_jelas(monkeypatch):
 def test_gemini_membatasi_satu_request_ke_20_menit(monkeypatch):
     monkeypatch.setattr(settings, "ASR_PROVIDER", "gemini")
     assert asr.duration_limit() == 1200.0
-
-
-def test_batas_ukuran_beda_jauh_antar_provider(monkeypatch):
-    """Groq 25MB, Scribe 3GB — kalau tertukar, audio 1 jam dipecah sia-sia
-    atau justru ditolak provider karena kebesaran."""
-    monkeypatch.setattr(settings, "ASR_PROVIDER", "groq")
-    kecil = asr.size_limit()
-    monkeypatch.setattr(settings, "ASR_PROVIDER", "elevenlabs")
-    assert asr.size_limit() > kecil * 50

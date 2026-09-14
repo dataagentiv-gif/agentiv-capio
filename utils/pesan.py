@@ -21,13 +21,11 @@ yang hilang cuma terjemahannya.
 import re
 
 #: Nama penyedia beserta tempat mengurus key-nya. Diambil dari teks mentah,
-#: supaya satu aturan ("kuota habis") bisa melayani keempat penyedia tanpa
-#: ditulis empat kali.
+#: supaya satu aturan ("kuota habis") bisa melayani semua penyedia tanpa
+#: ditulis ulang per penyedia.
 PENYEDIA = {
     "elevenlabs": ("ElevenLabs", "elevenlabs.io/app/settings/api-keys"),
-    "groq": ("Groq", "console.groq.com/keys"),
     "gemini": ("Gemini", "aistudio.google.com/apikey"),
-    "openrouter": ("OpenRouter", "openrouter.ai/keys"),
 }
 
 UMUM = "Tunjukkan detail teknis di bawah ke orang yang memasang CAPIO."
@@ -75,7 +73,7 @@ def _model(teks: str) -> tuple[str, str]:
     return (
         f"Nama model {nama} sudah tidak berlaku",
         f"Key-nya kemungkinan besar tidak apa-apa — yang perlu diganti nama "
-        f"modelnya. Buka halaman Setting, bagian LLM, lalu pakai nama beralias "
+        f"modelnya. Buka halaman Setting → API Key → Lanjutan, lalu pakai nama beralias "
         f"yang berakhiran -latest (misalnya gemini-flash-lite-latest): alias "
         f"selalu menunjuk versi terbaru, jadi ia tidak ikut pensiun. Tekan "
         f"'Tes {nama.lower()}' untuk memastikan sebelum memproses video.",
@@ -163,7 +161,7 @@ ATURAN: list[tuple[tuple[str, ...], object]] = [
         "Waktunya habis sebelum selesai",
         "Videonya terlalu panjang, atau internetnya sedang lambat sehingga "
         "unduhannya belum selesai saat waktu habis. Coba video yang lebih "
-        "pendek, atau naikkan batas waktu di halaman Setting → Infra.",
+        "pendek, atau naikkan batas waktu di halaman Setting → Klip → Lanjutan.",
     )),
     (("transkrip kosong", "tanpa suara"), (
         "Tidak ada suara yang bisa dikenali di video ini",

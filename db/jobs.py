@@ -1,5 +1,6 @@
 """CRUD tabel jobs. Satu fungsi = satu operasi, tanpa logic pipeline."""
 import uuid
+from datetime import datetime
 
 from sqlalchemy import or_, select
 
@@ -37,6 +38,26 @@ def list_all(limit: int = 100) -> list[dict]:
             select(Job).order_by(Job.created_at.desc()).limit(limit)
         ).all()
         return [r.as_dict() for r in rows]
+
+
+def list_selesai_sebelum(batas: datetime) -> list[dict]:
+    """Job yang sudah selesai (done/failed) dan dibuat sebelum `batas`.
+
+    Job yang antre atau berjalan tidak pernah ikut, berapa pun umurnya: job
+    yang tersangkut lama justru yang sedang ditunggu orang.
+    """
+    with session_scope() as s:
+        rows = s.scalars(
+            select(Job).where(
+                Job.status.in_((Status.DONE, Status.FAILED)),
+                Job.created_at < batas,
+            )
+        ).all()
+        return [r.as_dict() for r in rows]
+
+
+def kosongkan_clips(job_id: str | uuid.UUID) -> None:
+    _update(job_id, clips=None)
 
 
 def _update(job_id: str | uuid.UUID, **fields) -> None:

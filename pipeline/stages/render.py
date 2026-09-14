@@ -36,8 +36,10 @@ def _mask(workdir: Path, lay, g: dict, deadline) -> str:
     yang sama, karena geometrinya tidak berubah antar klip.
     """
     r = lay.redup
+    # round, bukan int: int(0.29 * 100) = 28, jadi dua setelan berbeda bisa
+    # berbagi nama berkas dan yang kedua memakai gambar milik yang pertama.
     nama = (f"lapis{g['bw']}x{g['bh']}r{lay.radius}"
-            f"g{int(r[0] * 100) if r else 0}_{int(r[1] * 100) if r else 0}.png")
+            f"g{round(r[0] * 100) if r else 0}_{round(r[1] * 100) if r else 0}.png")
     if (workdir / nama).exists():
         return nama
 
@@ -87,10 +89,12 @@ def _mask(workdir: Path, lay, g: dict, deadline) -> str:
 
 
 def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
-                src_w: int, src_h: int, deadline, nama_layout: str = "penuh",
+                src_w: int, src_h: int, deadline, lay=None,
                 teks: bool = True) -> Path:
     out = Path("clips") / f"{seg['id']}.mp4"
-    lay = layout.ambil(nama_layout)
+    # Objek Layout, bukan nama: knob bayangan milik job sudah diterapkan di
+    # run(), dan mengambil ulang dari nama akan membuangnya diam-diam.
+    lay = lay or layout.ambil("penuh")
     g = layout.geometri(lay, crop, src_w, src_h)
     mask = _mask(workdir, lay, g, deadline) if layout.butuh_lapisan(lay) else None
     # Nama file polos, tanpa path. Inilah gunanya cwd=workdir: filter subtitles
@@ -139,7 +143,8 @@ def run(ctx: dict) -> dict:
     deadline = ctx["deadline"]
     (workdir / "clips").mkdir(exist_ok=True)
 
-    lay = layout.ambil(ctx.get("layout") or settings.CLIP_LAYOUT)
+    lay = layout.terapkan_knob(
+        layout.ambil(ctx.get("layout") or settings.CLIP_LAYOUT), ctx.get("gaya"))
     teks = layout.pakai_caption(lay, ctx.get("gaya"))
     log.info("render memakai layout '%s'%s", lay.nama, "" if teks else " tanpa caption")
 
@@ -148,7 +153,7 @@ def run(ctx: dict) -> dict:
         crop = ctx["crops"][seg["id"]]
         # Retry 1x (PRD Bagian 6) = 2 percobaan.
         path = retry(attempts=2, backoff=2.0)(_render_one)(
-            source, workdir, seg, crop, src_w, src_h, deadline, lay.nama, teks
+            source, workdir, seg, crop, src_w, src_h, deadline, lay, teks
         )
         size_mb = path.stat().st_size / 1e6
         if size_mb < 0.05:

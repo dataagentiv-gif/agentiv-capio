@@ -165,6 +165,24 @@ def test_warna_ngawur_jatuh_ke_putih():
     assert L._bgr("bukan warna") == "FFFFFF"
 
 
+def test_warna_enam_karakter_bukan_hex_tidak_menyelinap_ke_tag():
+    """Hasilnya ditempel di dalam blok override .ass; kurawal yang lolos
+    menutup blok itu lebih awal dan merusak seluruh baris caption."""
+    assert L._bgr("a{b}cd") == "FFFFFF"
+
+
+def test_ukuran_teks_mengikuti_skala_libass():
+    """Fontsize libass = tinggi win ascent+descent, bukan em. Salah skala
+    membuat semua kata terukur hampir dua kali lebih lebar."""
+    from pipeline import metrik
+
+    assert metrik.vertikal("Poppins", 96, True)[0] == 96
+    satu = metrik.lebar("kata", "Poppins", 96, True)
+    assert 100 < satu < 160
+    assert abs(metrik.lebar("kata", "Poppins", 192, True) - 2 * satu) < 1e-6
+    assert metrik.lebar("Lora", "Lora", 96, True) > metrik.lebar("Lora", "Lora", 96, False)
+
+
 def test_header_memakai_font_dan_ukuran_dari_knob():
     h = L.header_ass(L.ambil("kotak"), {"font": "Anton", "ukuran": 130})
     assert "Anton,130," in h
@@ -224,11 +242,42 @@ def test_samping_menyarankan_serif():
     assert L.ambil("samping").font_saran == "Lora"
 
 
-def test_gradasi_samping_jauh_lebih_halus_dari_versi_awal():
-    """Versi awal 0.88 terbaca sebagai bidang gelap. Sekarang perannya cuma
-    asuransi keterbacaan untuk sumber yang latarnya terang."""
+def test_gradasi_samping_di_antara_terlalu_tipis_dan_terlalu_pekat():
+    """Versi awal 0.88 terbaca sebagai bidang gelap; 0.45 sesudahnya ternyata
+    tidak cukup menahan latar terang di pemakaian nyata. Defaultnya harus di
+    antara keduanya — ujung-ujungnya masih bisa dicapai lewat knob."""
     _, maks = L.ambil("samping").redup
-    assert maks < 0.6
+    assert 0.6 <= maks <= 0.8
+
+
+# --- knob bayangan per video ---
+
+def test_knob_bayangan_menimpa_default_layout():
+    lay = L.terapkan_knob(L.ambil("samping"), {"redup_gelap": 50, "redup_luas": 70})
+    assert lay.redup == (0.3, 0.5)
+
+
+def test_knob_bayangan_dijepit_ke_rentang_aman():
+    """Di atas 85% detail video tertutup; luas di atas 80% merayap ke
+    pembicara. Nilai dari API tidak boleh melewati itu."""
+    lay = L.terapkan_knob(L.ambil("samping"), {"redup_gelap": 500, "redup_luas": -9})
+    assert lay.redup == (1 - L.REDUP_LUAS[0] / 100, L.REDUP_GELAP[1] / 100)
+
+
+def test_bayangan_nol_berarti_tanpa_bayangan_bukan_default():
+    assert L.terapkan_knob(L.ambil("samping"), {"redup_gelap": 0}).redup[1] == 0
+
+
+def test_knob_kosong_atau_ngawur_ikut_default_layout():
+    asli = L.ambil("samping")
+    assert L.terapkan_knob(asli, None) == asli
+    assert L.terapkan_knob(asli, {"redup_gelap": "abc"}).redup == asli.redup
+
+
+def test_knob_bayangan_tidak_menciptakan_bayangan_di_layout_lain():
+    for nama in ("penuh", "kotak", "ori"):
+        lay = L.ambil(nama)
+        assert L.terapkan_knob(lay, {"redup_gelap": 70, "redup_luas": 60}) is lay
 
 
 def test_header_tidak_tebal_saat_layout_meminta():

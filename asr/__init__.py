@@ -13,8 +13,11 @@ from pathlib import Path
 
 from asr import angka
 from config.settings import settings
+from utils.logging import get
 
-PROVIDERS = ("groq", "elevenlabs", "gemini")
+log = get(__name__)
+
+PROVIDERS = ("elevenlabs", "gemini")
 
 
 def rasio_non_latin(teks: str) -> float:
@@ -32,19 +35,29 @@ def rasio_non_latin(teks: str) -> float:
     return asing / len(huruf) * 100
 
 
+def nama() -> str:
+    """Provider yang BENAR-BENAR dipakai.
+
+    Nilai yang tidak dikenal jatuh ke provider yang ada, bukan ditolak. Groq
+    sudah dibuang, tapi .env milik client yang update lewat `docker compose
+    pull` masih bisa berisi ASR_PROVIDER=groq. Menolak membuat check_config
+    worker melempar saat start, dan `restart: unless-stopped` mengulanginya
+    selamanya — padahal provider yang tersisa jalan normal.
+    """
+    n = settings.ASR_PROVIDER.strip().lower()
+    return n if n in PROVIDERS else PROVIDERS[0]
+
+
 def _impl():
-    name = settings.ASR_PROVIDER.strip().lower()
-    if name == "groq":
-        from asr import client_groq as m
-    elif name == "elevenlabs":
-        from asr import client_elevenlabs as m
-    elif name == "gemini":
+    # Diperingatkan di sini, bukan di nama(): nama() ikut dipanggil strip
+    # status yang di-polling halaman, dan log-nya akan banjir.
+    if nama() != settings.ASR_PROVIDER.strip().lower():
+        log.warning("ASR_PROVIDER='%s' tidak dikenal — memakai %s",
+                    settings.ASR_PROVIDER, nama())
+    if nama() == "gemini":
         from asr import client_gemini as m
     else:
-        raise RuntimeError(
-            f"ASR_PROVIDER='{settings.ASR_PROVIDER}' tidak dikenal. "
-            f"Pilihan: {', '.join(PROVIDERS)}"
-        )
+        from asr import client_elevenlabs as m
     return m
 
 
@@ -55,8 +68,8 @@ def check_config() -> None:
 
 
 def size_limit() -> int:
-    """Batas ukuran file sebelum audio perlu dipecah. Beda jauh antar provider:
-    Groq 25MB, Scribe 3GB."""
+    """Batas ukuran file sebelum audio perlu dipecah. Tiap provider punya
+    batasnya sendiri (Scribe 3GB)."""
     return _impl().SIZE_LIMIT
 
 
@@ -86,5 +99,5 @@ def transcribe(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
     return rapi, sentences
 
 
-__all__ = ["PROVIDERS", "check_config", "size_limit", "duration_limit",
+__all__ = ["PROVIDERS", "check_config", "nama", "size_limit", "duration_limit",
            "rasio_non_latin", "transcribe"]

@@ -86,8 +86,8 @@ venv/Scripts/python main.py worker
 
 > **Dijalankan di laptop sendiri, bukan VPS.** yt-dlp kena bot-detection
 > YouTube yang jauh lebih galak dari datacenter, jadi siapkan cookies kalau
-> memang harus di server. Transkrip sendiri tidak jadi penghalang selama
-> memakai ElevenLabs — hanya Groq yang menolak IP datacenter dengan 403.
+> memang harus di server. Transkrip sendiri tidak jadi penghalang, karena
+> ElevenLabs dan Gemini tidak memblokir IP datacenter.
 
 ---
 
@@ -98,7 +98,7 @@ venv/Scripts/python main.py worker
 | **Submit** `/` | Link YouTube atau unggah berkas sendiri, jumlah klip, pemilih layout dengan contoh videonya, dan knob gaya caption — semuanya per video. Begitu satu layout dipilih, halaman melebar dan panel pratinjau caption (dirender lewat jalur yang sama dengan produksi, bukan tiruan CSS) muncul di sebelah kanan. Strip di atas menunjukkan provider aktif, status lisensi, dan apakah konfigurasi sudah lengkap, jadi yang bolong ketahuan *sebelum* submit, bukan belasan menit kemudian. |
 | **Proses** `/process` | Job berjalan dengan penanda 9 tahap, plus job gagal beserta error-nya. Tiap job bisa dihapus. |
 | **Hasil** `/results` | Klip jadi, bisa diputar, diunduh, atau dihapus — satu per satu maupun sekaligus per job. |
-| **Setting** `/settings` | Semua konfigurasi (termasuk license key), dengan tombol tes per provider. |
+| **Setting** `/settings` | Semua konfigurasi dalam lima tab — API Key, Lisensi, Klip, Kinerja, Infra — dengan tombol tes per provider. Penjelasan tiap setelan tersembunyi di balik ikon `?`, dan setelan yang jarang disentuh (model, kalibrasi) dilipat di bagian *Lanjutan*. |
 
 Klip juga bisa diambil langsung dari folder `clips/<job-id>/` lewat file
 manager — tidak perlu lewat aplikasi.
@@ -123,7 +123,7 @@ dipanggil untuk dua tugas sempit saja dan tidak pernah memutuskan alur.
 | # | Tahap | Alat | Hasil |
 |---|---|---|---|
 | 1 | Unduh | yt-dlp + ffmpeg | `source.mp4`, `audio.ogg` (16kHz mono opus) |
-| 2 | Transkrip | ElevenLabs / Groq / Gemini Transcribe | kata + kalimat, bertimestamp |
+| 2 | Transkrip | ElevenLabs / Gemini Transcribe | kata + kalimat, bertimestamp |
 | 3 | Seleksi momen | LLM | kandidat klip + skor + alasan |
 | 4 | Geser batas | ffmpeg | batas dipindah ke jeda alami terdekat |
 | 5 | Caption | generator `.ass` | caption karaoke per kata |
@@ -158,47 +158,30 @@ project, jadi bisa juga disunting manual kalau lebih suka.
 | Provider | Biaya | Catatan |
 |---|---|---|
 | **ElevenLabs** Scribe — *default* | ada tier gratis | Akurat untuk Bahasa Indonesia termasuk yang bercampur istilah Inggris. Tanpa blokir IP. Mengeja angka, tapi `asr/angka.py` mengubahnya kembali jadi digit. |
-| **Groq** Whisper | free tier 8 jam audio/hari | Sangat cepat — 15 menit audio selesai dalam ~4 detik. Aman untuk konten Indonesia murni. **Menolak IP datacenter/VPN dengan 403** — lihat peringatan di bawah. |
 | **Gemini 3.5 Transcribe** | tier gratis 25 request/hari **per project** Google Cloud | Memakai `GEMINI_API_KEYS`. Model ini hanya menulis **satu bahasa per request** dan diam-diam membuang kalimat bahasa lain — 28–31% detik bicara hilang pada video Indonesia berkutip Inggris. CAPIO menambalnya: celah bersuara tanpa kata dideteksi ffmpeg lalu ditranskrip ulang sekaligus dalam satu request tambahan, sisa 2–3% (setara video Indonesia murni). Konten Indonesia murni tetap 1 request. Key tambahan hanya menambah jatah kalau dibuat di project lain. |
-
-> ### Groq memblokir IP datacenter, dan gejalanya menyesatkan
->
-> Groq menolak permintaan dari IP datacenter dengan **HTTP 403** — VPS, cloud,
-> dan sebagian besar VPN termasuk di dalamnya. Yang bikin mahal: 403 terbaca
-> seperti "API key salah", jadi orang membuat key baru berkali-kali padahal
-> key-nya tidak pernah bermasalah.
->
-> **Cara mengenalinya:** tombol *Tes groq* di halaman Setting menjawab
-> `Ditolak (403). Groq memblokir IP datacenter — matikan VPN kalau menyala.`
-> Kalau pesan itu muncul, jangan sentuh key-nya.
->
-> **Jalan keluarnya:** matikan VPN, atau pakai ElevenLabs (default) yang tidak
-> memblokir IP mana pun. Ini juga alasan CAPIO ditujukan untuk laptop atau PC
-> sendiri, bukan VPS.
 
 Ini pilihan yang paling terasa hasilnya, karena **caption terbakar permanen di
 video**. Transkrip yang meleset kelihatan oleh penonton dan tidak bisa
 diperbaiki setelah render.
 
-**Kenapa Groq bukan lagi default.** Tiga video Indonesia berisi istilah Inggris
-ditranskrip kedua provider dari file audio yang sama persis. Pada satu dari tiga
-video, **29,6% keluaran Groq adalah teks Jepang** — Whisper berpindah bahasa
-lalu mengarang panjang lebar; dua video lain nol. Kalimat Inggris juga
-diterjemahkan alih-alih ditranskrip: *"Tools like Google Analytics"* keluar
-sebagai *"Tua seperti analitik"*.
-
-Yang menentukan bukan rata-rata akurasinya, melainkan bentuk kegagalannya: benar
-di dua video lalu ambruk total di video ketiga tanpa peringatan. Kegagalan tak
-merata seperti itu lebih sulit diantisipasi daripada kesalahan kecil yang
-konsisten. Groq tetap disediakan dan tetap berguna — cepat, gratis, dan aman
-untuk konten yang murni Bahasa Indonesia.
+**Kenapa Groq dibuang.** Tiga video Indonesia berisi istilah Inggris ditranskrip
+Groq dan ElevenLabs dari file audio yang sama persis. Pada satu dari tiga video,
+**29,6% keluaran Groq adalah teks Jepang** — Whisper berpindah bahasa lalu
+mengarang panjang lebar; dua video lain nol. Kalimat Inggris juga diterjemahkan
+alih-alih ditranskrip: *"Tools like Google Analytics"* keluar sebagai *"Tua
+seperti analitik"*. Kegagalan yang benar di dua video lalu ambruk total di video
+ketiga tanpa peringatan lebih sulit diantisipasi daripada kesalahan kecil yang
+konsisten. `ASR_PROVIDER=groq` yang masih tertulis di `.env` lama tidak membuat
+worker gagal start — CAPIO memakai provider yang tersisa.
 
 ### LLM
 
 | Provider | Catatan |
 |---|---|
 | **Gemini** | Ada free tier. Boleh diisi beberapa key dipisah koma. |
-| **OpenRouter** | Satu key untuk banyak model. |
+
+OpenRouter sudah dibuang; `LLM_PROVIDER` dan `OPENROUTER_*` di `.env` lama
+diabaikan tanpa error.
 
 Pipeline memakai **dua panggilan LLM per video**, jadi kuota gratis Gemini
 (1.000 permintaan/hari) setara sekitar 500 video per hari.
@@ -218,10 +201,34 @@ pernah bisa dimasukkan sama sekali.
 ### Tampilan
 
 Empat bentuk klip (`penuh`, `kotak`, `samping`, `ori`) plus gaya caption
-(font, ukuran, warna kata aktif, jumlah kata per tampilan, huruf besar) —
+(font, ukuran, jumlah kata per tampilan, huruf besar, gaya kata aktif) —
 dipilih **per video** di halaman Submit, bukan sekali untuk semua video.
 Nilai di halaman Setting cuma jadi nilai awal yang tampil pertama kali.
 Detail tiap layout ada di `pipeline/layout.py`.
+
+**Gaya kata aktif** ada tiga: *warna teks* (kata yang diucapkan cuma berubah
+warna), *blok* (blok bersudut tumpul di belakang kata itu), dan *blok +
+membesar* (blok, dan katanya membesar 1,08×). Warna blok, warna teks di dalam
+blok, radius sudut, dan padding bisa diatur. Karena libass tidak punya latar per
+kata yang bersudut tumpul, di dua gaya blok posisi tiap kata dihitung sendiri
+dari metrik font (`pipeline/metrik.py`) dan bloknya digambar sebagai vector
+drawing di titik tengah yang sama dengan katanya.
+
+Layout **Pembicara di kiri** (`samping`) punya bayangan gelap dari tepi kanan di
+belakang teksnya. Kegelapan (0–85%) dan luasnya (20–80% lebar) bisa digeser per
+video di halaman Submit.
+
+### Auto clear
+
+Tab **Infra** bisa membuang task dan hasil lama secara otomatis — **mati secara
+bawaan**. Umur dihitung dari tanggal video disubmit, dicek tiap jam oleh proses
+API, dan video yang sedang antre atau diproses tidak pernah disentuh.
+
+| Target | Yang dibuang |
+|---|---|
+| `keduanya` | Job beserta semua klip dan folder kerjanya — sama dengan tombol Hapus. |
+| `task` | Hanya job yang tidak punya klip (gagal, atau klipnya sudah dibuang). Job yang masih punya klip dibiarkan, supaya tidak ada klip yang hilang dari halaman Hasil sementara berkasnya tertinggal di disk. |
+| `hasil` | Berkas klip saja. Riwayat job tetap ada di halaman Proses. |
 
 ### Kinerja
 
@@ -230,14 +237,15 @@ diganti ke `multi` di halaman Setting untuk memproses beberapa job
 bersamaan — lebih cepat kalau CPU-nya cukup, tapi setiap job menjalankan
 ffmpeg yang memakai semua core tanpa batas, jadi di mesin kecil job
 paralel bisa membuat semuanya lebih lambat, bukan lebih cepat. Naikkan
-`WORKER_COUNT` bertahap sambil memperhatikan beban CPU.
+`WORKER_COUNT` bertahap sambil memperhatikan beban CPU. Keduanya baru berlaku
+setelah worker di-restart (`docker compose restart worker`).
 
 ---
 
 ## Kalibrasi
 
-Semua ada di halaman Setting. Ini yang benar-benar perlu diputar kalau hasilnya
-belum pas:
+Semua ada di halaman Setting → Klip (angka hening dan geser batas ada di bagian
+*Lanjutan*). Ini yang benar-benar perlu diputar kalau hasilnya belum pas:
 
 | Pengaturan | Default | Putar kalau |
 |---|---|---|
@@ -315,8 +323,8 @@ api/                  REST + penyaji halaman
 web/                  template Jinja2 + aset
 worker/               orchestrator (satu-satunya pemanggil stage)
 pipeline/stages/      sembilan tahap, masing-masing satu file
-asr/                  provider transkrip (groq, elevenlabs)
-llm/                  provider LLM (openrouter, gemini)
+asr/                  provider transkrip (elevenlabs)
+llm/                  LLM (gemini)
 storage/              penyimpanan klip lokal
 db/                   skema + CRUD
 jobqueue/             adapter Redis + RQ
@@ -413,8 +421,8 @@ diperkirakan.
   berlaku umum. Klipnya tetap jadi; yang hilang cuma wajah orang yang sedang
   bicara.
 - **Chunking transkrip** memotong tepat di menit ke-20 tanpa menyesuaikan ke
-  jeda bicara. Cabang itu baru aktif di atas ~2,3 jam audio, dan sudah
-  diverifikasi end-to-end pada podcast 2,44 jam.
+  jeda bicara. Dulu aktif di atas ~2,3 jam audio karena batas 25 MB Groq;
+  dengan ElevenLabs (batas 2 GB) cabang itu praktis tidak pernah tersentuh.
 - **Tidak ada autentikasi bawaan** selain `AUTH_TOKEN` opsional.
 
 ---

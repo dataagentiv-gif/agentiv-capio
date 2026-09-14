@@ -1,9 +1,8 @@
 # Seluruh sistem dalam satu perintah: docker compose up -d
 #
-# Ditujukan untuk dijalankan di laptop sendiri, BUKAN di VPS. Groq menolak IP
-# datacenter dengan 403 (terbukti di pemakaian), dan yt-dlp kena bot-detection
-# YouTube yang jauh lebih galak dari sana. Untuk VPS, ASR harus dipindah ke
-# ElevenLabs dan yt-dlp perlu cookies.
+# Ditujukan untuk dijalankan di laptop sendiri, BUKAN di VPS: yt-dlp kena
+# bot-detection YouTube yang jauh lebih galak dari IP datacenter. Untuk VPS,
+# yt-dlp perlu cookies.
 
 x-app: &app
   # Client menarik image jadi dari Docker Hub, bukan membangun dari source —

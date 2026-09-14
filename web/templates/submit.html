@@ -71,11 +71,58 @@
         <label for="g-font">Font</label>
         <select id="g-font" data-gaya="font"></select>
       </div>
-      <div class="field teks">
+      {# Gaya kata aktif menentukan knob mana yang berarti: warna teks untuk
+         gaya lama, warna + ukuran blok untuk dua gaya blok. Yang tidak
+         berlaku disembunyikan, bukan cuma diburamkan. #}
+      <div class="field teks gaya-aktif">
+        <label id="l-gaya-aktif">Gaya kata aktif</label>
+        <div class="chips" id="chips-aktif" role="radiogroup" aria-labelledby="l-gaya-aktif">
+          <button type="button" class="chip" role="radio" data-v="text_color">Warna teks</button>
+          <button type="button" class="chip" role="radio" data-v="background">Blok</button>
+          <button type="button" class="chip" role="radio" data-v="background_scale">Blok + membesar</button>
+        </div>
+        <input type="hidden" id="g-gaya-aktif" data-gaya="active_word_style">
+      </div>
+      <div class="field teks" id="f-warna-teks">
         <label for="g-warna">Warna kata aktif</label>
         <div class="warna-baris">
-          <input type="color" id="g-warna-pick" aria-label="Pilih warna">
+          <input type="color" aria-label="Pilih warna kata aktif">
           <input type="text" id="g-warna" data-gaya="aktif" spellcheck="false">
+        </div>
+      </div>
+      <div class="field teks blok-opsi" id="f-blok" hidden>
+        <div class="blok-warna">
+          <div>
+            <label for="g-blok-warna">Warna blok</label>
+            <div class="warna-baris">
+              <input type="color" aria-label="Pilih warna blok">
+              <input type="text" id="g-blok-warna" data-gaya="active_word_background_color" spellcheck="false">
+            </div>
+          </div>
+          <div>
+            <label for="g-blok-teks">Warna teks aktif</label>
+            <div class="warna-baris">
+              <input type="color" aria-label="Pilih warna teks di dalam blok">
+              <input type="text" id="g-blok-teks" data-gaya="active_word_text_color" spellcheck="false">
+            </div>
+          </div>
+        </div>
+        {# Batas 60 sama dengan _angka() di pipeline/stages/caption.py, yang
+           menjepitnya lagi di server. #}
+        <div class="geser">
+          <label for="g-blok-radius">Sudut</label>
+          <input type="range" id="g-blok-radius" data-gaya="active_word_border_radius" min="0" max="60" step="2">
+          <output for="g-blok-radius" data-satuan=" px"></output>
+        </div>
+        <div class="geser">
+          <label for="g-blok-px">Padding X</label>
+          <input type="range" id="g-blok-px" data-gaya="active_word_padding_x" min="0" max="60" step="2">
+          <output for="g-blok-px" data-satuan=" px"></output>
+        </div>
+        <div class="geser">
+          <label for="g-blok-py">Padding Y</label>
+          <input type="range" id="g-blok-py" data-gaya="active_word_padding_y" min="0" max="60" step="2">
+          <output for="g-blok-py" data-satuan=" px"></output>
         </div>
       </div>
       <div class="field teks">
@@ -92,6 +139,24 @@
           <option value="">tidak</option>
           <option value="true">ya</option>
         </select>
+      </div>
+      {# Bukan .teks: bayangan tetap terpakai walau captionnya dimatikan, jadi
+         saklar caption tidak boleh ikut mematikannya. Muncul hanya untuk
+         layout yang punya bayangan (lihat segarkanBayangan). Rentang min/max
+         sama dengan REDUP_GELAP / REDUP_LUAS di pipeline/layout.py — server
+         menjepitnya lagi, jadi yang di sini cuma batas geser. #}
+      <div class="field bayangan" id="f-bayangan" hidden>
+        <label>Bayangan di belakang teks</label>
+        <div class="geser">
+          <label for="g-redup-gelap">Kegelapan</label>
+          <input type="range" id="g-redup-gelap" data-gaya="redup_gelap" min="0" max="85" step="5">
+          <output for="g-redup-gelap"></output>
+        </div>
+        <div class="geser">
+          <label for="g-redup-luas">Luas</label>
+          <input type="range" id="g-redup-luas" data-gaya="redup_luas" min="20" max="80" step="5">
+          <output for="g-redup-luas"></output>
+        </div>
       </div>
      </div>
       {# .field.pratinjau dipindah ke luar sebagai #submit-preview — panel di
@@ -234,11 +299,13 @@ function drawChips() {
     `<button type="button" class="chip ${Number(n.value) === v ? 'on' : ''}" data-v="${v}">${v} klip</button>`
   ).join('') + `<input type="number" class="chip-num" id="custom" min="1" max="20"
                  value="${n.value}" aria-label="Jumlah klip kustom">`;
-  document.querySelectorAll('.chip').forEach(b =>
+  // Dibatasi ke #chips: chip gaya kata aktif memakai kelas yang sama, dan
+  // selektor global akan membuatnya ikut mengisi jumlah klip.
+  document.querySelectorAll('#chips .chip').forEach(b =>
     b.onclick = () => { n.value = b.dataset.v; drawChips(); segarkanTombol(); });
   document.getElementById('custom').oninput = e => {
     n.value = e.target.value;
-    document.querySelectorAll('.chip').forEach(b =>
+    document.querySelectorAll('#chips .chip').forEach(b =>
       b.classList.toggle('on', Number(b.dataset.v) === Number(n.value)));
     segarkanTombol();
   };
@@ -290,10 +357,12 @@ async function drawLayouts() {
         font.value = l.font_saran;
       }
       segarkanCaption();
+      segarkanBayangan();
       tandaiLayout();
       segarkanPratinjau();
       segarkanPanel();
     });
+    segarkanBayangan();
     tandaiLayout();
     // Juga di sini, bukan cuma di onclick: kalau default di Setting kebetulan
     // layout tanpa caption, knobnya harus sudah mati sejak halaman dibuka.
@@ -351,10 +420,14 @@ function segarkanPanel() {
 function nilaiGaya() {
   const g = {};
   document.querySelectorAll('[data-gaya]').forEach(el => {
-    if (el.disabled) return;   // knob caption saat captionnya dimatikan
+    // Knob caption saat captionnya dimatikan, dan knob yang disembunyikan
+    // karena tidak berlaku untuk gaya/layout yang dipilih.
+    if (el.disabled || el.closest('[hidden]')) return;
     const v = el.value.trim();
-    if (v === '' || v === '0') return;
-    g[el.dataset.gaya] = el.type === 'number' ? Number(v) : v;
+    // Nol pada penggeser itu nilai sungguhan (bayangan 0% = tanpa bayangan),
+    // bukan "ikut default" seperti nol di kolom angka.
+    if (v === '' || (v === '0' && el.type !== 'range')) return;
+    g[el.dataset.gaya] = el.type === 'number' || el.type === 'range' ? Number(v) : v;
   });
   if (g.upper) g.upper = true;
   // Hanya dikirim saat MATI. Nyala adalah default, dan mengirimnya sama saja
@@ -375,11 +448,66 @@ function segarkanCaption() {
   const on = dukung && t.checked;
   document.querySelectorAll('.gaya-grid .field.teks').forEach(f => {
     f.classList.toggle('mati', !on);
-    f.querySelectorAll('input, select').forEach(el => { el.disabled = !on; });
+    f.querySelectorAll('input, select, button').forEach(el => { el.disabled = !on; });
   });
   document.getElementById('ket-caption').textContent = !dukung
     ? 'Tampilan mentahan memang tidak pakai teks.'
     : (on ? '' : 'Klipnya keluar polos, tanpa teks sama sekali.');
+}
+
+// Knob bayangan cuma untuk layout yang memang punya bayangan, dan nilai awalnya
+// diambil dari layout itu lewat /api/layouts — bukan angka yang ditulis ulang
+// di sini. Nilainya direset hanya saat LAYOUT-nya berganti; mengeklik ulang
+// layout yang sama tidak boleh membuang angka yang baru saja digeser orang.
+let bayanganUntuk = null;
+function segarkanBayangan() {
+  const r = layoutData.find(x => x.nama === layoutPilih)?.redup;
+  const gelap = document.getElementById('g-redup-gelap');
+  const luas = document.getElementById('g-redup-luas');
+  document.getElementById('f-bayangan').hidden = !r;
+  // Ikut di-disable saat tersembunyi: nilaiGaya() melewati kontrol disabled,
+  // jadi layout tanpa bayangan tidak menyimpan angka yang tidak terpakai.
+  gelap.disabled = luas.disabled = !r;
+  if (r && bayanganUntuk !== layoutPilih) {
+    gelap.value = Math.round(r[1] * 100);
+    luas.value = Math.round((1 - r[0]) * 100);
+  }
+  bayanganUntuk = layoutPilih;
+  tulisGeser();
+}
+
+function tulisGeser() {
+  document.querySelectorAll('.geser').forEach(g => {
+    const o = g.querySelector('output');
+    o.textContent = g.querySelector('input').value + (o.dataset.satuan ?? '%');
+  });
+}
+
+// Gaya kata aktif: chip menulis ke input tersembunyi (yang dibaca nilaiGaya),
+// lalu memunculkan knob yang berlaku untuk gaya itu saja.
+function pilihGayaAktif(v) {
+  document.getElementById('g-gaya-aktif').value = v;
+  document.querySelectorAll('#chips-aktif .chip').forEach(b => {
+    b.classList.toggle('on', b.dataset.v === v);
+    b.setAttribute('aria-checked', String(b.dataset.v === v));
+  });
+  const blok = v !== 'text_color';
+  document.getElementById('f-blok').hidden = !blok;
+  document.getElementById('f-warna-teks').hidden = blok;
+}
+
+// Dua kontrol menulis nilai yang sama: pemilih warna untuk yang mau menunjuk,
+// kotak teks untuk yang sudah punya kode hex dari brand-nya.
+function pasangWarna(baris, awal) {
+  const pick = baris.querySelector('input[type=color]');
+  const teks = baris.querySelector('input[type=text]');
+  teks.value = (awal || '').replace(/^#/, '').toUpperCase();
+  if (/^[0-9a-f]{6}$/i.test(teks.value)) pick.value = '#' + teks.value;
+  pick.oninput = () => { teks.value = pick.value.slice(1).toUpperCase(); segarkanPratinjau(); };
+  teks.oninput = () => {
+    if (/^#?[0-9a-f]{6}$/i.test(teks.value)) pick.value = '#' + teks.value.replace(/^#/, '');
+    segarkanPratinjau();
+  };
 }
 
 async function isiGaya() {
@@ -395,17 +523,20 @@ async function isiGaya() {
   document.getElementById('g-upper').value =
     String(f.CAPTION_UPPER?.value).toLowerCase() === 'true' ? 'true' : '';
 
-  const warna = document.getElementById('g-warna');
-  const pick = document.getElementById('g-warna-pick');
-  warna.value = f.CAPTION_COLOR?.value || 'FFE500';
-  pick.value = '#' + warna.value.replace(/^#/, '');
-  // Dua kontrol menulis nilai yang sama: pemilih warna untuk yang mau
-  // menunjuk, kotak teks untuk yang sudah punya kode hex dari brand-nya.
-  pick.oninput = () => { warna.value = pick.value.slice(1).toUpperCase(); segarkanPratinjau(); };
-  warna.oninput = () => {
-    if (/^#?[0-9a-f]{6}$/i.test(warna.value)) pick.value = '#' + warna.value.replace(/^#/, '');
+  const baris = id => document.getElementById(id).closest('.warna-baris');
+  pasangWarna(baris('g-warna'), f.CAPTION_COLOR?.value || 'FFE500');
+  pasangWarna(baris('g-blok-warna'), f.ACTIVE_WORD_BACKGROUND_COLOR?.value || 'FFE500');
+  pasangWarna(baris('g-blok-teks'), f.ACTIVE_WORD_TEXT_COLOR?.value || '000000');
+  // `?? ''` bukan `|| ''`: nol di sini nilai sungguhan (sudut siku).
+  document.getElementById('g-blok-radius').value = f.ACTIVE_WORD_BORDER_RADIUS?.value ?? 18;
+  document.getElementById('g-blok-px').value = f.ACTIVE_WORD_PADDING_X?.value ?? 18;
+  document.getElementById('g-blok-py').value = f.ACTIVE_WORD_PADDING_Y?.value ?? 8;
+  pilihGayaAktif(f.ACTIVE_WORD_STYLE?.value || 'text_color');
+  document.querySelectorAll('#chips-aktif .chip').forEach(b => b.onclick = () => {
+    pilihGayaAktif(b.dataset.v);
     segarkanPratinjau();
-  };
+  });
+  tulisGeser();
 
   document.getElementById('g-font').addEventListener('change',
     () => { fontDisentuh = true; });
@@ -417,9 +548,12 @@ async function isiGaya() {
   segarkanCaption();
 
   document.querySelectorAll('[data-gaya]').forEach(el => {
-    if (el.id !== 'g-warna') el.addEventListener('input', segarkanPratinjau);
+    // Kolom warna sudah memanggil pratinjau lewat pasangWarna.
+    if (!el.closest('.warna-baris')) el.addEventListener('input', segarkanPratinjau);
     el.addEventListener('change', segarkanPratinjau);
   });
+  document.querySelectorAll('.geser input').forEach(el =>
+    el.addEventListener('input', tulisGeser));
 }
 
 // Pratinjau dirender server lewat jalur yang sama dengan produksi. Ditunda
@@ -455,7 +589,10 @@ function segarkanPratinjau() {
     if (layoutPilih) q.set('layout', layoutPilih);
     const g = nilaiGaya() || {};
     const peta = { font: 'font', ukuran: 'ukuran', aktif: 'warna',
-                   kata: 'kata', upper: 'upper', caption: 'caption' };
+                   kata: 'kata', upper: 'upper', caption: 'caption',
+                   redup_luas: 'redup_luas', redup_gelap: 'redup_gelap' };
+    // Knob kata aktif memakai nama yang sama di gaya job dan di pratinjau.
+    for (const k of Object.keys(g)) if (k.startsWith('active_word_')) peta[k] = k;
     for (const [k, param] of Object.entries(peta)) {
       if (g[k] !== undefined) q.set(param, g[k]);
     }
