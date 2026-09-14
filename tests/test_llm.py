@@ -1,4 +1,4 @@
-"""Pemilihan provider dan rotasi key Gemini.
+"""Rotasi key Gemini dan penanganan balasan LLM.
 
 Rotasi tidak punya gejala yang kelihatan saat rusak: kalau key selalu jatuh ke
 indeks yang sama, semuanya tetap jalan sampai key pertama kehabisan kuota, lalu
@@ -62,60 +62,25 @@ def test_pemakai_mengambil_pasangan_sesuai_urutan(keys):
     assert pemakai.idx == 2
 
 
-@pytest.mark.parametrize("pool,nama,field", [
-    ("gemini", "Gemini", "GEMINI_API_KEYS"),
-    ("openrouter", "OpenRouter", "OPENROUTER_API_KEYS"),
-])
-def test_key_kosong_ditolak_dengan_pesan_jelas(monkeypatch, pool, nama, field):
-    """Kedua provider LLM harus menyebut namanya sendiri, bukan pesan generik —
-    orang perlu tahu key MANA yang kurang."""
-    from llm._engine import call_pool
-
-    monkeypatch.setattr(settings, field, "")
-    if pool == "openrouter":
-        monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "")
-    with pytest.raises(LLMError, match=f"{nama} API key kosong"):
-        call_pool("halo", None, pool=pool, nama=nama,
-                  endpoint="http://x", models=["m"], use_schema=False)
-
-
-def test_rotasi_dipakai_kedua_provider_llm(monkeypatch):
-    """Regresi: rotasi sempat cuma ada di Gemini. Menambah provider tanpa
-    rotasi berarti key keduanya tidak pernah terpakai."""
-    import httpx
-
-    import keypool
-    from llm import client_gemini, client_openrouter, rute
-
-    for field in ("GEMINI_API_KEYS", "OPENROUTER_API_KEYS"):
-        monkeypatch.setattr(settings, field, "k1,k2")
-    dipakai = []
-    asli = rute.urutan
-    monkeypatch.setattr(rute, "urutan",
-                        lambda pool, m, n: dipakai.append(pool) or asli(pool, m, n))
-    monkeypatch.setattr(keypool, "lapor", lambda *a, **k: None)
-    monkeypatch.setattr(httpx, "post", _fake_post({}))
-
-    client_gemini.call_llm("halo")
-    client_openrouter.call_llm("halo")
-    assert dipakai == ["gemini", "openrouter"]
-
-
-# --- pemilihan provider ---
-
-def test_provider_tidak_dikenal_ditolak(monkeypatch):
-    monkeypatch.setattr(settings, "LLM_PROVIDER", "openai")
-    with pytest.raises(LLMError, match="tidak dikenal"):
-        call_llm("halo")
-
-
-@pytest.mark.parametrize("nama", ["gemini", "GEMINI", " Gemini "])
-def test_nama_provider_tidak_peduli_huruf_besar_kecil(monkeypatch, keys, nama):
-    monkeypatch.setattr(settings, "LLM_PROVIDER", nama)
+def test_key_kosong_ditolak_dengan_pesan_jelas(keys):
+    """Menyebut nama providernya, bukan pesan generik — orang perlu tahu key
+    MANA yang kurang."""
     keys("")
-    # Sampai ke client Gemini (gagal karena key kosong), bukan ditolak dispatcher.
-    with pytest.raises(LLMError, match="Gemini API key"):
+    with pytest.raises(LLMError, match="Gemini API key kosong"):
         call_llm("halo")
+
+
+def test_env_lama_berisi_provider_yang_dibuang_tetap_bisa_dimuat(tmp_path):
+    """Groq dan OpenRouter sudah dibuang, tapi .env milik client lama masih
+    memuat barisnya. Satu baris yang tidak terbaca membuat SELURUH konfigurasi
+    gagal dimuat — dan aplikasinya tidak bisa start sama sekali."""
+    from config.settings import Settings
+
+    env = tmp_path / ".env"
+    env.write_text("LLM_PROVIDER=openrouter\nOPENROUTER_API_KEYS=or\n"
+                   "OPENROUTER_MODEL=x\nGROQ_API_KEYS=gsk\nGROQ_API_KEY=gsk\n",
+                   encoding="utf-8")
+    Settings(_env_file=env)
 
 
 # --- badan request ---
@@ -144,19 +109,6 @@ def test_gemini_kirim_json_object_bukan_json_schema(monkeypatch, keys):
     assert cap["body"]["response_format"] == {"type": "json_object"}
     assert "generativelanguage.googleapis.com" in cap["url"]
     assert cap["headers"]["Authorization"] == "Bearer k1"
-
-
-def test_openrouter_kirim_json_schema(monkeypatch):
-    import httpx
-
-    from llm import client_openrouter
-
-    monkeypatch.setattr(settings, "OPENROUTER_API_KEYS", "or-key")
-    cap = {}
-    monkeypatch.setattr(httpx, "post", _fake_post(cap))
-    client_openrouter.call_llm("halo", {"type": "object"})
-    assert cap["body"]["response_format"]["type"] == "json_schema"
-    assert "openrouter.ai" in cap["url"]
 
 
 def test_tanpa_schema_tidak_ada_response_format(monkeypatch, keys):

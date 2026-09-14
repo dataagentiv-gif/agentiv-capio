@@ -1,10 +1,9 @@
-"""Mesin bersama untuk provider yang bicara protokol OpenAI chat/completions.
+"""Mesin untuk provider yang bicara protokol OpenAI chat/completions.
 
-OpenRouter dan Gemini dua-duanya menyediakan endpoint OpenAI-compatible, jadi
-badan request, cara baca response, dan loop retry-nya identik. Yang benar-benar
-berbeda cuma tiga hal, dan itulah yang jadi parameter di sini: URL endpoint,
-dari mana API key diambil, dan apakah provider-nya menerima response_format
-bertipe json_schema.
+Dulu dipakai bersama OpenRouter dan Gemini; sekarang tinggal Gemini, tapi
+parameternya dibiarkan — URL endpoint, dari mana API key diambil, dan apakah
+provider-nya menerima response_format bertipe json_schema — karena itulah yang
+membedakan provider OpenAI-compatible mana pun yang nanti ditambahkan.
 """
 import json
 import re

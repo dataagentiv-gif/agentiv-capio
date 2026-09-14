@@ -18,15 +18,6 @@ log = get(__name__)
 TIMEOUT = 25.0
 
 
-# Penjelasan khusus provider untuk kode yang artinya tidak lazim. Groq menolak
-# IP datacenter dengan 403, dan tanpa keterangan ini orang akan mengira key-nya
-# yang salah lalu membuat key baru berkali-kali — padahal yang perlu dimatikan
-# cuma VPN-nya.
-KHUSUS = {
-    ("groq", 403): "Ditolak (403). Groq memblokir IP datacenter — matikan VPN kalau menyala.",
-}
-
-
 def _per_key(pool: str, kirim) -> tuple[bool, str]:
     """Uji TIAP key satu per satu, bukan cuma yang pertama.
 
@@ -53,8 +44,6 @@ def _per_key(pool: str, kirim) -> tuple[bool, str]:
 def _pesan(pool: str, code: int, badan: str) -> str:
     if code == 200:
         return "Terhubung"
-    if (pool, code) in KHUSUS:
-        return KHUSUS[(pool, code)]
     # 404 di sini hampir selalu soal NAMA MODEL, bukan key — dan itu perbedaan
     # yang mahal. Tanpa dibedakan, orangnya akan menghapus key yang baik-baik
     # saja lalu membuat key baru berkali-kali, sementara yang perlu diganti cuma
@@ -79,17 +68,9 @@ def _pesan(pool: str, code: int, badan: str) -> str:
 
 
 PROBES = {
-    "groq": lambda: _per_key("groq", lambda k: httpx.get(
-        "https://api.groq.com/openai/v1/models",
-        headers={"Authorization": f"Bearer {k}"}, timeout=TIMEOUT)),
-
     "elevenlabs": lambda: _per_key("elevenlabs", lambda k: httpx.get(
         "https://api.elevenlabs.io/v1/user/subscription",
         headers={"xi-api-key": k}, timeout=TIMEOUT)),
-
-    "openrouter": lambda: _per_key("openrouter", lambda k: httpx.get(
-        "https://openrouter.ai/api/v1/key",
-        headers={"Authorization": f"Bearer {k}"}, timeout=TIMEOUT)),
 
     # Gemini diuji dengan panggilan chat sungguhan, bukan sekadar daftar model:
     # ketersediaan MODEL berbeda per key (Google menutup model lama untuk

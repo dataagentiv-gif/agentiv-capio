@@ -114,20 +114,28 @@ def test_tanpa_key_transkrip_ditolak(client, monkeypatch):
 
 
 def test_tanpa_key_llm_ditolak(client, monkeypatch):
-    monkeypatch.setattr(settings, "LLM_PROVIDER", "openrouter")
-    monkeypatch.setattr(settings, "OPENROUTER_API_KEYS", "")
-    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "")
+    monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
 
     r = client.post("/jobs", json={"url": URL, "target_clips": 2})
     assert r.status_code == 400
-    assert "openrouter" in r.text
+    assert "gemini" in r.text
+
+
+def test_asr_provider_lama_tidak_bikin_submit_crash(client, monkeypatch):
+    """ASR_PROVIDER=groq di .env lama tidak punya pool di keypool; membacanya
+    mentah melempar 500, bukan melaporkan key yang kurang."""
+    monkeypatch.setattr(settings, "ASR_PROVIDER", "groq")
+    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
+    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
+
+    r = client.post("/jobs", json={"url": URL, "target_clips": 2})
+    assert r.status_code == 400
+    assert "elevenlabs" in r.text
 
 
 def test_pesan_menyebut_akibatnya_bukan_cuma_larangan(client, monkeypatch):
     """"Key belum diisi" saja tidak memberitahu kenapa itu penting SEKARANG."""
-    monkeypatch.setattr(settings, "LLM_PROVIDER", "openrouter")
-    monkeypatch.setattr(settings, "OPENROUTER_API_KEYS", "")
-    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "")
+    monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
 
     teks = client.post("/jobs", json={"url": URL}).text.lower()
     assert "setting" in teks

@@ -20,9 +20,9 @@ menangkap satu bentuk kegagalan:
               tidak terlihat sama sekali dari hurufnya
   jumlah kata selisih besar berarti ada bagian yang hilang atau dikarang
 
-Pakai:
-    python scripts/banding_asr.py video.mp4
-    python scripts/banding_asr.py video.mp4 --keluar banding.md
+Pakai (dua nama provider dari asr.PROVIDERS):
+    python scripts/banding_asr.py video.mp4 --provider elevenlabs <provider-lain>
+    python scripts/banding_asr.py video.mp4 --provider ... --keluar banding.md
 """
 import argparse
 import difflib
@@ -144,7 +144,13 @@ def laporan(sumber: Path, hasil: dict[str, str]) -> str:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("sumber", type=Path, help="berkas video atau audio")
-    p.add_argument("--provider", nargs=2, default=["elevenlabs", "groq"])
+    import asr
+
+    # Wajib dan dibatasi ke provider yang ada. Tanpa `choices`, nama yang sudah
+    # dibuang (groq) diam-diam jatuh ke elevenlabs di asr/ — dan skrip ini
+    # akan membandingkan elevenlabs dengan dirinya sendiri sambil melaporkan
+    # 100% mirip.
+    p.add_argument("--provider", nargs=2, required=True, choices=asr.PROVIDERS)
     p.add_argument("--keluar", type=Path, help="tulis laporan Markdown ke sini")
     a = p.parse_args()
 
@@ -164,20 +170,6 @@ def main() -> int:
                 hasil[prov] = transkrip(prov, audio)
             except Exception as e:  # noqa: BLE001
                 print(f"  {prov} gagal: {e}", file=sys.stderr)
-                # 403 dari Groq hampir selalu blokir IP datacenter, bukan key
-                # yang salah — dan pesan aslinya ("Access denied. Please check
-                # your network settings") menyuruh memeriksa hal yang benar
-                # dengan cara yang membuat orang mengoprek key-nya berjam-jam.
-                if "403" in str(e) and prov == "groq":
-                    print(
-                        "\n  Groq memblokir IP datacenter dan sebagian besar "
-                        "VPN dengan 403.\n"
-                        "  Key-nya kemungkinan besar tidak apa-apa. Matikan VPN "
-                        "lalu ulangi\n"
-                        "  perintah yang sama — perbandingan ini memang butuh "
-                        "kedua provider.",
-                        file=sys.stderr,
-                    )
                 return 2
 
     teks = laporan(a.sumber, hasil)
