@@ -10,9 +10,16 @@ Yang boleh diputar sendiri ada di `settings` sebagai knob: font, ukuran, warna
 kata aktif, jumlah kata, huruf besar. Semuanya berdiri sendiri — diputar
 bagaimanapun tidak bisa merusak geometri.
 """
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass, field, replace
 
 OUT_W, OUT_H = 1080, 1920
+
+#: Rentang knob bayangan, dalam persen. Kegelapan di atas 85% menutup detail
+#: video; luas di bawah 20% tidak lagi sampai ke belakang teks, dan di atas 80%
+#: gelapnya mulai merayap ke pembicara yang ditaruh di sepertiga kiri.
+REDUP_GELAP = (0, 85)
+REDUP_LUAS = (20, 80)
 
 
 @dataclass(frozen=True)
@@ -110,12 +117,12 @@ LAYOUTS = {
         tinggi=0.42,
         zoom=0.85,
         wajah_x=0.3,
-        # Jauh lebih halus dari sebelumnya. Di referensi tidak ada gelap buatan
-        # sama sekali — ruangannya memang gelap. Tapi sumber tidak selalu
-        # begitu, dan teks putih di atas latar terang tidak terbaca meski sudah
-        # ber-outline. Ini asuransi keterbacaan, bukan elemen desain: cukup
-        # untuk menahan latar terang, tidak cukup untuk terlihat sebagai bidang.
-        redup=(0.42, 0.45),
+        # Sempat diturunkan ke 0.45 setelah versi awal 0.88 terbaca sebagai
+        # bidang gelap. Di pemakaian nyata 0.45 ternyata kurang: teks putih di
+        # atas latar terang tetap sulit dibaca. 0.70 di tengah keduanya, dan
+        # sekarang bisa diputar per video lewat knob (terapkan_knob) — jadi
+        # angka ini cuma titik awal, bukan satu-satunya pilihan.
+        redup=(0.40, 0.70),
         align=6,
         margin_r=70,
         # Satu baris mendatar, bukan ditumpuk — mengikuti referensi.
@@ -147,6 +154,36 @@ DEFAULT = "penuh"
 
 def ambil(nama: str) -> Layout:
     return LAYOUTS.get(str(nama).strip().lower(), LAYOUTS[DEFAULT])
+
+
+def _jepit(v, lo: float, hi: float) -> float | None:
+    try:
+        return max(lo, min(hi, float(v)))
+    except (TypeError, ValueError):
+        return None
+
+
+def terapkan_knob(lay: Layout, knob: dict | None) -> Layout:
+    """Layout dengan bayangan milik JOB, kalau knobnya diisi.
+
+    Yang boleh ditimpa cuma dua angka — seberapa gelap dan seberapa luas.
+    Arahnya tetap milik layout, jadi knob tidak bisa menaruh gelap di sisi
+    pembicara. Layout tanpa bayangan dikembalikan apa adanya: knob tidak
+    menciptakan bayangan di layout yang tidak dirancang untuknya.
+
+    `redup_luas` diukur dari tepi kanan, karena begitu orang membacanya di
+    layar ("60% lebar tertutup bayangan"); di dalam, `redup` menyimpan titik
+    MULAINYA dari kiri.
+    """
+    if not lay.redup:
+        return lay
+    knob = knob or {}
+    mulai, maks = lay.redup
+    if (luas := _jepit(knob.get("redup_luas"), *REDUP_LUAS)) is not None:
+        mulai = 1 - luas / 100
+    if (gelap := _jepit(knob.get("redup_gelap"), *REDUP_GELAP)) is not None:
+        maks = gelap / 100
+    return replace(lay, redup=(round(mulai, 2), round(maks, 2)))
 
 
 def _genap(n: float) -> int:
@@ -291,7 +328,10 @@ def header_ass(lay: Layout, knob: dict) -> str:
 def _bgr(hex_rgb: str) -> str:
     """RRGGBB -> BBGGRR. Salah urutan di sini menghasilkan warna yang terlihat
     'hampir benar' (merah jadi biru), jadi gampang lolos tanpa disadari."""
-    h = str(hex_rgb).lstrip("#").strip()
-    if len(h) != 6:
+    h = str(hex_rgb).strip().lstrip("#")
+    # Hex sungguhan, bukan sekadar enam karakter: hasilnya ditempel ke dalam
+    # blok override .ass, dan "a{b}cd" yang lolos akan menutup blok itu lebih
+    # awal lalu merusak seluruh baris caption.
+    if not re.fullmatch(r"[0-9A-Fa-f]{6}", h):
         h = "FFFFFF"
     return (h[4:6] + h[2:4] + h[0:2]).upper()

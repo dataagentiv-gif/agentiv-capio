@@ -9,6 +9,7 @@ import shutil
 
 import pytest
 
+from pipeline.layout import ambil
 from pipeline.stages.caption import build_ass
 from pipeline.stages.render import OUT_H, OUT_W, _render_one
 from utils.ffmpeg_helpers import Deadline, probe
@@ -55,7 +56,7 @@ def render(workdir, seg, crop=None, layout="penuh", teks=True):
         src_w=1920,
         src_h=1080,
         deadline=Deadline(300),
-        nama_layout=layout,
+        lay=ambil(layout),
         teks=teks,
     )
 
