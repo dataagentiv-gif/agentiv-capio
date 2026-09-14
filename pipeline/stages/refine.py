@@ -16,45 +16,17 @@ from config.settings import settings
 # Di-alias: tiap stage mengekspor run(ctx) sendiri, dan nama itu akan
 # menimpa helper ini di namespace modul.
 from utils.ffmpeg_helpers import run as ff
+from utils.ffmpeg_helpers import silences
 from utils.logging import get
 
 log = get(__name__)
 
-_SIL = re.compile(r"silence_(start|end):\s*(-?[\d.]+)")
 _PTS = re.compile(r"pts_time:([\d.]+)")
 
 SCENE_THRESHOLD = 0.35
 SCENE_WINDOW = 1.5  # detik yang dipindai di kiri-kanan tiap batas
 LEAD_IN = 0.08      # mundurkan start sedikit supaya fonem pertama tidak terpotong
 TAIL = 0.15         # majukan end sedikit supaya kata terakhir tidak terasa dipotong
-
-
-def _silences(audio: Path, duration: float, deadline) -> list[tuple[float, float]]:
-    """Daftar (mulai, selesai) tiap jeda hening di seluruh audio. Satu pass."""
-    proc = ff(
-        [
-            # WAJIB -v info. silencedetect menulis hasilnya ke log level info;
-            # dengan -v error output-nya tertelan habis dan yang balik adalah
-            # list kosong dengan exit code 0 — gagal diam-diam.
-            "ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-v", "info",
-            "-i", str(audio),
-            "-af", f"silencedetect=n={settings.SILENCE_NOISE_DB}dB:d={settings.SILENCE_MIN_DUR}",
-            "-f", "null", "-",
-        ],
-        deadline,
-        cap=600,
-    )
-    out: list[tuple[float, float]] = []
-    cur = None
-    for kind, val in _SIL.findall(proc.stderr):
-        if kind == "start":
-            cur = float(val)
-        elif cur is not None:
-            out.append((cur, float(val)))
-            cur = None
-    if cur is not None:  # hening yang masih terbuka saat file habis
-        out.append((cur, duration))
-    return out
 
 
 def _scene_cuts(source: Path, t: float, deadline) -> list[float]:
@@ -120,7 +92,8 @@ def run(ctx: dict) -> dict:
     # timestamp asli — batas yang tidak di-snap masih menghasilkan klip yang
     # layak, sedangkan batas yang di-snap ke hening palsu justru lebih buruk.
     try:
-        sils = _silences(ctx["audio"], duration, deadline)
+        sils = silences(ctx["audio"], duration, deadline,
+                        settings.SILENCE_NOISE_DB, settings.SILENCE_MIN_DUR)
     except Exception as e:  # noqa: BLE001
         log.warning("silencedetect gagal (%s) — batas dipakai apa adanya", e)
         sils = []

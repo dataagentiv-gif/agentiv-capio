@@ -3,7 +3,8 @@ melanggar rentang durasi.
 """
 import re
 
-from pipeline.stages.refine import _PTS, _SIL, _snap
+from pipeline.stages.refine import _PTS, _snap
+from utils.ffmpeg_helpers import _SIL
 
 DRIFT = 1.2
 # (mulai, selesai) tiap hening.

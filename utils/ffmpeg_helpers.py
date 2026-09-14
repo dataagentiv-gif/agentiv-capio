@@ -91,6 +91,45 @@ def ffmpeg(args: list[str], deadline: Deadline, **kw) -> subprocess.CompletedPro
     )
 
 
+_SIL = re.compile(r"silence_(start|end):\s*(-?[\d.]+)")
+
+
+def silences(
+    audio: Path, duration: float, deadline: Deadline, noise_db: float, min_dur: float
+) -> list[tuple[float, float]]:
+    """Daftar (mulai, selesai) tiap jeda hening di seluruh audio. Satu pass.
+
+    Dipakai dua pihak dengan pertanyaan berlawanan: Stage 4 mencari jeda untuk
+    menaruh batas klip, provider Gemini mencari yang BUKAN jeda untuk menemukan
+    ucapan yang dibuang model. Ambangnya diteruskan pemanggil — utils tidak
+    membaca settings.
+    """
+    proc = run(
+        [
+            # WAJIB -v info. silencedetect menulis hasilnya ke log level info;
+            # dengan -v error output-nya tertelan habis dan yang balik adalah
+            # list kosong dengan exit code 0 — gagal diam-diam.
+            "ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-v", "info",
+            "-i", str(audio),
+            "-af", f"silencedetect=n={noise_db}dB:d={min_dur}",
+            "-f", "null", "-",
+        ],
+        deadline,
+        cap=600,
+    )
+    out: list[tuple[float, float]] = []
+    cur = None
+    for kind, val in _SIL.findall(proc.stderr):
+        if kind == "start":
+            cur = float(val)
+        elif cur is not None:
+            out.append((cur, float(val)))
+            cur = None
+    if cur is not None:  # hening yang masih terbuka saat file habis
+        out.append((cur, duration))
+    return out
+
+
 def probe(path: Path, deadline: Deadline) -> dict:
     """Kembalikan {duration, width, height} dari file video."""
     proc = run(
