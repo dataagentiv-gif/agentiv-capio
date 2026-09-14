@@ -3,8 +3,8 @@
 Gemini menyediakan endpoint OpenAI-compatible, jadi badan request-nya sama
 persis dengan OpenRouter dan seluruh logikanya dipakai bersama lewat _engine.
 
-Rotasi ada di DUA sumbu, karena kuota gratis Gemini dihitung per key DAN per
-model. Yang kedua terbukti sendiri: kuota yang habis pulih seketika hanya
+Rotasi ada di DUA sumbu, karena kuota gratis Gemini dihitung per project DAN
+per model — "per key" hanya berlaku selama tiap key dibuat di project sendiri. Yang kedua terbukti sendiri: kuota yang habis pulih seketika hanya
 dengan berpindah model, tanpa menunggu reset harian. Jadi 3 key x 3 model
 memberi sembilan jatah yang berdiri sendiri, dan percobaan yang kena 429 atau
 503 otomatis memakai pasangan berikutnya alih-alih mengulang ke yang sedang

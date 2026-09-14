@@ -123,7 +123,7 @@ dipanggil untuk dua tugas sempit saja dan tidak pernah memutuskan alur.
 | # | Tahap | Alat | Hasil |
 |---|---|---|---|
 | 1 | Unduh | yt-dlp + ffmpeg | `source.mp4`, `audio.ogg` (16kHz mono opus) |
-| 2 | Transkrip | ElevenLabs Scribe / Groq Whisper | kata + kalimat, bertimestamp |
+| 2 | Transkrip | ElevenLabs / Groq / Gemini Transcribe | kata + kalimat, bertimestamp |
 | 3 | Seleksi momen | LLM | kandidat klip + skor + alasan |
 | 4 | Geser batas | ffmpeg | batas dipindah ke jeda alami terdekat |
 | 5 | Caption | generator `.ass` | caption karaoke per kata |
@@ -159,6 +159,7 @@ project, jadi bisa juga disunting manual kalau lebih suka.
 |---|---|---|
 | **ElevenLabs** Scribe — *default* | ada tier gratis | Akurat untuk Bahasa Indonesia termasuk yang bercampur istilah Inggris. Tanpa blokir IP. Mengeja angka, tapi `asr/angka.py` mengubahnya kembali jadi digit. |
 | **Groq** Whisper | free tier 8 jam audio/hari | Sangat cepat — 15 menit audio selesai dalam ~4 detik. Aman untuk konten Indonesia murni. **Menolak IP datacenter/VPN dengan 403** — lihat peringatan di bawah. |
+| **Gemini 3.5 Transcribe** | tier gratis 25 request/hari **per project** Google Cloud | Memakai `GEMINI_API_KEYS`. Model ini hanya menulis **satu bahasa per request** dan diam-diam membuang kalimat bahasa lain — 28–31% detik bicara hilang pada video Indonesia berkutip Inggris. CAPIO menambalnya: celah bersuara tanpa kata dideteksi ffmpeg lalu ditranskrip ulang sekaligus dalam satu request tambahan, sisa 2–3% (setara video Indonesia murni). Konten Indonesia murni tetap 1 request. Key tambahan hanya menambah jatah kalau dibuat di project lain. |
 
 > ### Groq memblokir IP datacenter, dan gejalanya menyesatkan
 >

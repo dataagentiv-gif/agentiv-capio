@@ -11,8 +11,9 @@ Aturannya sederhana dan itu disengaja:
 1. Tier teratas dipakai TERUS, di seluruh key, selama masih ada satu key yang
    kuotanya belum habis untuk model itu.
 2. Baru setelah SEMUA key habis untuk tier itu, turun ke tier berikutnya.
-3. Kuota gratis Gemini dihitung per key DAN per model, jadi "habis" dicatat per
-   pasangan — bukan per model saja. Satu key yang habis tidak boleh menjatuhkan
+3. Kuota gratis Gemini dihitung per project DAN per model, jadi "habis" dicatat per
+   pasangan (key, model) — bukan per model saja. Dua key satu project akan
+   habis bersamaan; mencatatnya per key hanya sedikit boros, tidak salah. Satu key yang habis tidak boleh menjatuhkan
    model itu untuk key lain.
 
 Soal pulihnya: TIDAK ada penjadwalan dan tidak ada tebakan kapan Google

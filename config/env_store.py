@@ -30,12 +30,13 @@ def _f(key, label, group, secret=False, kind="text", help="", options=None, pool
 # Satu-satunya daftar yang boleh ditulis dari UI.
 FIELDS = [
     _f("ASR_PROVIDER", "Provider transkrip", "Transkrip", kind="select",
-       options=["elevenlabs", "groq"],
+       options=["elevenlabs", "groq", "gemini"],
        help="elevenlabs (disarankan): akurat untuk Bahasa Indonesia, ada tier gratis. "
             "groq: gratis dan 5-10x lebih cepat, tapi diuji pada 3 video berisi "
             "istilah Inggris ia menghasilkan 29,6% teks Jepang di salah satunya, "
             "dan menerjemahkan kalimat Inggris alih-alih mentranskripnya. "
-            "Aman untuk konten Indonesia murni."),
+            "Aman untuk konten Indonesia murni. gemini: free tier dan "
+            "timestamp per kata; memakai key Gemini di bagian LLM."),
     _f("GROQ_API_KEYS", "Groq API key", "Transkrip", secret=True, pool="groq",
        help="console.groq.com/keys — dipakai hanya kalau provider di atas groq. "
             "Beberapa key dipakai bergiliran untuk menaikkan atap free tier."),
@@ -49,8 +50,10 @@ FIELDS = [
        options=["openrouter", "gemini"],
        help="Dipakai untuk memilih momen dan menulis judul/caption/hashtag."),
     _f("GEMINI_API_KEYS", "Gemini API key", "LLM", secret=True, pool="gemini",
-       help="aistudio.google.com/apikey — free tier dibatasi per key, jadi "
-            "beberapa key dipakai bergiliran untuk menaikkan atapnya."),
+       help="aistudio.google.com/apikey — free tier dibatasi per PROJECT Google "
+            "Cloud, bukan per key: key tambahan hanya menaikkan atap kalau dibuat "
+            "di project yang berbeda. Key yang sama juga dipakai kalau provider "
+            "transkrip dipilih gemini."),
     # Urutan tier DIPAKU di llm/rute.py, tidak bisa disetel dari sini. Yang di
     # bawah ini jalan keluar untuk yang memang tahu apa yang dilakukannya —
     # kosong berarti ikut tier bawaan.

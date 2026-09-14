@@ -118,8 +118,9 @@ def _pesan(code: int, badan: str) -> str:
     """
     if _kuota_habis(code, badan):
         return (
-            "kuota API habis. Free tier dibatasi per hari per key — tunggu "
-            "resetnya, tambah key di halaman Setting, atau naikkan plan."
+            "kuota API habis. Free tier dibatasi per hari — tunggu resetnya, "
+            "tambah key di halaman Setting (untuk Gemini: dari project Google "
+            "Cloud yang berbeda), atau naikkan plan."
         )
     if code == 429:
         return "kena rate limit dan belum pulih setelah beberapa kali dicoba."

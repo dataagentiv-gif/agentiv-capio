@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # elevenlabs : akurat, tanpa blokir IP, ada tier gratis. Mengeja angka
     #              ("seratus empat puluh empat"), tapi asr/angka.py sudah
     #              mengubahnya kembali jadi digit sebelum masuk caption.
-    ASR_PROVIDER: str = "elevenlabs"  # groq | elevenlabs
+    ASR_PROVIDER: str = "elevenlabs"  # groq | elevenlabs | gemini
 
     # Boleh lebih dari satu key dipisah koma, sama seperti Gemini — free tier
     # Groq dibatasi per key, jadi key yang dirotasi menaikkan atap tanpa biaya.
@@ -59,7 +59,9 @@ class Settings(BaseSettings):
 
     # Gemini dipanggil langsung (endpoint OpenAI-compatible milik Google), bukan
     # lewat OpenRouter. Boleh diisi lebih dari satu key dipisah koma: free tier
-    # Gemini dibatasi PER KEY, jadi key yang dirotasi menaikkan atap tanpa biaya.
+    # Gemini dibatasi PER PROJECT Google Cloud (terukur: dua key satu project
+    # habis bersamaan di 28 request gabungan), jadi rotasi hanya menaikkan atap
+    # untuk key dari project yang berbeda.
     GEMINI_API_KEYS: str = ""  # "key1,key2,key3"
     # Alias "-latest", BUKAN nomor versi. Google memensiunkan model untuk
     # pengguna baru tanpa menyentuh yang lama: key dari project lama tetap bisa
