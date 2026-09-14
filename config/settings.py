@@ -17,46 +17,26 @@ class Settings(BaseSettings):
 
     # --- Transkrip (Stage 2) ---
     #
-    # Default elevenlabs, dan ini keputusan yang diambil dari pengukuran, bukan
-    # dari klaim vendor. Tiga video Indonesia berisi istilah Inggris ditranskrip
-    # oleh kedua provider dari file audio yang sama persis:
-    #
-    #   - Pada satu dari tiga video, 29.6% keluaran Groq adalah TEKS JEPANG.
-    #     Bukan salah dengar — Whisper berpindah bahasa lalu mengarang panjang
-    #     lebar. Dua video lain nol. Jadi kegagalannya tidak merata, melainkan
-    #     ambruk total tanpa peringatan, dan itu lebih sulit diantisipasi
-    #     daripada kesalahan kecil yang konsisten.
-    #   - Kalimat Inggris DITERJEMAHKAN, bukan ditranskrip: "Tools like Google
-    #     Analytics" keluar sebagai "Tua seperti analitik".
-    #
-    # groq       : gratis dan 5-10x lebih cepat. Aman untuk konten Indonesia
-    #              murni. MENOLAK IP datacenter dengan 403 — perhatikan kalau
-    #              worker dijalankan di VPS.
     # elevenlabs : akurat, tanpa blokir IP, ada tier gratis. Mengeja angka
     #              ("seratus empat puluh empat"), tapi asr/angka.py sudah
     #              mengubahnya kembali jadi digit sebelum masuk caption.
-    ASR_PROVIDER: str = "elevenlabs"  # groq | elevenlabs
-
-    # Boleh lebih dari satu key dipisah koma, sama seperti Gemini — free tier
-    # Groq dibatasi per key, jadi key yang dirotasi menaikkan atap tanpa biaya.
-    GROQ_API_KEYS: str = ""
-    # Nama lama, dipertahankan supaya .env yang sudah ada tetap jalan.
-    GROQ_API_KEY: str = ""
+    #
+    # Groq pernah jadi pilihan kedua dan dibuang. Pada satu dari tiga video
+    # Indonesia berisi istilah Inggris, 29.6% keluarannya TEKS JEPANG — Whisper
+    # berpindah bahasa lalu mengarang — dan kalimat Inggris diterjemahkan alih-
+    # alih ditranskrip. Nilai lama `groq` di .env tetap aman: asr/ memakai
+    # provider yang tersisa, bukan menolak start.
+    ASR_PROVIDER: str = "elevenlabs"
 
     ELEVENLABS_API_KEYS: str = ""
     # Nama lama, dipertahankan supaya .env yang sudah ada tetap jalan.
     ELEVENLABS_API_KEY: str = ""
     ELEVENLABS_MODEL: str = "scribe_v2"
 
-    # Stage 3 (segment) dan Stage 8 (metadata) sama-sama lewat llm/, jadi ganti
-    # provider atau model cukup ubah env var di sini — kode stage tidak disentuh.
-    LLM_PROVIDER: str = "openrouter"  # openrouter | gemini
-
-    OPENROUTER_API_KEYS: str = ""
-    # Nama lama, dipertahankan supaya .env yang sudah ada tetap jalan.
-    OPENROUTER_API_KEY: str = ""
-    OPENROUTER_MODEL: str = "google/gemini-2.5-flash-lite"
-
+    # Stage 3 (segment) dan Stage 8 (metadata) sama-sama lewat llm/, yang kini
+    # cuma memakai Gemini. OpenRouter dibuang; LLM_PROVIDER / OPENROUTER_* yang
+    # masih tertulis di .env lama diabaikan (extra="ignore" di atas).
+    #
     # Gemini dipanggil langsung (endpoint OpenAI-compatible milik Google), bukan
     # lewat OpenRouter. Boleh diisi lebih dari satu key dipisah koma: free tier
     # Gemini dibatasi PER KEY, jadi key yang dirotasi menaikkan atap tanpa biaya.
@@ -102,6 +82,19 @@ class Settings(BaseSettings):
     CAPTION_COLOR: str = "FFE500"
     CAPTION_WORDS: int = 0      # 0 = ikut bawaan layout
     CAPTION_UPPER: bool = False
+
+    # Gaya kata yang sedang diucapkan:
+    #   text_color       : cuma warnanya berubah (CAPTION_COLOR) — perilaku lama
+    #   background       : blok bersudut tumpul di belakang kata aktif
+    #   background_scale : blok + kata aktif membesar sedikit
+    # Angka di bawah dalam piksel kanvas 1080x1920, dan dipakai hanya oleh dua
+    # gaya blok. Radius setengah tinggi blok atau lebih = pil penuh.
+    ACTIVE_WORD_STYLE: str = "text_color"
+    ACTIVE_WORD_BACKGROUND_COLOR: str = "FFE500"
+    ACTIVE_WORD_TEXT_COLOR: str = "000000"
+    ACTIVE_WORD_BORDER_RADIUS: int = 18
+    ACTIVE_WORD_PADDING_X: int = 18
+    ACTIVE_WORD_PADDING_Y: int = 8
 
     # --- Lisensi ---
     #
@@ -165,6 +158,18 @@ class Settings(BaseSettings):
     # project ini sama sekali.
     CLIPS_DIR: Path = ROOT / "clips"
 
+    # --- Auto clear (api/bersih.py) ---
+    #
+    # Bawaan MATI: fitur yang menghapus data tidak boleh menyala sendiri setelah
+    # update. Umur dihitung dari created_at; job yang antre/berjalan tidak
+    # pernah disentuh.
+    #   task     : job tanpa klip (gagal, atau klipnya sudah dibuang) + workdir
+    #   hasil    : berkas klip dibuang, baris job tetap ada di Riwayat
+    #   keduanya : job + klip + workdir, sama dengan tombol Hapus
+    AUTO_CLEAR_ENABLED: bool = False
+    AUTO_CLEAR_DAYS: int = 30
+    AUTO_CLEAR_TARGET: str = "keduanya"
+
     # --- Guardrail (PRD Bagian 6) ---
     JOB_TIMEOUT_SEC: int = 1800  # 30 menit untuk video referensi 1 jam
     MIN_CLIP_SEC: float = 30.0
@@ -218,19 +223,9 @@ class Settings(BaseSettings):
     # supaya .env yang sudah ada tetap jalan tanpa harus disunting — termasuk
     # milik orang lain yang sudah memasang versi sebelumnya.
     @property
-    def groq_keys(self) -> list[str]:
-        return self._pecah(self.GROQ_API_KEYS) or self._pecah(self.GROQ_API_KEY)
-
-    @property
     def elevenlabs_keys(self) -> list[str]:
         return self._pecah(self.ELEVENLABS_API_KEYS) or self._pecah(
             self.ELEVENLABS_API_KEY
-        )
-
-    @property
-    def openrouter_keys(self) -> list[str]:
-        return self._pecah(self.OPENROUTER_API_KEYS) or self._pecah(
-            self.OPENROUTER_API_KEY
         )
 
 

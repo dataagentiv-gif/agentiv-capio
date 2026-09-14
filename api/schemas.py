@@ -21,8 +21,24 @@ class JobCreate(BaseModel):
         diam-diam, bukan ditolak, supaya form versi lama tetap bisa submit."""
         if not v:
             return None
-        BOLEH = {"font", "ukuran", "aktif", "kata", "upper"}
+        from pipeline.stages.caption import GAYA_AKTIF
+
+        BOLEH = {"font", "ukuran", "aktif", "kata", "upper",
+                 "active_word_background_color", "active_word_text_color"}
         bersih = {k: v[k] for k in BOLEH if v.get(k) not in (None, "", 0, "0")}
+        if v.get("active_word_style") in GAYA_AKTIF:
+            bersih["active_word_style"] = v["active_word_style"]
+        # Angka yang NOL-nya bermakna — bayangan 0% berarti tanpa bayangan,
+        # radius 0 berarti sudut siku — bukan "ikut default", jadi tidak boleh
+        # lewat saringan di atas. Dipaksa jadi int sekalian: nilainya masuk ke
+        # rumus ffmpeg dan path gambar .ass. Rentangnya dijepit di tempat
+        # pemakaiannya, bukan di sini.
+        for k in ("redup_luas", "redup_gelap", "active_word_border_radius",
+                  "active_word_padding_x", "active_word_padding_y"):
+            try:
+                bersih[k] = int(float(v[k]))
+            except (KeyError, TypeError, ValueError, OverflowError):
+                pass
         # `caption` disaring terpisah, dan itu bukan gaya-gayaan: ia satu-satunya
         # knob yang nilai bermaknanya False, sementara `False == 0` di Python
         # membuat saringan di atas MEMBUANGNYA justru saat caption dimatikan.

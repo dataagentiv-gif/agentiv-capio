@@ -1265,6 +1265,67 @@ input.chip-num { width: 96px; cursor: text; text-align: center; }
   max-width: 62ch;
 }
 
+/* ---------- Penjelasan di balik ikon `?` ---------- */
+
+.field-kepala { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.field-kepala label { margin-bottom: 0; }
+
+.tanya {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font: 600 11px/1 inherit;
+  color: var(--color-muted);
+  background: transparent;
+  border: 1px solid var(--color-ash);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.tanya:hover { border-color: var(--color-action); color: var(--color-action); }
+
+.tanya[aria-expanded="true"] {
+  color: #fff;
+  background: var(--color-action);
+  border-color: var(--color-action);
+}
+
+.penjelasan { margin: 0 0 10px; max-width: 62ch; }
+
+/* Judul kelompok di dalam satu tab (Transkrip, LLM, Tampilan, ...). */
+.bagian {
+  margin: 26px 0 14px;
+  padding-top: 18px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+  border-top: 1px solid rgba(9, 30, 66, .08);
+}
+
+.panel .bagian:first-of-type { margin-top: 4px; padding-top: 0; border-top: 0; }
+.bagian-tanya { display: flex; align-items: center; gap: 6px; }
+
+.lanjutan {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(9, 30, 66, .08);
+}
+
+.lanjutan summary {
+  margin-bottom: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.lanjutan:not([open]) summary { margin-bottom: 0; }
+
+.catatan { margin: 0 0 20px; }
+
 .panel h2 { display: flex; align-items: center; gap: 10px; }
 .panel h2 .ic { width: 18px; height: 18px; color: var(--color-action); }
 
@@ -1746,6 +1807,45 @@ select:focus {
 }
 
 .gaya-grid .saklar .sub:empty { display: none; }
+
+/* Gaya kata aktif dan knob bloknya selebar kedua kolom: chip tiga pilihan
+   tidak muat di satu kolom, dan knob blok dibaca sebagai satu kelompok. */
+.gaya-knob .gaya-aktif,
+.gaya-knob .blok-opsi { grid-column: 1 / -1; }
+
+.blok-warna {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 720px) {
+  .blok-warna { grid-template-columns: 1fr; }
+}
+
+/* Bayangan layout samping: dua penggeser selebar kedua kolom, masing-masing
+   label | penggeser | angka dalam satu baris supaya angkanya terbaca sambil
+   digeser. */
+.gaya-knob .bayangan { grid-column: 1 / -1; }
+
+.geser {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 44px;
+  gap: 12px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.geser label { margin-bottom: 0; font-weight: 400; }
+.geser input[type=range] { width: 100%; accent-color: var(--color-action); }
+
+.geser output {
+  font-size: 14px;
+  text-align: right;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
 
 /* Knob caption saat captionnya mati. Kontrolnya sudah benar-benar `disabled`;
    ini cuma supaya matinya terlihat, bukan supaya terasa mati. */
