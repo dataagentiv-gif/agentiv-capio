@@ -3,6 +3,7 @@
 Route di sini tidak pernah menjalankan pipeline secara sinkron: terima request
 -> tulis row awal -> push job_id ke queue -> balas. Sisanya urusan worker.
 """
+import asyncio
 import base64
 import re
 import secrets
@@ -20,8 +21,9 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from api import checks, preview
+from api import bersih, checks, preview
 from api.schemas import JobCreate, JobCreated, JobOut
+import asr
 import keypool
 from config import env_store
 from config.settings import settings
@@ -32,7 +34,6 @@ from llm import rute
 from pipeline import layout as layout_mod
 import storage
 import unggah
-from utils.ffmpeg_helpers import rmtree_retry
 from utils.logging import get
 
 log = get(__name__)
@@ -105,7 +106,11 @@ async def lifespan(app: FastAPI):
         settings.API_PORT,
         " (autentikasi aktif)" if settings.AUTH_TOKEN else "",
     )
+    # Selalu dijalankan; nyala/mati dibaca dari setelan di tiap putarannya,
+    # jadi mengubahnya di halaman Setting tidak butuh restart.
+    sapuan = asyncio.create_task(bersih.loop())
     yield
+    sapuan.cancel()
 
 
 class StaticSegar(StaticFiles):
@@ -269,8 +274,10 @@ def daftar_layout():
             # `teks` dipakai UI untuk mematikan seluruh knob caption saat
             # layoutnya memang tidak memakai caption — bukan menampilkan kontrol
             # yang diputar tanpa akibat apa pun.
+            # `redup` dipakai UI untuk memunculkan knob bayangan hanya di
+            # layout yang memang punya bayangan, beserta nilai awalnya.
             {"nama": l.nama, "judul": l.judul, "keterangan": l.keterangan,
-             "font_saran": l.font_saran, "teks": l.teks}
+             "font_saran": l.font_saran, "teks": l.teks, "redup": l.redup}
             for l in layout_mod.LAYOUTS.values()
         ],
     }
@@ -280,7 +287,14 @@ def daftar_layout():
 def preview_tampilan(layout: str | None = None, font: str | None = None,
                      ukuran: int | None = None, warna: str | None = None,
                      kata: int | None = None, upper: bool | None = None,
-                     caption: bool | None = None):
+                     caption: bool | None = None,
+                     redup_luas: int | None = None, redup_gelap: int | None = None,
+                     active_word_style: str | None = None,
+                     active_word_background_color: str | None = None,
+                     active_word_text_color: str | None = None,
+                     active_word_border_radius: int | None = None,
+                     active_word_padding_x: int | None = None,
+                     active_word_padding_y: int | None = None):
     """Contoh caption dengan setelan tampilan yang sedang dipilih.
 
     Parameternya opsional supaya halaman Setting bisa menampilkan akibat sebuah
@@ -290,6 +304,13 @@ def preview_tampilan(layout: str | None = None, font: str | None = None,
     knob = {k: v for k, v in (
         ("font", font), ("ukuran", ukuran), ("aktif", warna),
         ("kata", kata), ("upper", upper), ("caption", caption),
+        ("redup_luas", redup_luas), ("redup_gelap", redup_gelap),
+        ("active_word_style", active_word_style),
+        ("active_word_background_color", active_word_background_color),
+        ("active_word_text_color", active_word_text_color),
+        ("active_word_border_radius", active_word_border_radius),
+        ("active_word_padding_x", active_word_padding_x),
+        ("active_word_padding_y", active_word_padding_y),
     ) if v is not None}
     try:
         isi, tipe = preview.render(layout, knob)
@@ -312,30 +333,27 @@ def _kurang_konfigurasi() -> str | None:
     Nama provider = nama pool, jadi tidak ada daftar terpisah yang bisa basi
     saat provider baru ditambahkan.
     """
-    kosong = [
-        n for n in (settings.ASR_PROVIDER, settings.LLM_PROVIDER)
-        if not keypool.keys(n)
-    ]
+    # asr.nama(), bukan ASR_PROVIDER mentah: nilai lama `groq` tidak punya pool
+    # di keypool, dan membacanya mentah melempar alih-alih melapor.
+    kosong = [n for n in (asr.nama(), "gemini") if not keypool.keys(n)]
     return ", ".join(kosong) or None
 
 
 @app.get("/api/status")
 def config_status():
     """Ringkasan singkat untuk strip status di halaman Submit."""
-    asr_ok = bool(keypool.keys(settings.ASR_PROVIDER))
-    llm_ok = bool(keypool.keys(settings.LLM_PROVIDER))
+    asr_ok = bool(keypool.keys(asr.nama()))
+    llm_ok = bool(keypool.keys("gemini"))
     return {
-        "asr": {"provider": settings.ASR_PROVIDER, "ok": asr_ok},
+        "asr": {"provider": asr.nama(), "ok": asr_ok},
         # Model yang sedang dipakai ikut dilaporkan. Tanpa itu, turunnya tier
         # karena kuota habis benar-benar tidak terlihat dari mana pun: klipnya
         # tetap keluar, cuma dari model yang lebih rendah — persis kelas
         # perubahan yang paling sulit disadari.
         "llm": {
-            "provider": settings.LLM_PROVIDER,
+            "provider": "gemini",
             "ok": llm_ok,
-            **({"model": rute.status(
-                "gemini", rute.daftar(), len(keypool.keys("gemini")))}
-               if settings.LLM_PROVIDER == "gemini" else {}),
+            "model": rute.status("gemini", rute.daftar(), len(keypool.keys("gemini"))),
         },
         # Penyimpanan lokal tidak pernah "belum dikonfigurasi" — foldernya
         # dibuat sendiri. Tetap dilaporkan supaya strip status di halaman
@@ -540,10 +558,8 @@ def delete_job(job_id: str):
     """
     if not _UUID.match(job_id):
         raise HTTPException(404, "Job tidak ditemukan")
-    if not jobs.delete(job_id):
+    if not bersih.hapus_job(job_id):
         raise HTTPException(404, "Job tidak ditemukan")
-    storage.delete_job(job_id)
-    rmtree_retry(settings.WORK_DIR / job_id[:8])
     log.info("job %s dihapus beserta berkasnya", job_id)
     return Response(status_code=204)
 

@@ -116,7 +116,13 @@ def rmtree_retry(path: Path, attempts: int = 3) -> None:
 
     File tidak bisa dihapus selama masih dipegang handle, dan Defender menahan
     handle beberapa saat setelah ffmpeg menutup file.
+
+    Folder yang memang tidak ada bukan kegagalan. Job yang sukses sudah
+    membuang workdir-nya sendiri, jadi menghapus job seperti itu dulu berarti
+    tiga percobaan, dua detik jeda, dan satu peringatan palsu di log.
     """
+    if not path.exists():
+        return
     for i in range(attempts):
         try:
             shutil.rmtree(path, ignore_errors=False)

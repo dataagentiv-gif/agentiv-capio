@@ -68,9 +68,12 @@ function masalahHtml(j) {
 
 function jobRiwayat(j) {
   const n = (j.clips || []).length;
-  const hasil = j.status === 'done'
-    ? `${n} klip · <a href="/results">lihat hasil</a>`
-    : '';
+  // Job selesai tanpa klip = klipnya sudah dibuang (manual satu per satu, atau
+  // auto clear mode "hasil"). "0 klip · lihat hasil" menjanjikan halaman yang
+  // isinya kosong.
+  const hasil = j.status !== 'done' ? ''
+    : n ? `${n} klip · <a href="/results">lihat hasil</a>`
+    : 'Klipnya sudah dibersihkan — riwayatnya saja yang tersisa.';
   return `<div class="job">
     ${kepala(j, ` · ${esc(NAMA_LAYOUT[j.layout] || j.layout || 'Penuh')}`)}
     ${hasil ? `<div class="job-body"><p class="sub">${hasil}</p></div>` : ''}
