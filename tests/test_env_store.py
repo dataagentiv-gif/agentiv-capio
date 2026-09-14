@@ -203,6 +203,12 @@ def env_asli(tmp_path, monkeypatch):
     p = tmp_path / ".env"
     p.write_text("", encoding="utf-8")
     monkeypatch.setattr(env_store, "ENV_PATH", p)
+    # reload() menimpa field objek settings GLOBAL, dan monkeypatch.setenv tidak
+    # ikut mengembalikannya. Tanpa ini DATABASE_URL "x@postgres:5432" dari test
+    # di bawah menempel ke seluruh test sesudahnya, dan test database gagal
+    # konek — tergantung urutan, jadi hanya kadang-kadang.
+    for nama in type(settings).model_fields:
+        monkeypatch.setattr(settings, nama, getattr(settings, nama))
     return p
 
 
