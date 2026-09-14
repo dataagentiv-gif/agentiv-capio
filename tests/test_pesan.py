@@ -10,9 +10,12 @@ import pytest
 
 from utils import pesan
 
-# Teks mentah sungguhan, disalin dari kolom error di database.
-KUOTA_ELEVENLABS = (
-    'RuntimeError: ElevenLabs HTTP 401: {"detail":{"type":"invalid_request",'
+# Bentuknya sintetis, tapi regresinya nyata: ElevenLabs (sudah dibuang) dulu
+# betulan mengirim kuota habis dengan status HTTP 401, bukan 429 yang lazim.
+# Dipertahankan sebagai jaring pengaman kalau provider lain suatu saat
+# melakukan hal serupa.
+KUOTA_401 = (
+    'RuntimeError: Gemini HTTP 401: {"detail":{"type":"invalid_request",'
     '"code":"quota_exceeded","message":"This request exceeds your quota of '
     '10000. You have 704 credits remaining, while 965 credits are required for '
     'this request.","status":"quota_exceeded"}}\n\nTraceback (most recent call '
@@ -21,32 +24,31 @@ KUOTA_ELEVENLABS = (
 
 
 def test_kuota_habis_tidak_disalahartikan_sebagai_key_salah():
-    """Kasus yang sebenarnya terjadi, dan jebakannya nyata: ElevenLabs
-    mengirim kuota habis dengan status HTTP 401. Kalau aturan "key ditolak"
-    diperiksa lebih dulu, orangnya disuruh mengganti key yang sebetulnya
-    baik-baik saja — dan kuotanya tetap habis setelah diganti."""
-    m = pesan.terjemah(KUOTA_ELEVENLABS)
+    """Kalau aturan "key ditolak" diperiksa lebih dulu untuk kode 401, orangnya
+    disuruh mengganti key yang sebetulnya baik-baik saja — dan kuotanya tetap
+    habis setelah diganti."""
+    m = pesan.terjemah(KUOTA_401)
     assert "habis" in m["judul"].lower()
-    assert "ElevenLabs" in m["judul"]
+    assert "Gemini" in m["judul"]
     assert "ditolak" not in m["judul"].lower()
 
 
 def test_kuota_habis_menyebut_tindakan_yang_bisa_diambil():
-    saran = pesan.terjemah(KUOTA_ELEVENLABS)["saran"].lower()
+    saran = pesan.terjemah(KUOTA_401)["saran"].lower()
     assert "setting" in saran, "harus menunjuk ke mana orangnya pergi"
     assert "key" in saran
 
 
 def test_tidak_ada_traceback_yang_bocor_ke_pesan():
     """Kalau teks mentahnya ikut masuk, seluruh gunanya hilang."""
-    m = pesan.terjemah(KUOTA_ELEVENLABS)
+    m = pesan.terjemah(KUOTA_401)
     for bagian in ("Traceback", "RuntimeError", "orchestrator.py", "{"):
         assert bagian not in m["judul"] + m["saran"]
 
 
 @pytest.mark.parametrize("mentah,kata", [
     ("RuntimeError: Groq HTTP 401: invalid api key", "ditolak"),
-    ("RuntimeError: ElevenLabs API key kosong — isi di halaman Setting", "belum diisi"),
+    ("RuntimeError: Gemini API key kosong — isi di halaman Setting", "belum diisi"),
     ("RuntimeError: gemini HTTP 429 rate limit exceeded", "membatasi"),
     ("TimeoutError: deadline job terlampaui sebelum stage 'rendering'", "waktu"),
     ("RuntimeError: Transkrip kosong — audio kemungkinan tanpa suara", "suara"),
@@ -112,10 +114,10 @@ def test_tes_koneksi_membedakan_tanpa_jatah_gratis_dari_kuota_habis():
 
 def test_penyedia_disebut_namanya():
     """"Kuota habis" tanpa menyebut kuota MILIK SIAPA tidak bisa ditindaklanjuti
-    — tiap penyedia punya halaman key sendiri."""
-    for kunci, nama in (("elevenlabs", "ElevenLabs"), ("gemini", "Gemini")):
-        m = pesan.terjemah(f"RuntimeError: {kunci} HTTP 429 quota_exceeded")
-        assert nama in m["judul"]
+    — penyedia yang tidak dikenali jatuh ke pesan generik, bukan diam-diam
+    tidak menyebut siapa pun."""
+    m = pesan.terjemah("RuntimeError: gemini HTTP 429 quota_exceeded")
+    assert "Gemini" in m["judul"]
 
 
 def test_kegagalan_asing_tetap_dapat_penjelasan():
@@ -150,12 +152,12 @@ def test_job_gagal_membawa_penjelasan_ke_ui():
     from api.schemas import JobOut
 
     j = JobOut(id="x", url="u", target_clips=3, status="failed", progress=0,
-               error=KUOTA_ELEVENLABS)
+               error=KUOTA_401)
     assert j.masalah["judul"]
-    assert "ElevenLabs" in j.masalah["judul"]
+    assert "Gemini" in j.masalah["judul"]
     # Teks mentahnya tetap utuh — kalau terjemahannya meleset, yang hilang cuma
     # terjemahannya.
-    assert j.error == KUOTA_ELEVENLABS
+    assert j.error == KUOTA_401
 
 
 def test_job_berhasil_tidak_punya_masalah():

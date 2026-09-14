@@ -23,7 +23,6 @@ from fastapi.templating import Jinja2Templates
 
 from api import bersih, checks, preview
 from api.schemas import JobCreate, JobCreated, JobOut
-import asr
 import keypool
 from config import env_store
 from config.settings import settings
@@ -328,31 +327,30 @@ def preview_tampilan(layout: str | None = None, font: str | None = None,
 
 
 def _kurang_konfigurasi() -> str | None:
-    """Nama provider yang key-nya masih kosong, atau None kalau lengkap.
+    """"gemini" kalau key-nya masih kosong, None kalau lengkap.
 
-    Nama provider = nama pool, jadi tidak ada daftar terpisah yang bisa basi
-    saat provider baru ditambahkan.
+    Transkrip dan LLM sama-sama lewat pool "gemini" sekarang, jadi satu
+    pemeriksaan cukup untuk keduanya.
     """
-    # asr.nama(), bukan ASR_PROVIDER mentah: nilai lama `groq` tidak punya pool
-    # di keypool, dan membacanya mentah melempar alih-alih melapor.
-    kosong = [n for n in (asr.nama(), "gemini") if not keypool.keys(n)]
-    return ", ".join(kosong) or None
+    return None if keypool.keys("gemini") else "gemini"
 
 
 @app.get("/api/status")
 def config_status():
     """Ringkasan singkat untuk strip status di halaman Submit."""
-    asr_ok = bool(keypool.keys(asr.nama()))
-    llm_ok = bool(keypool.keys("gemini"))
+    gemini_ok = bool(keypool.keys("gemini"))
     return {
-        "asr": {"provider": asr.nama(), "ok": asr_ok},
+        # Transkrip dan LLM ditampilkan terpisah karena secara konsep memang
+        # dua tahap pipeline berbeda (Stage 2 vs Stage 3/8) — kebetulan saja
+        # keduanya sekarang memakai pool key yang sama.
+        "asr": {"provider": "gemini", "ok": gemini_ok},
         # Model yang sedang dipakai ikut dilaporkan. Tanpa itu, turunnya tier
         # karena kuota habis benar-benar tidak terlihat dari mana pun: klipnya
         # tetap keluar, cuma dari model yang lebih rendah — persis kelas
         # perubahan yang paling sulit disadari.
         "llm": {
             "provider": "gemini",
-            "ok": llm_ok,
+            "ok": gemini_ok,
             "model": rute.status("gemini", rute.daftar(), len(keypool.keys("gemini"))),
         },
         # Penyimpanan lokal tidak pernah "belum dikonfigurasi" — foldernya
@@ -361,7 +359,7 @@ def config_status():
         "storage": {"provider": "local", "ok": True},
         "lisensi": lisensi.status(),
         "wa": lisensi.tautan_wa(),
-        "ready": asr_ok and llm_ok and lisensi.boleh_submit()[0],
+        "ready": gemini_ok and lisensi.boleh_submit()[0],
         # Jumlah job yang belum selesai. Dipakai titik penanda di dock, supaya
         # dari halaman mana pun terlihat bahwa masih ada yang berjalan — orang
         # submit lalu pindah halaman, dan sebelumnya tidak ada satu pun tanda.

@@ -24,7 +24,6 @@ import re
 #: supaya satu aturan ("kuota habis") bisa melayani semua penyedia tanpa
 #: ditulis ulang per penyedia.
 PENYEDIA = {
-    "elevenlabs": ("ElevenLabs", "elevenlabs.io/app/settings/api-keys"),
     "gemini": ("Gemini", "aistudio.google.com/apikey"),
 }
 

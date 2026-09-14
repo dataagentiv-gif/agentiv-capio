@@ -87,7 +87,7 @@ venv/Scripts/python main.py worker
 > **Dijalankan di laptop sendiri, bukan VPS.** yt-dlp kena bot-detection
 > YouTube yang jauh lebih galak dari datacenter, jadi siapkan cookies kalau
 > memang harus di server. Transkrip sendiri tidak jadi penghalang, karena
-> ElevenLabs dan Gemini tidak memblokir IP datacenter.
+> Gemini tidak memblokir IP datacenter.
 
 ---
 
@@ -123,7 +123,7 @@ dipanggil untuk dua tugas sempit saja dan tidak pernah memutuskan alur.
 | # | Tahap | Alat | Hasil |
 |---|---|---|---|
 | 1 | Unduh | yt-dlp + ffmpeg | `source.mp4`, `audio.ogg` (16kHz mono opus) |
-| 2 | Transkrip | ElevenLabs / Gemini Transcribe | kata + kalimat, bertimestamp |
+| 2 | Transkrip | Gemini Transcribe | kata + kalimat, bertimestamp |
 | 3 | Seleksi momen | LLM | kandidat klip + skor + alasan |
 | 4 | Geser batas | ffmpeg | batas dipindah ke jeda alami terdekat |
 | 5 | Caption | generator `.ass` | caption karaoke per kata |
@@ -153,38 +153,40 @@ napas.
 Semua lewat halaman **Setting**. Yang ditulis di sana masuk ke `.env` di folder
 project, jadi bisa juga disunting manual kalau lebih suka.
 
-### Transkrip
+### Gemini
 
-| Provider | Biaya | Catatan |
-|---|---|---|
-| **ElevenLabs** Scribe — *default* | ada tier gratis | Akurat untuk Bahasa Indonesia termasuk yang bercampur istilah Inggris. Tanpa blokir IP. Mengeja angka, tapi `asr/angka.py` mengubahnya kembali jadi digit. |
-| **Gemini 3.5 Transcribe** | tier gratis 25 request/hari **per project** Google Cloud | Memakai `GEMINI_API_KEYS`. Model ini hanya menulis **satu bahasa per request** dan diam-diam membuang kalimat bahasa lain — 28–31% detik bicara hilang pada video Indonesia berkutip Inggris. CAPIO menambalnya: celah bersuara tanpa kata dideteksi ffmpeg lalu ditranskrip ulang sekaligus dalam satu request tambahan, sisa 2–3% (setara video Indonesia murni). Konten Indonesia murni tetap 1 request. Key tambahan hanya menambah jatah kalau dibuat di project lain. |
+Satu key, dua tugas: transkrip (Stage 2) lewat `GEMINI_API_KEYS`, lalu seleksi
+momen dan metadata (Stage 3 & 8) lewat key yang sama. Bukan pilihan di antara
+beberapa provider — CAPIO cuma jalan dengan Gemini.
 
-Ini pilihan yang paling terasa hasilnya, karena **caption terbakar permanen di
-video**. Transkrip yang meleset kelihatan oleh penonton dan tidak bisa
-diperbaiki setelah render.
+Ini pilihan yang paling terasa hasilnya untuk transkrip, karena **caption
+terbakar permanen di video**. Transkrip yang meleset kelihatan oleh penonton
+dan tidak bisa diperbaiki setelah render. Gemini 3.5 Transcribe punya satu
+sifat yang perlu ditambal: model ini hanya menulis **satu bahasa per
+request** dan diam-diam membuang kalimat bahasa lain — 28–31% detik bicara
+hilang pada video Indonesia berkutip Inggris. CAPIO menambalnya: celah
+bersuara tanpa kata dideteksi ffmpeg lalu ditranskrip ulang sekaligus dalam
+satu request tambahan, sisa 2–3% (setara video Indonesia murni). Konten
+Indonesia murni tetap 1 request.
 
-**Kenapa Groq dibuang.** Tiga video Indonesia berisi istilah Inggris ditranskrip
-Groq dan ElevenLabs dari file audio yang sama persis. Pada satu dari tiga video,
-**29,6% keluaran Groq adalah teks Jepang** — Whisper berpindah bahasa lalu
-mengarang panjang lebar; dua video lain nol. Kalimat Inggris juga diterjemahkan
-alih-alih ditranskrip: *"Tools like Google Analytics"* keluar sebagai *"Tua
-seperti analitik"*. Kegagalan yang benar di dua video lalu ambruk total di video
-ketiga tanpa peringatan lebih sulit diantisipasi daripada kesalahan kecil yang
-konsisten. `ASR_PROVIDER=groq` yang masih tertulis di `.env` lama tidak membuat
-worker gagal start — CAPIO memakai provider yang tersisa.
+Kuota gratisnya per PROJECT Google Cloud, bukan per key — key tambahan cuma
+menaikkan atap kalau dibuat di project yang berbeda (terukur: dua key satu
+project habis bersamaan di 28 request gabungan). Transkrip: ~25 request/hari
+per project. LLM: pipeline memakai dua panggilan per video, dan kuota gratis
+chat completions (1.000 permintaan/hari) setara sekitar 500 video per hari.
 
-### LLM
-
-| Provider | Catatan |
-|---|---|
-| **Gemini** | Ada free tier. Boleh diisi beberapa key dipisah koma. |
-
-OpenRouter sudah dibuang; `LLM_PROVIDER` dan `OPENROUTER_*` di `.env` lama
-diabaikan tanpa error.
-
-Pipeline memakai **dua panggilan LLM per video**, jadi kuota gratis Gemini
-(1.000 permintaan/hari) setara sekitar 500 video per hari.
+**Kenapa bukan Groq atau ElevenLabs.** Groq dibuang duluan: tiga video
+Indonesia berisi istilah Inggris ditranskrip Groq dan ElevenLabs dari file
+audio yang sama persis, dan **29,6% keluaran Groq adalah teks Jepang** pada
+satu dari tiga video — Whisper berpindah bahasa lalu mengarang panjang lebar,
+dua video lain nol. Kalimat Inggris juga diterjemahkan alih-alih ditranskrip:
+*"Tools like Google Analytics"* keluar sebagai *"Tua seperti analitik"*.
+ElevenLabs sempat jadi default (akurat, tanpa blokir IP) sampai tambalan di
+atas terbukti: free tier-nya tembok bulanan (~15 video/bulan) jauh lebih
+sempit dari batas laju harian Gemini, dan target market CAPIO sensitif harga.
+`ASR_PROVIDER`, `LLM_PROVIDER`, `ELEVENLABS_*`, dan `OPENROUTER_*` yang masih
+tertulis di `.env` lama diabaikan tanpa error — tidak ada yang perlu
+disunting setelah update.
 
 ### Lisensi
 
@@ -323,7 +325,7 @@ api/                  REST + penyaji halaman
 web/                  template Jinja2 + aset
 worker/               orchestrator (satu-satunya pemanggil stage)
 pipeline/stages/      sembilan tahap, masing-masing satu file
-asr/                  provider transkrip (elevenlabs)
+asr/                  transkrip (gemini)
 llm/                  LLM (gemini)
 storage/              penyimpanan klip lokal
 db/                   skema + CRUD
@@ -421,8 +423,10 @@ diperkirakan.
   berlaku umum. Klipnya tetap jadi; yang hilang cuma wajah orang yang sedang
   bicara.
 - **Chunking transkrip** memotong tepat di menit ke-20 tanpa menyesuaikan ke
-  jeda bicara. Dulu aktif di atas ~2,3 jam audio karena batas 25 MB Groq;
-  dengan ElevenLabs (batas 2 GB) cabang itu praktis tidak pernah tersentuh.
+  jeda bicara. Gemini menolak word timestamp di atas 30 menit per request,
+  jadi cabang ini aktif untuk setiap audio **di atas 20 menit** — bukan cuma
+  video sangat panjang seperti pada provider sebelumnya. Satu kata terpotong
+  di tiap batas chunk; diverifikasi end-to-end pada podcast 2,44 jam.
 - **Tidak ada autentikasi bawaan** selain `AUTH_TOKEN` opsional.
 
 ---

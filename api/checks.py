@@ -78,10 +78,6 @@ def _pesan(pool: str, code: int, badan: str) -> str:
 
 
 PROBES = {
-    "elevenlabs": lambda: _per_key("elevenlabs", lambda k: httpx.get(
-        "https://api.elevenlabs.io/v1/user/subscription",
-        headers={"xi-api-key": k}, timeout=TIMEOUT)),
-
     # Tes ASR Gemini harus memeriksa model transkrip, bukan model chat yang
     # kebetulan memakai key sama. Ketersediaan model bisa berbeda per project.
     "gemini-transcribe": lambda: _per_key(

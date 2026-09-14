@@ -1,23 +1,23 @@
-"""Pemilih provider transkrip.
+"""Transkrip lewat Gemini (asr/client_gemini.py).
 
-Stage 2 memanggil dari sini dan tidak tahu provider mana yang aktif — ganti
-provider cukup ubah ASR_PROVIDER di .env, kode stage tidak disentuh.
+Modul ini tetap ada sebagai titik masuk stabil untuk worker dan Stage 2 —
+keduanya memanggil `asr.check_config()` / `asr.transcribe()` tanpa tahu
+implementasinya. ASR_PROVIDER yang masih tertulis di .env lama (elevenlabs,
+groq) diabaikan tanpa error — config/settings.py memakai extra="ignore".
 
-Kontrak yang dijamin sama untuk semua provider:
+Kontrak yang dijamin:
     transcribe(path, offset) -> (words, sentences)
     words     : [{"w", "s", "e"}]      dipakai caption karaoke (Stage 5)
     sentences : [{"text", "s", "e"}]   bertanda baca, dipakai LLM (Stage 3)
 """
+import re
 import unicodedata
 from pathlib import Path
 
 from asr import angka
-from config.settings import settings
 from utils.logging import get
 
 log = get(__name__)
-
-PROVIDERS = ("elevenlabs", "gemini")
 
 
 def rasio_non_latin(teks: str) -> float:
@@ -25,8 +25,9 @@ def rasio_non_latin(teks: str) -> float:
 
     Dihitung dari HURUF saja, bukan seluruh karakter: angka, spasi, dan tanda
     baca sama di semua bahasa dan cuma mengencerkan angkanya. Tanda paling
-    jelas bahwa model berhenti mentranskrip lalu mengarang — Groq menulis teks
-    Jepang, Gemini menulis aksara Gujarat di atas efek suara.
+    jelas bahwa model berhenti mentranskrip lalu mengarang — pernah menulis
+    teks Jepang (Groq, sudah dibuang), pernah menulis aksara Gujarat di atas
+    efek suara (Gemini, ditolak _sah() di client_gemini.py).
     """
     huruf = [c for c in teks if c.isalpha()]
     if not huruf:
@@ -35,29 +36,70 @@ def rasio_non_latin(teks: str) -> float:
     return asing / len(huruf) * 100
 
 
-def nama() -> str:
-    """Provider yang BENAR-BENAR dipakai.
+# --- kalimat dari kata ---
+#
+# Gemini Transcribe tidak mengembalikan pembagian kalimat sama sekali — cuma
+# kata dan timestamp-nya. Padahal Stage 3 memakai kalimat bertanda baca untuk
+# menentukan titik potong, jadi kalimatnya diturunkan di sini. Kalau penurunan
+# ini rusak, tidak ada yang error: seluruh transkrip jadi satu kalimat raksasa
+# dan Stage 3 diam-diam kehilangan semua titik potongnya.
 
-    Nilai yang tidak dikenal jatuh ke provider yang ada, bukan ditolak. Groq
-    sudah dibuang, tapi .env milik client yang update lewat `docker compose
-    pull` masih bisa berisi ASR_PROVIDER=groq. Menolak membuat check_config
-    worker melempar saat start, dan `restart: unless-stopped` mengulanginya
-    selamanya — padahal provider yang tersisa jalan normal.
+# Akhir kalimat, termasuk yang diikuti kutip atau kurung penutup.
+_END = re.compile(r"[.!?…]+[\"'\)\]]*$")
+# Ambang cadangan saat transkrip sama sekali tanpa tanda baca.
+_PAUSE_SPLIT = 0.6
+
+
+def _pack(group: list[dict]) -> dict:
+    return {
+        "text": " ".join(w["w"] for w in group).strip(),
+        "s": group[0]["s"],
+        "e": group[-1]["e"],
+    }
+
+
+def sentences_from_words(words: list[dict]) -> list[dict]:
+    """Turunkan kalimat dari daftar kata.
+
+    Pemisahnya tanda baca akhir kalimat. Kalau transkrip ternyata tidak
+    mengandung tanda baca sama sekali, dipakai jeda bicara sebagai pengganti —
+    tanpa cadangan itu seluruh transkrip jadi satu kalimat raksasa.
     """
-    n = settings.ASR_PROVIDER.strip().lower()
-    return n if n in PROVIDERS else PROVIDERS[0]
+    if not words:
+        return []
+
+    out: list[dict] = []
+    cur: list[dict] = []
+    ada_tanda_baca = False
+    for w in words:
+        cur.append(w)
+        if _END.search(w["w"]):
+            ada_tanda_baca = True
+            out.append(_pack(cur))
+            cur = []
+    if cur:
+        out.append(_pack(cur))
+
+    # Syaratnya ADANYA tanda baca, bukan banyaknya kalimat. Memakai jumlah
+    # kalimat membuat transkrip pendek yang memang cuma satu kalimat — dan
+    # tanda bacanya benar — ikut dipecah paksa oleh jeda.
+    if ada_tanda_baca:
+        return out
+
+    log.warning("transkrip tanpa tanda baca — kalimat dipecah berdasarkan jeda")
+    out, cur = [], []
+    for i, w in enumerate(words):
+        cur.append(w)
+        gap = words[i + 1]["s"] - w["e"] if i + 1 < len(words) else None
+        if gap is None or gap >= _PAUSE_SPLIT:
+            out.append(_pack(cur))
+            cur = []
+    return out
 
 
 def _impl():
-    # Diperingatkan di sini, bukan di nama(): nama() ikut dipanggil strip
-    # status yang di-polling halaman, dan log-nya akan banjir.
-    if nama() != settings.ASR_PROVIDER.strip().lower():
-        log.warning("ASR_PROVIDER='%s' tidak dikenal — memakai %s",
-                    settings.ASR_PROVIDER, nama())
-    if nama() == "gemini":
-        from asr import client_gemini as m
-    else:
-        from asr import client_elevenlabs as m
+    from asr import client_gemini as m
+
     return m
 
 
@@ -68,8 +110,7 @@ def check_config() -> None:
 
 
 def size_limit() -> int:
-    """Batas ukuran file sebelum audio perlu dipecah. Tiap provider punya
-    batasnya sendiri (Scribe 3GB)."""
+    """Batas ukuran file sebelum audio perlu dipecah."""
     return _impl().SIZE_LIMIT
 
 
@@ -81,10 +122,10 @@ def duration_limit() -> float:
 def transcribe(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
     """Transkrip, lalu angka yang dieja diubah jadi digit.
 
-    Normalisasi dilakukan di sini, bukan di masing-masing client, karena ini
-    kebutuhan CAPTION dan bukan sifat provider: siapa pun yang mengeja angka
-    menghasilkan caption yang pecah dua tampilan. Pada transkrip yang sudah
-    memakai digit, langkah ini tidak mengubah apa pun.
+    Normalisasi dilakukan di sini, bukan di client, karena ini kebutuhan
+    CAPTION: siapa pun yang mengeja angka menghasilkan caption yang pecah dua
+    tampilan. Pada transkrip yang sudah memakai digit, langkah ini tidak
+    mengubah apa pun.
 
     Kalimat dibentuk ulang dari kata hasil normalisasi supaya teks yang dibaca
     LLM di Stage 3 sama dengan yang tampil di caption — kalau dibiarkan
@@ -93,11 +134,9 @@ def transcribe(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
     words, sentences = _impl().transcribe(path, offset)
     rapi = angka.normalkan(words)
     if len(rapi) != len(words):
-        from asr.client_elevenlabs import sentences_from_words
-
         sentences = sentences_from_words(rapi)
     return rapi, sentences
 
 
-__all__ = ["PROVIDERS", "check_config", "nama", "size_limit", "duration_limit",
-           "rasio_non_latin", "transcribe"]
+__all__ = ["check_config", "duration_limit", "rasio_non_latin",
+           "sentences_from_words", "size_limit", "transcribe"]

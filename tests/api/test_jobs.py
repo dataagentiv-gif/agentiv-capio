@@ -131,8 +131,8 @@ E2E_URL = os.getenv("TEST_YOUTUBE_URL", "")
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not (E2E_URL and settings.elevenlabs_keys),
-    reason="butuh TEST_YOUTUBE_URL + ELEVENLABS_API_KEYS",
+    not (E2E_URL and settings.gemini_keys),
+    reason="butuh TEST_YOUTUBE_URL + GEMINI_API_KEYS",
 )
 def test_end_to_end_sampai_done(client):
     """Jalankan `python main.py worker` di terminal lain sebelum test ini."""
@@ -199,11 +199,9 @@ def test_api_settings_tidak_membocorkan_rahasia(client):
 
     r = client.get("/api/settings")
     assert r.status_code == 200
-    isi = r.text
-    for key in ("ELEVENLABS_API_KEYS", "GEMINI_API_KEYS"):
-        nilai = getattr(settings, key, "")
-        if nilai:
-            assert nilai not in isi, f"{key} terkirim utuh ke browser"
+    nilai = settings.GEMINI_API_KEYS
+    if nilai:
+        assert nilai not in r.text, "GEMINI_API_KEYS terkirim utuh ke browser"
 
 
 def test_api_settings_menolak_key_di_luar_allowlist(client):

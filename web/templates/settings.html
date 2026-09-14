@@ -21,14 +21,14 @@
 
 {% block script %}
 <script>
-const TES = { 'API Key': ['elevenlabs', 'gemini-transcribe', 'gemini'] };
+const TES = { 'API Key': ['gemini-transcribe', 'gemini'] };
 
 // Penjelasan singkat tiap tab. Tidak tampil langsung — dibuka lewat ikon `?`
 // di judul tab, sama seperti penjelasan tiap field. Halaman yang memajang semua
 // paragraf penjelasan sekaligus sulit dipindai; yang sudah paham cukup
 // melihat labelnya.
 const INTRO = {
-  'API Key': 'Key untuk transkrip (mengubah suara jadi teks) dan LLM (memilih momen, lalu menulis judul, caption, dan hashtag). Tiap provider boleh diisi beberapa key; dipakai bergiliran.',
+  'API Key': 'Satu key Gemini untuk transkrip (mengubah suara jadi teks) dan LLM (memilih momen, lalu menulis judul, caption, dan hashtag). Boleh diisi beberapa, dipakai bergiliran.',
   'Lisensi': 'Tanpa license key CAPIO tetap jalan normal — hanya memproses video baru yang diblokir. Klip lama tetap bisa diputar, diunduh, dan dihapus.',
   'Klip': 'Nilai awal tampilan caption di halaman Submit, batas durasi klip, dan angka kalibrasi titik potong. Layout dipilih utuh — posisi teks dan geometri video harus sepakat. Preview dirender lewat jalur yang sama persis dengan produksi, bukan tiruan CSS.',
   'Kinerja': 'Berapa banyak video diproses bersamaan. Lebih banyak bisa lebih cepat, tapi lebih berat di CPU.',

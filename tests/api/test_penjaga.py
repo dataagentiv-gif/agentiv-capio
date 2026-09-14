@@ -82,8 +82,7 @@ def test_lisensi_diperiksa_sebelum_api_key(client, bersihkan, monkeypatch):
     padahal yang kurang lisensinya cuma membuang waktunya."""
     import license as lisensi
 
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
+    monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
     monkeypatch.setattr(lisensi, "boleh_submit", lambda: (False, "Lisensi belum aktif."))
     r = client.post("/jobs", json={"url": URL, "target_clips": 2})
     assert r.status_code == 403
@@ -103,34 +102,14 @@ def test_halaman_tetap_terbuka_tanpa_lisensi(client, monkeypatch):
 
 # --- konfigurasi bolong ---
 
-def test_tanpa_key_transkrip_ditolak(client, monkeypatch):
-    monkeypatch.setattr(settings, "ASR_PROVIDER", "elevenlabs")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
-
-    r = client.post("/jobs", json={"url": URL, "target_clips": 2})
-    assert r.status_code == 400
-    assert "elevenlabs" in r.text
-
-
-def test_tanpa_key_llm_ditolak(client, monkeypatch):
+def test_tanpa_key_gemini_ditolak(client, monkeypatch):
+    """Transkrip dan LLM sama-sama lewat pool "gemini" sekarang, jadi satu
+    key kosong memblokir keduanya sekaligus."""
     monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
 
     r = client.post("/jobs", json={"url": URL, "target_clips": 2})
     assert r.status_code == 400
     assert "gemini" in r.text
-
-
-def test_asr_provider_lama_tidak_bikin_submit_crash(client, monkeypatch):
-    """ASR_PROVIDER=groq di .env lama tidak punya pool di keypool; membacanya
-    mentah melempar 500, bukan melaporkan key yang kurang."""
-    monkeypatch.setattr(settings, "ASR_PROVIDER", "groq")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
-
-    r = client.post("/jobs", json={"url": URL, "target_clips": 2})
-    assert r.status_code == 400
-    assert "elevenlabs" in r.text
 
 
 def test_pesan_menyebut_akibatnya_bukan_cuma_larangan(client, monkeypatch):

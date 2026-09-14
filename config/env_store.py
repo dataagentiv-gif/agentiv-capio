@@ -36,30 +36,15 @@ def _f(key, label, group, secret=False, kind="text", help="", options=None, pool
 # halaman Setting, dan urutan field di dalam tiap tab.
 FIELDS = [
     # --- API Key ---
-    _f("ASR_PROVIDER", "Provider transkrip", "API Key", kind="select",
-       options=["elevenlabs", "gemini"], bagian="Transkrip",
-       help="Mengubah suara jadi teks. Menentukan kualitas caption yang "
-            "terbakar di video, jadi ini pilihan yang paling terasa hasilnya. "
-            "elevenlabs (disarankan): akurat untuk Bahasa Indonesia yang "
-            "bercampur istilah Inggris, ada tier gratis. gemini: tier gratis "
-            "25 request/hari per project Google Cloud — model ini cenderung "
-            "membuang kalimat bahasa minoritas, dan CAPIO menambalnya dengan "
-            "mendeteksi lalu mentranskrip ulang celah yang hilang; memakai "
-            "key Gemini di bagian LLM."),
-    _f("ELEVENLABS_API_KEYS", "ElevenLabs API key", "API Key", secret=True,
-       pool="elevenlabs", bagian="Transkrip",
-       help="elevenlabs.io/app/settings/api-keys — beberapa key dipakai "
-            "bergiliran untuk menaikkan atap tier gratis."),
+    #
+    # Satu key Gemini buat dua tugas: mengubah suara jadi teks (menentukan
+    # kualitas caption yang terbakar di video, jadi ini yang paling terasa
+    # hasilnya), lalu memilih momen dan menulis judul/caption/hashtag.
     _f("GEMINI_API_KEYS", "Gemini API key", "API Key", secret=True, pool="gemini",
-       bagian="LLM",
-       help="Memilih momen yang dijadikan klip, lalu menulis judul, caption, dan "
-            "hashtag — dua panggilan per video. Key dari aistudio.google.com/apikey; "
-            "free tier dibatasi per PROJECT Google Cloud, bukan per key — key "
-            "tambahan hanya menaikkan atap kalau dibuat di project yang berbeda. "
-            "Key yang sama juga dipakai kalau provider transkrip di atas dipilih "
-            "gemini."),
-    _f("ELEVENLABS_MODEL", "Model ElevenLabs", "API Key", lanjutan=True,
-       help="Biarkan scribe_v2 kecuali ElevenLabs merilis model transkrip baru."),
+       help="aistudio.google.com/apikey — free tier dibatasi per PROJECT "
+            "Google Cloud, bukan per key: key tambahan cuma menaikkan atap "
+            "kalau dibuat di project yang berbeda. Boleh diisi beberapa, "
+            "dipakai bergiliran."),
     # Urutan tier DIPAKU di llm/rute.py, tidak bisa disetel dari sini. Yang di
     # bawah ini jalan keluar untuk yang memang tahu apa yang dilakukannya —
     # kosong berarti ikut tier bawaan.

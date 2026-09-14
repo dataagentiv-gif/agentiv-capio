@@ -1,15 +1,15 @@
-"""Pemilihan provider transkrip dan penurunan kalimat.
+"""Penurunan kalimat dari kata, dan pemeriksaan konfigurasi ASR.
 
-Scribe tidak mengembalikan pembagian kalimat sama sekali — cuma kata. Padahal
-Stage 3 memakai kalimat bertanda baca untuk menentukan titik potong, jadi
-kalimatnya diturunkan di client. Kalau penurunan itu rusak, tidak ada yang
-error: seluruh transkrip jadi satu kalimat raksasa dan Stage 3 diam-diam
-kehilangan semua titik potongnya.
+Scribe/Gemini tidak mengembalikan pembagian kalimat sama sekali — cuma kata.
+Padahal Stage 3 memakai kalimat bertanda baca untuk menentukan titik potong,
+jadi kalimatnya diturunkan di client. Kalau penurunan itu rusak, tidak ada
+yang error: seluruh transkrip jadi satu kalimat raksasa dan Stage 3
+diam-diam kehilangan semua titik potongnya.
 """
 import pytest
 
 import asr
-from asr.client_elevenlabs import sentences_from_words
+from asr import sentences_from_words
 from config.settings import settings
 
 
@@ -67,44 +67,13 @@ def test_satu_kalimat_utuh_tidak_dipaksa_pecah():
     assert len(out) == 1
 
 
-# --- pemilihan provider ---
-
-@pytest.mark.parametrize("nama", ["groq", " Groq ", "deepgram"])
-def test_provider_lama_atau_asing_jatuh_ke_yang_ada(monkeypatch, nama):
-    """Groq sudah dibuang, tapi .env client yang update lewat `docker compose
-    pull` masih bisa berisi ASR_PROVIDER=groq. Menolaknya membuat worker gagal
-    start dan diulang `restart: unless-stopped` selamanya."""
-    monkeypatch.setattr(settings, "ASR_PROVIDER", nama)
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
-    assert asr.nama() == "elevenlabs"
-    # Sampai ke client ElevenLabs (gagal karena key kosong), bukan ditolak
-    # dispatcher.
-    with pytest.raises(RuntimeError, match="ElevenLabs API key kosong"):
-        asr.check_config()
-
-
-@pytest.mark.parametrize("nama", ["elevenlabs", "ELEVENLABS", " ElevenLabs "])
-def test_nama_provider_tidak_peduli_huruf_besar_kecil(monkeypatch, nama):
-    monkeypatch.setattr(settings, "ASR_PROVIDER", nama)
-    assert asr.nama() == "elevenlabs"
-
-
-def test_key_elevenlabs_kosong_ditolak_dengan_pesan_jelas(monkeypatch):
-    monkeypatch.setattr(settings, "ASR_PROVIDER", "elevenlabs")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
-    with pytest.raises(RuntimeError, match="ElevenLabs API key kosong"):
-        asr.check_config()
-
+# --- konfigurasi ---
 
 def test_key_gemini_kosong_ditolak_dengan_pesan_jelas(monkeypatch):
-    monkeypatch.setattr(settings, "ASR_PROVIDER", "gemini")
     monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
     with pytest.raises(RuntimeError, match="Gemini API key kosong"):
         asr.check_config()
 
 
-def test_gemini_membatasi_satu_request_ke_20_menit(monkeypatch):
-    monkeypatch.setattr(settings, "ASR_PROVIDER", "gemini")
+def test_gemini_membatasi_satu_request_ke_20_menit():
     assert asr.duration_limit() == 1200.0

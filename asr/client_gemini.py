@@ -25,8 +25,7 @@ from pathlib import Path
 import httpx
 
 import keypool
-from asr import rasio_non_latin
-from asr.client_elevenlabs import sentences_from_words
+from asr import rasio_non_latin, sentences_from_words
 from config.settings import settings
 from utils.ffmpeg_helpers import Deadline, ffmpeg, probe, run, silences
 from utils.logging import get

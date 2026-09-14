@@ -4,15 +4,14 @@ Input  : ctx[audio], ctx[workdir], ctx[deadline], ctx[meta]
 Output : words.json     -> [{"i", "w", "s", "e"}]        caption karaoke (Stage 5)
          sentences.json -> [{"text", "s", "e"}]          bahan LLM (Stage 3)
 
-Provider mana yang dipakai ditentukan ASR_PROVIDER di .env; stage ini tidak
-tahu-menahu soal ElevenLabs maupun Gemini secara spesifik.
+Stage ini tidak tahu-menahu soal implementasi Gemini Transcribe — cuma
+memanggil asr.transcribe() lewat kontraknya.
 """
 import json
 import math
 from pathlib import Path
 
 import asr
-from config.settings import settings
 from utils.ffmpeg_helpers import ffmpeg
 from utils.logging import get
 
@@ -24,10 +23,8 @@ CHUNK_SEC = 1200.0  # 20 menit
 def _chunks(audio: Path, workdir: Path, duration: float, deadline) -> tuple[list, list]:
     """Cabang untuk audio melebihi batas provider.
 
-    CHUNK_SEC dipatok ke batas TERKETAT yang ada: Gemini menolak word timestamp
-    di atas 30 menit per request, jadi 20 menit menyisakan margin aman.
-    ElevenLabs (2GB) baru kena batas ukuran di berjam-jam audio — untuk provider
-    itu cabang ini nyaris tidak pernah jalan. Karena itu sengaja dibiarkan
+    CHUNK_SEC dipatok ke batas Gemini: word timestamp ditolak di atas 30 menit
+    per request, jadi 20 menit menyisakan margin aman. Sengaja dibiarkan
     sederhana: potong tepat 20 menit tanpa menyesuaikan ke jeda bicara. Satu
     kata terpotong di batas chunk tiap 20 menit tidak mengubah hasil seleksi
     momen.
@@ -94,7 +91,7 @@ def run(ctx: dict) -> dict:
         json.dumps(sentences, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     log.info(
-        "transkrip [%s]: %d kata, %d kalimat, %.0f detik",
-        settings.ASR_PROVIDER, len(words), len(sentences), words[-1]["e"],
+        "transkrip: %d kata, %d kalimat, %.0f detik",
+        len(words), len(sentences), words[-1]["e"],
     )
     return {"words": words, "sentences": sentences}

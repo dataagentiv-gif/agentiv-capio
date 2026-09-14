@@ -15,33 +15,20 @@ class Settings(BaseSettings):
         env_file=ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    # --- Transkrip (Stage 2) ---
+    # --- Transkrip (Stage 2) & Seleksi momen/metadata (Stage 3 & 8) ---
     #
-    # elevenlabs : akurat, tanpa blokir IP, ada tier gratis. Mengeja angka
-    #              ("seratus empat puluh empat"), tapi asr/angka.py sudah
-    #              mengubahnya kembali jadi digit sebelum masuk caption.
+    # Semuanya lewat Gemini sekarang — satu key, dua tugas. Groq (halusinasi
+    # bahasa: 29,6% keluaran jadi TEKS JEPANG pada satu dari tiga video
+    # Indonesia berisi istilah Inggris) dan ElevenLabs (akurat tapi free tier
+    # cuma ~15 video/bulan, seperlimapuluh dari jatah Gemini) sudah dibuang.
+    # ASR_PROVIDER / LLM_PROVIDER / ELEVENLABS_* / OPENROUTER_* yang masih
+    # tertulis di .env lama diabaikan tanpa error (extra="ignore" di atas).
     #
-    # Groq pernah jadi pilihan kedua dan dibuang. Pada satu dari tiga video
-    # Indonesia berisi istilah Inggris, 29.6% keluarannya TEKS JEPANG — Whisper
-    # berpindah bahasa lalu mengarang — dan kalimat Inggris diterjemahkan alih-
-    # alih ditranskrip. Nilai lama `groq` di .env tetap aman: asr/ memakai
-    # provider yang tersisa, bukan menolak start.
-    ASR_PROVIDER: str = "elevenlabs"  # elevenlabs | gemini
-
-    ELEVENLABS_API_KEYS: str = ""
-    # Nama lama, dipertahankan supaya .env yang sudah ada tetap jalan.
-    ELEVENLABS_API_KEY: str = ""
-    ELEVENLABS_MODEL: str = "scribe_v2"
-
-    # Stage 3 (segment) dan Stage 8 (metadata) sama-sama lewat llm/, yang kini
-    # cuma memakai Gemini. OpenRouter dibuang; LLM_PROVIDER / OPENROUTER_* yang
-    # masih tertulis di .env lama diabaikan (extra="ignore" di atas).
-    #
-    # Gemini dipanggil langsung (endpoint OpenAI-compatible milik Google), bukan
-    # lewat OpenRouter. Boleh diisi lebih dari satu key dipisah koma: free tier
-    # Gemini dibatasi PER PROJECT Google Cloud (terukur: dua key satu project
-    # habis bersamaan di 28 request gabungan), jadi rotasi hanya menaikkan atap
-    # untuk key dari project yang berbeda.
+    # Gemini dipanggil langsung (endpoint OpenAI-compatible milik Google).
+    # Boleh diisi lebih dari satu key dipisah koma: free tier Gemini dibatasi
+    # PER PROJECT Google Cloud (terukur: dua key satu project habis bersamaan
+    # di 28 request gabungan), jadi rotasi hanya menaikkan atap untuk key dari
+    # project yang berbeda.
     GEMINI_API_KEYS: str = ""  # "key1,key2,key3"
     # Alias "-latest", BUKAN nomor versi. Google memensiunkan model untuk
     # pengguna baru tanpa menyentuh yang lama: key dari project lama tetap bisa
@@ -220,15 +207,6 @@ class Settings(BaseSettings):
         dilakukannya, dan supaya .env lama yang sudah mengisi GEMINI_MODEL
         tetap jalan tanpa disunting."""
         return self._pecah(self.GEMINI_MODELS) or self._pecah(self.GEMINI_MODEL)
-
-    # Bentuk jamak dulu, bentuk tunggal sebagai cadangan. Nama tunggal dibaca
-    # supaya .env yang sudah ada tetap jalan tanpa harus disunting — termasuk
-    # milik orang lain yang sudah memasang versi sebelumnya.
-    @property
-    def elevenlabs_keys(self) -> list[str]:
-        return self._pecah(self.ELEVENLABS_API_KEYS) or self._pecah(
-            self.ELEVENLABS_API_KEY
-        )
 
 
 settings = Settings()

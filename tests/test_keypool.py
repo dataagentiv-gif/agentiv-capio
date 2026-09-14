@@ -13,8 +13,8 @@ from config.settings import settings
 
 @pytest.fixture
 def tiga(monkeypatch):
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "aaaa1111bbbb2222,cccc3333dddd4444,eeee5555ffff6666")
-    return settings.elevenlabs_keys
+    monkeypatch.setattr(settings, "GEMINI_API_KEYS", "aaaa1111bbbb2222,cccc3333dddd4444,eeee5555ffff6666")
+    return settings.gemini_keys
 
 
 @pytest.fixture
@@ -31,23 +31,10 @@ def test_menerima_banyak_key(tiga):
     assert len(tiga) == 3
 
 
-def test_nama_lama_tetap_terbaca(monkeypatch):
-    """.env yang sudah ada memakai ELEVENLABS_API_KEY tunggal; jangan sampai mati."""
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "sk_lama")
-    assert settings.elevenlabs_keys == ["sk_lama"]
-
-
-def test_nama_baru_menang_atas_nama_lama(monkeypatch):
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "baru1,baru2")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "sk_lama")
-    assert settings.elevenlabs_keys == ["baru1", "baru2"]
-
-
 # --- rotasi ---
 
 def test_berputar_x_plus_1(tiga, tanpa_redis):
-    urut = [keypool.ambil("elevenlabs")[0] for _ in range(6)]
+    urut = [keypool.ambil("gemini")[0] for _ in range(6)]
     # Penghitungnya global dan bisa mulai dari mana saja; yang diuji polanya:
     # maju satu tiap panggilan, berulang tiap 3.
     assert urut[3:] == urut[:3]
@@ -55,33 +42,32 @@ def test_berputar_x_plus_1(tiga, tanpa_redis):
 
 
 def test_indeks_dan_key_cocok(tiga, tanpa_redis):
-    idx, key = keypool.ambil("elevenlabs")
+    idx, key = keypool.ambil("gemini")
     assert key == tiga[idx]
 
 
 def test_tanpa_key_ditolak_dengan_pesan_jelas(monkeypatch):
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEYS", "")
-    monkeypatch.setattr(settings, "ELEVENLABS_API_KEY", "")
-    with pytest.raises(RuntimeError, match="elevenlabs"):
-        keypool.ambil("elevenlabs")
+    monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
+    with pytest.raises(RuntimeError, match="gemini"):
+        keypool.ambil("gemini")
 
 
 def test_redis_mati_tidak_menggagalkan_rotasi(tiga, tanpa_redis):
     """Panel status boleh hilang; job tidak boleh ikut mati."""
-    assert keypool.ambil("elevenlabs")[1] in tiga
-    keypool.lapor("elevenlabs", 0, True, "OK")   # tidak boleh melempar
+    assert keypool.ambil("gemini")[1] in tiga
+    keypool.lapor("gemini", 0, True, "OK")   # tidak boleh melempar
 
 
 # --- status untuk UI ---
 
 def test_status_menandai_satu_key_sebagai_berikutnya(tiga, tanpa_redis):
-    s = keypool.status("elevenlabs")
+    s = keypool.status("gemini")
     assert s["jumlah"] == 3
     assert sum(1 for k in s["keys"] if k["berikutnya"]) == 1
 
 
 def test_status_tidak_membocorkan_key_utuh(tiga, tanpa_redis):
-    teks = str(keypool.status("elevenlabs"))
+    teks = str(keypool.status("gemini"))
     for k in tiga:
         assert k not in teks
     assert "••••" in teks
@@ -93,14 +79,13 @@ def test_pool_kosong_dilaporkan_nol(monkeypatch):
     assert s["jumlah"] == 0 and s["keys"] == []
 
 
-# --- keseragaman antar provider ---
+# --- kontrak per pool ---
 #
-# Rotasi awalnya cuma ada di sebagian provider. Provider yang memakai satu key
-# tunggal diam-diam mengabaikan key kedua: UI menerimanya, .env menyimpannya,
-# dan key itu tidak pernah dipakai.
+# Cuma satu pool sekarang, tapi parametrize dipertahankan: menambah provider
+# baru berarti baris ini otomatis ikut mengujinya, tanpa kode test baru.
 
 def test_semua_provider_punya_pool():
-    assert set(keypool.POOLS) == {"elevenlabs", "gemini"}
+    assert set(keypool.POOLS) == {"gemini"}
 
 
 @pytest.mark.parametrize("pool", keypool.POOLS)

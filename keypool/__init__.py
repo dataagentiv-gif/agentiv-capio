@@ -19,7 +19,7 @@ from utils.logging import get
 
 log = get(__name__)
 
-POOLS = ("elevenlabs", "gemini")
+POOLS = ("gemini",)
 _lokal = itertools.count()
 # Status per key tidak perlu abadi: begitu worker dijalankan lagi, hasil lama
 # tidak lagi menggambarkan keadaan sekarang.
