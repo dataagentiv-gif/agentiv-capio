@@ -68,7 +68,7 @@ def run(ctx: dict) -> dict:
     # pesan error yang sudah pasti.
     asr.check_config()
 
-    if audio.stat().st_size <= asr.size_limit():
+    if audio.stat().st_size <= asr.size_limit() and duration <= asr.duration_limit():
         words, sentences = asr.transcribe(audio, 0.0)
     else:
         words, sentences = _chunks(audio, workdir, duration, ctx["deadline"])

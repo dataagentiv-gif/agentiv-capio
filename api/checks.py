@@ -24,10 +24,13 @@ TIMEOUT = 25.0
 # cuma VPN-nya.
 KHUSUS = {
     ("groq", 403): "Ditolak (403). Groq memblokir IP datacenter — matikan VPN kalau menyala.",
+    ("gemini-transcribe", 404): (
+        "Model Gemini Transcribe tidak tersedia untuk key ini (404)."
+    ),
 }
 
 
-def _per_key(pool: str, kirim) -> tuple[bool, str]:
+def _per_key(pool: str, kirim, nama_pesan: str | None = None) -> tuple[bool, str]:
     """Uji TIAP key satu per satu, bukan cuma yang pertama.
 
     Satu key mati di antara beberapa key harus ketahuan, bukan tertutup oleh
@@ -44,7 +47,7 @@ def _per_key(pool: str, kirim) -> tuple[bool, str]:
     for i, k in enumerate(keys):
         r = kirim(k)
         ok_i = r.status_code == 200
-        pesan = _pesan(pool, r.status_code, r.text)
+        pesan = _pesan(nama_pesan or pool, r.status_code, r.text)
         keypool.lapor(pool, i, ok_i, pesan)
         hasil.append(f"#{i + 1} {'OK' if ok_i else pesan}")
     return all("OK" in h for h in hasil), f"{len(keys)} key: " + ", ".join(hasil)
@@ -86,6 +89,18 @@ PROBES = {
     "elevenlabs": lambda: _per_key("elevenlabs", lambda k: httpx.get(
         "https://api.elevenlabs.io/v1/user/subscription",
         headers={"xi-api-key": k}, timeout=TIMEOUT)),
+
+    # Tes ASR Gemini harus memeriksa model transkrip, bukan model chat yang
+    # kebetulan memakai key sama. Ketersediaan model bisa berbeda per project.
+    "gemini-transcribe": lambda: _per_key(
+        "gemini",
+        lambda k: httpx.get(
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            "gemini-3.5-transcribe",
+            headers={"x-goog-api-key": k}, timeout=TIMEOUT,
+        ),
+        "gemini-transcribe",
+    ),
 
     "openrouter": lambda: _per_key("openrouter", lambda k: httpx.get(
         "https://openrouter.ai/api/v1/key",

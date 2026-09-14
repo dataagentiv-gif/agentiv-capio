@@ -92,6 +92,18 @@ def test_key_elevenlabs_kosong_ditolak_dengan_pesan_jelas(monkeypatch):
         asr.check_config()
 
 
+def test_key_gemini_kosong_ditolak_dengan_pesan_jelas(monkeypatch):
+    monkeypatch.setattr(settings, "ASR_PROVIDER", "gemini")
+    monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
+    with pytest.raises(RuntimeError, match="Gemini API key kosong"):
+        asr.check_config()
+
+
+def test_gemini_membatasi_satu_request_ke_20_menit(monkeypatch):
+    monkeypatch.setattr(settings, "ASR_PROVIDER", "gemini")
+    assert asr.duration_limit() == 1200.0
+
+
 def test_batas_ukuran_beda_jauh_antar_provider(monkeypatch):
     """Groq 25MB, Scribe 3GB — kalau tertukar, audio 1 jam dipecah sia-sia
     atau justru ditolak provider karena kebesaran."""

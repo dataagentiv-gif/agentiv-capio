@@ -30,11 +30,11 @@ import re
 import subprocess
 import sys
 import tempfile
-import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from asr import rasio_non_latin  # noqa: E402,F401 — dipakai laporan() dan test
 from utils.ffmpeg_helpers import Deadline  # noqa: E402
 
 # Sama persis dengan yang dipakai stage download. Membandingkan dua provider di
@@ -53,19 +53,6 @@ def ekstrak(sumber: Path, tujuan: Path) -> None:
 
 def kata(teks: str) -> list[str]:
     return re.findall(r"\w+", teks.lower())
-
-
-def rasio_non_latin(teks: str) -> float:
-    """Bagian huruf yang bukan Latin.
-
-    Dihitung dari HURUF saja, bukan seluruh karakter: angka, spasi, dan tanda
-    baca sama di semua bahasa dan cuma mengencerkan angkanya.
-    """
-    huruf = [c for c in teks if c.isalpha()]
-    if not huruf:
-        return 0.0
-    asing = sum(1 for c in huruf if "LATIN" not in unicodedata.name(c, ""))
-    return asing / len(huruf) * 100
 
 
 def transkrip(provider: str, audio: Path) -> str:

@@ -41,6 +41,7 @@ def palsu(monkeypatch):
     """Ganti provider ASR dan ffmpeg dengan yang tidak menyentuh apa pun."""
     monkeypatch.setattr(transcribe, "ffmpeg", lambda *a, **k: None)
     monkeypatch.setattr(transcribe.asr, "check_config", lambda: None)
+    monkeypatch.setattr(transcribe.asr, "duration_limit", lambda: float("inf"))
 
     def _pasang(batas, hasil_per_chunk):
         """hasil_per_chunk: daftar (words, sentences) sebelum offset."""
@@ -84,6 +85,13 @@ def test_tepat_di_batas_tidak_dipecah(ctx, palsu):
     panggilan = palsu(100, [([kata("a", 0, 1)], [])])
     transcribe.run(ctx)
     assert len(panggilan) == 1
+
+
+def test_batas_durasi_provider_memicu_chunking(ctx, palsu, monkeypatch):
+    panggilan = palsu(10_000, [([kata("a", 0, 1)], [])])
+    monkeypatch.setattr(transcribe.asr, "duration_limit", lambda: 1200.0)
+    transcribe.run(ctx)
+    assert panggilan == [0.0, 1200.0, 2400.0]
 
 
 # --- penggabungan chunk ---

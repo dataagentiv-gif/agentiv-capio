@@ -8,12 +8,28 @@ Kontrak yang dijamin sama untuk semua provider:
     words     : [{"w", "s", "e"}]      dipakai caption karaoke (Stage 5)
     sentences : [{"text", "s", "e"}]   bertanda baca, dipakai LLM (Stage 3)
 """
+import unicodedata
 from pathlib import Path
 
 from asr import angka
 from config.settings import settings
 
-PROVIDERS = ("groq", "elevenlabs")
+PROVIDERS = ("groq", "elevenlabs", "gemini")
+
+
+def rasio_non_latin(teks: str) -> float:
+    """Persen huruf yang bukan aksara Latin.
+
+    Dihitung dari HURUF saja, bukan seluruh karakter: angka, spasi, dan tanda
+    baca sama di semua bahasa dan cuma mengencerkan angkanya. Tanda paling
+    jelas bahwa model berhenti mentranskrip lalu mengarang — Groq menulis teks
+    Jepang, Gemini menulis aksara Gujarat di atas efek suara.
+    """
+    huruf = [c for c in teks if c.isalpha()]
+    if not huruf:
+        return 0.0
+    asing = sum(1 for c in huruf if "LATIN" not in unicodedata.name(c, ""))
+    return asing / len(huruf) * 100
 
 
 def _impl():
@@ -22,6 +38,8 @@ def _impl():
         from asr import client_groq as m
     elif name == "elevenlabs":
         from asr import client_elevenlabs as m
+    elif name == "gemini":
+        from asr import client_gemini as m
     else:
         raise RuntimeError(
             f"ASR_PROVIDER='{settings.ASR_PROVIDER}' tidak dikenal. "
@@ -40,6 +58,11 @@ def size_limit() -> int:
     """Batas ukuran file sebelum audio perlu dipecah. Beda jauh antar provider:
     Groq 25MB, Scribe 3GB."""
     return _impl().SIZE_LIMIT
+
+
+def duration_limit() -> float:
+    """Batas durasi satu request; tak hingga kalau provider tidak membatasi."""
+    return getattr(_impl(), "MAX_DURATION_SEC", float("inf"))
 
 
 def transcribe(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
@@ -63,4 +86,5 @@ def transcribe(path: Path, offset: float) -> tuple[list[dict], list[dict]]:
     return rapi, sentences
 
 
-__all__ = ["PROVIDERS", "check_config", "size_limit", "transcribe"]
+__all__ = ["PROVIDERS", "check_config", "size_limit", "duration_limit",
+           "rasio_non_latin", "transcribe"]
