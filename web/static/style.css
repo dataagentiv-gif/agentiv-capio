@@ -1795,7 +1795,7 @@ select:focus {
 
 .caption-accordion > summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 18px;
+  grid-template-columns: minmax(0, 1fr) auto 28px;
   align-items: center;
   gap: 16px;
   padding: 16px 18px;
@@ -1804,14 +1804,19 @@ select:focus {
 }
 
 .caption-accordion > summary::-webkit-details-marker { display: none; }
-.caption-accordion > summary::after {
-  content: "⌄";
-  color: var(--color-muted);
-  font-size: 20px;
-  line-height: 1;
+.caption-summary-chevron {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-tinted);
+  color: var(--color-action);
   transition: transform .18s ease;
 }
-.caption-accordion[open] > summary::after { transform: rotate(180deg); }
+.caption-summary-chevron svg { width: 17px; height: 17px; }
+.caption-accordion > summary:hover .caption-summary-chevron { background: var(--color-fog); }
+.caption-accordion[open] .caption-summary-chevron { transform: rotate(180deg); }
 .caption-summary-label {
   display: flex;
   align-items: center;
@@ -1961,14 +1966,14 @@ select:focus {
      satu supaya tidak sempit di layar HP. */
   .gaya-knob { width: 100%; grid-template-columns: 1fr; }
   .caption-accordion > summary {
-    grid-template-columns: minmax(0, 1fr) 18px;
+    grid-template-columns: minmax(0, 1fr) 28px;
     gap: 8px 12px;
   }
   .caption-accordion > summary b {
     grid-column: 1;
     text-align: left;
   }
-  .caption-accordion > summary::after {
+  .caption-summary-chevron {
     grid-column: 2;
     grid-row: 1 / span 2;
     align-self: center;
