@@ -41,6 +41,8 @@ LATAR = "0x3a3f47"
 # DARI ukuran sumber, jadi memberinya rentang yang lain berarti kotak dan
 # gradasinya jatuh di tempat yang tidak sama dengan hasil aslinya.
 SRC_W, SRC_H = 1920, 1080
+FONT_DIR = str((Path(__file__).resolve().parent.parent / "assets" / "fonts")) \
+    .replace("\\", "/").replace(":", "\\:")
 
 # Kalimat contoh sengaja memuat kata panjang dan angka: dua hal yang paling
 # sering bikin caption pecah baris atau meluber, dan tidak akan ketahuan dari
@@ -98,11 +100,15 @@ def render(nama_layout: str | None = None,
 
             mask = _mask(kerja, lay, g, _TanpaBatas())
 
-        vf = layout.filtergraph(lay, g, "p.ass" if teks else None, mask)
+        # Preview dari source lokal tidak memasang font ke Windows seperti
+        # Dockerfile. Tanpa fontsdir libass diam-diam memakai Arial, sementara
+        # posisi kata dihitung dari Poppins — hasilnya kata blok bertumpuk.
+        ass = f"p.ass:fontsdir='{FONT_DIR}'" if teks else None
+        vf = layout.filtergraph(lay, g, ass, mask)
         kompleks = None
         if lay.duo:
             a, b = layout.geometri_duo(lay, crop, sw, sh)
-            cap = ",subtitles=p.ass" if teks else ""
+            cap = f",subtitles={ass}" if teks else ""
             kompleks = (
                 f"[0:v]split=2[va][vb];"
                 f"[va]crop={a['cw']}:{a['ch']}:{a['cx']}:{a['cy']},"
