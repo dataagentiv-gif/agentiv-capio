@@ -44,7 +44,7 @@ def jangan_antre(monkeypatch):
 
     Test di sini mem-POST /jobs ke Redis yang sama dengan yang dipakai worker
     produksi, jadi tanpa ini setiap kali `pytest` dijalankan worker benar-benar
-    mengunduh video, memanggil Groq, dan merender klip — membuang kuota, disk,
+    mengunduh video, memanggil Gemini, dan merender klip — membuang kuota, disk,
     dan waktu, sekaligus menaruh job sampah di halaman Proses.
 
     Yang diuji route ini memang cuma "row tertulis lalu enqueue dipanggil",

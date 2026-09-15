@@ -176,9 +176,9 @@ def run(ctx: dict) -> dict:
         found = list(workdir.glob("source.*"))
         raise RuntimeError(f"source.mp4 tidak terbentuk. Ada di workdir: {found}")
 
-    # 24kbps opus mono = ~10.8 MB/jam, jadi limit 25MB Groq baru kena di ~2.3 jam
-    # audio. FLAC 16k yang disarankan docs Groq ~45 MB/jam dan sudah lewat limit
-    # di menit ke-33 — jangan dipakai.
+    # 16kHz mono, cukup untuk ucapan dan jauh di bawah batas 2GB Gemini —
+    # kualitas lebih tinggi tidak menambah ketepatan transkrip, cuma memperlambat
+    # unggahan ke Files API. 24kbps opus ~10.8 MB/jam.
     ffmpeg(
         [
             "-i", "source.mp4", "-vn",

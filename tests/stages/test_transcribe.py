@@ -1,8 +1,12 @@
-"""Stage 2, khususnya cabang chunking yang belum pernah jalan di produksi.
+"""Stage 2, khususnya cabang chunking.
 
-`_chunks()` baru aktif kalau audio melebihi batas provider — pada Groq itu 24 MB
-≈ 2,3 jam, dan video terpanjang yang pernah diproses baru 26 menit. Jadi seluruh
-logika penggabungannya belum pernah diuji oleh kenyataan.
+`_chunks()` aktif kalau audio melebihi batas provider — Gemini menolak word
+timestamp di atas 30 menit per request, jadi CHUNK_SEC dipatok 20 menit untuk
+margin aman. Jauh lebih sering tersentuh daripada saat masih Groq (limit lama
+≈2,3 jam): sudah diverifikasi end-to-end pada podcast 2,44 jam sungguhan
+(lihat README), tapi logika penggabungannya tetap diuji di sini dengan ASR
+dipalsukan supaya tiap edge case (urutan, offset, index) bisa dipastikan tanpa
+menunggu audio panjang beneran.
 
 Yang berisiko di situ bukan pemanggilan ASR-nya, melainkan penyatuannya: tiap
 chunk mengembalikan timestamp yang dimulai dari nol, dan kalau offset-nya salah
@@ -180,8 +184,8 @@ def test_kontrak_field_kata_dijaga(ctx, palsu):
 def test_chunk_membaca_nama_file_audio_yang_sebenarnya(tmp_path, monkeypatch):
     """Nama file sempat ditulis literal "audio.ogg" di perintah ffmpeg,
     sementara nama sebenarnya datang lewat argumen. Selama keduanya kebetulan
-    sama tidak ada yang terlihat — dan cabang ini cuma hidup pada audio >2,3
-    jam, jadi kerusakannya akan menunggu lama sebelum ketahuan."""
+    sama tidak ada yang terlihat — dan cabang ini cuma hidup pada audio
+    >20 menit, jadi kerusakannya baru ketahuan belakangan."""
     dipakai = []
     monkeypatch.setattr(transcribe, "ffmpeg",
                         lambda args, *a, **k: dipakai.append(args[args.index("-i") + 1]))

@@ -10,7 +10,6 @@ bukan transkrip atau upload sungguhan.
 import httpx
 
 import keypool
-from config.settings import settings
 from llm import rute
 from utils.logging import get
 

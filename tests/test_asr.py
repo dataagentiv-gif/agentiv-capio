@@ -1,6 +1,6 @@
 """Penurunan kalimat dari kata, dan pemeriksaan konfigurasi ASR.
 
-Scribe/Gemini tidak mengembalikan pembagian kalimat sama sekali — cuma kata.
+Gemini Transcribe tidak mengembalikan pembagian kalimat sama sekali — cuma kata.
 Padahal Stage 3 memakai kalimat bertanda baca untuk menentukan titik potong,
 jadi kalimatnya diturunkan di client. Kalau penurunan itu rusak, tidak ada
 yang error: seluruh transkrip jadi satu kalimat raksasa dan Stage 3
