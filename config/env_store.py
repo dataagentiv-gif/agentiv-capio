@@ -76,7 +76,7 @@ FIELDS = [
 
     # --- Klip: tampilan ---
     _f("CLIP_LAYOUT", "Layout klip", "Klip", kind="select", bagian="Tampilan",
-       options=["penuh", "kotak", "samping", "ori"],
+       options=["penuh", "duo", "kotak", "samping", "ori"],
        help="penuh: video mengisi layar, caption di bawah. "
             "kotak: video dalam kotak sudut tumpul di tengah, latar hitam. "
             "samping: pembicara digeser ke kiri, satu baris teks tenang di kanan. "

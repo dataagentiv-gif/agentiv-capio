@@ -84,8 +84,10 @@ def render(nama_layout: str | None = None,
 
         # Wajah dianggap di tengah-atas: preview menilai GEOMETRI dan gaya
         # teks, bukan ketepatan deteksi wajah pada satu frame.
-        g = layout.geometri(lay, {"x": (sw - 608) // 2, "w": 608,
-                                  "fx": 0.5, "fy": 0.38}, sw, sh)
+        crop = {"x": (sw - 608) // 2, "w": 608, "fx": 0.5, "fy": 0.38,
+                "duo": [{"fx": 0.30, "fy": 0.38},
+                         {"fx": 0.70, "fy": 0.38}]}
+        g = layout.geometri(lay, crop, sw, sh)
         mask = None
         if layout.butuh_lapisan(lay):
             from pipeline.stages.render import _mask
@@ -97,6 +99,18 @@ def render(nama_layout: str | None = None,
             mask = _mask(kerja, lay, g, _TanpaBatas())
 
         vf = layout.filtergraph(lay, g, "p.ass" if teks else None, mask)
+        kompleks = None
+        if lay.duo:
+            a, b = layout.geometri_duo(lay, crop, sw, sh)
+            cap = ",subtitles=p.ass" if teks else ""
+            kompleks = (
+                f"[0:v]split=2[va][vb];"
+                f"[va]crop={a['cw']}:{a['ch']}:{a['cx']}:{a['cy']},"
+                f"scale={layout.OUT_W}:{layout.OUT_H // 2},setsar=1[top];"
+                f"[vb]crop={b['cw']}:{b['ch']}:{b['cx']}:{b['cy']},"
+                f"scale={layout.OUT_W}:{layout.OUT_H // 2},setsar=1[bottom];"
+                f"[top][bottom]vstack=inputs=2{cap}[outv]"
+            )
         if not vf:
             # Layout mentahan tidak punya filter sama sekali, dan pratinjaunya
             # tetap harus muat di bingkai HP yang 9:16. Bilah hitamnya bukan
@@ -110,7 +124,10 @@ def render(nama_layout: str | None = None,
         subprocess.run(
             ["ffmpeg", "-nostdin", "-y", "-v", "error",
              "-f", "lavfi", "-i", f"color=c={LATAR}:s={sw}x{sh}:r=15",
-             "-t", str(DETIK), "-vf", vf, "-an",
+             "-t", str(DETIK),
+             *(["-filter_complex", kompleks, "-map", "[outv]"]
+               if kompleks else ["-vf", vf]),
+             "-an",
              "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
              "-pix_fmt", "yuv420p", "-movflags", "+faststart", "preview.mp4"],
             check=True, cwd=kerja, timeout=300)

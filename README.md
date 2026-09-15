@@ -202,7 +202,7 @@ pernah bisa dimasukkan sama sekali.
 
 ### Tampilan
 
-Empat bentuk klip (`penuh`, `kotak`, `samping`, `ori`) plus gaya caption
+Lima bentuk klip (`penuh`, `duo`, `kotak`, `samping`, `ori`) plus gaya caption
 (font, ukuran, jumlah kata per tampilan, huruf besar, gaya kata aktif) —
 dipilih **per video** di halaman Submit, bukan sekali untuk semua video.
 Nilai di halaman Setting cuma jadi nilai awal yang tampil pertama kali.
@@ -216,9 +216,15 @@ kata yang bersudut tumpul, di dua gaya blok posisi tiap kata dihitung sendiri
 dari metrik font (`pipeline/metrik.py`) dan bloknya digambar sebagai vector
 drawing di titik tengah yang sama dengan katanya.
 
-Layout **Pembicara di kiri** (`samping`) punya bayangan gelap dari tepi kanan di
-belakang teksnya. Kegelapan (0–85%) dan luasnya (20–80% lebar) bisa digeser per
+Layout **Pembicara di samping** (`samping`) bisa menaruh pembicara di kiri atau
+kanan, dengan gradasi pada sisi sebaliknya. Kepekatan ujung (0–100%) dan luasnya
+(20–80% lebar) bisa digeser per
 video di halaman Submit.
+
+Layout **Duo pembicara** (`duo`) mengambil dua wajah yang konsisten dari 20
+sampel, lalu menaruh pembicara kiri di panel atas dan kanan di panel bawah.
+Kalau dua wajah tidak hadir bersama pada sedikitnya 30% sampel, klip itu tetap
+berhasil dengan fallback otomatis ke layout `penuh`.
 
 ### Auto clear
 

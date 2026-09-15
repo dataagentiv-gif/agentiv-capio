@@ -18,6 +18,34 @@ log = get(__name__)
 OUT_W, OUT_H = 1080, 1920
 
 
+def _gradient_expr(lay) -> str | None:
+    """Ekspresi alpha ffmpeg; nol di area wajah, 255 di ujung luar."""
+    if not lay.redup:
+        return None
+    mulai, maks = lay.redup
+    if lay.redup_sisi == "kiri":
+        batas = (1 - mulai) * OUT_W
+        langkah = f"({batas:.0f}-X)/{max(1.0, batas):.0f}"
+    else:
+        batas = mulai * OUT_W
+        langkah = f"(X-{batas:.0f})/{max(1.0, OUT_W - 1 - batas):.0f}"
+    return f"{maks * 255:.0f}*pow(clip({langkah},0,1),1.6)"
+
+
+def _gradient_alpha_at(lay, x: float) -> int:
+    """Nilai referensi untuk menguji arah dan batas gradasi produksi."""
+    if not lay.redup:
+        return 0
+    mulai, maks = lay.redup
+    if lay.redup_sisi == "kiri":
+        batas = (1 - mulai) * OUT_W
+        p = (batas - x) / max(1.0, batas)
+    else:
+        batas = mulai * OUT_W
+        p = (x - batas) / max(1.0, OUT_W - 1 - batas)
+    return round(maks * 255 * max(0.0, min(1.0, p)) ** 1.6)
+
+
 def _mask(workdir: Path, lay, g: dict, deadline) -> str:
     """Gambar hitam beralpha untuk ditumpuk di atas video.
 
@@ -38,7 +66,7 @@ def _mask(workdir: Path, lay, g: dict, deadline) -> str:
     r = lay.redup
     # round, bukan int: int(0.29 * 100) = 28, jadi dua setelan berbeda bisa
     # berbagi nama berkas dan yang kedua memakai gambar milik yang pertama.
-    nama = (f"lapis{g['bw']}x{g['bh']}r{lay.radius}"
+    nama = (f"lapis{g['bw']}x{g['bh']}r{lay.radius}{lay.redup_sisi}"
             f"g{round(r[0] * 100) if r else 0}_{round(r[1] * 100) if r else 0}.png")
     if (workdir / nama).exists():
         return nama
@@ -62,15 +90,10 @@ def _mask(workdir: Path, lay, g: dict, deadline) -> str:
         bagian.append(f"255*lt({dalam},1)")
 
     if r:
-        mulai, maks = r
-        x0 = mulai * OUT_W
-        lebar = max(1.0, OUT_W - x0)
         # Pangkat 1.6, bukan lurus: gradasi linear masih menyisakan tepi awal
         # yang terasa sebagai garis. Kurva yang mulai landai lalu menguat
         # membuat permulaannya tidak bisa ditunjuk.
-        bagian.append(
-            f"{maks * 255:.0f}*pow(clip((X-{x0:.0f})/{lebar:.0f},0,1),1.6)"
-        )
+        bagian.append(_gradient_expr(lay))
 
     # Dua lapisan digabung dengan max, bukan dijumlah: penjumlahan bisa melewati
     # 255 di daerah yang kena keduanya dan menghasilkan tepi keras yang justru
@@ -95,6 +118,11 @@ def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
     # Objek Layout, bukan nama: knob bayangan milik job sudah diterapkan di
     # run(), dan mengambil ulang dari nama akan membuangnya diam-diam.
     lay = lay or layout.ambil("penuh")
+    # Tiap klip boleh fallback sendiri: sumber dengan cutaway atau pergantian
+    # kamera sering hanya menampilkan satu orang pada sebagian segmen.
+    if lay.duo and not crop.get("duo"):
+        log.warning("render %s: pasangan duo tidak tersedia — memakai penuh", seg["id"])
+        lay = layout.ambil("penuh")
     g = layout.geometri(lay, crop, src_w, src_h)
     mask = _mask(workdir, lay, g, deadline) if layout.butuh_lapisan(lay) else None
     # Nama file polos, tanpa path. Inilah gunanya cwd=workdir: filter subtitles
@@ -102,6 +130,18 @@ def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
     # (backslash, titik dua drive, spasi di nama user) harus di-escape berlapis.
     # Dengan nama relatif, tidak ada yang perlu di-escape.
     vf = layout.filtergraph(lay, g, f"{seg['id']}.ass" if teks else None, mask)
+    kompleks = None
+    if lay.duo:
+        a, b = layout.geometri_duo(lay, crop, src_w, src_h)
+        cap = f",subtitles={seg['id']}.ass" if teks else ""
+        kompleks = (
+            f"[0:v]split=2[va][vb];"
+            f"[va]crop={a['cw']}:{a['ch']}:{a['cx']}:{a['cy']},"
+            f"scale={OUT_W}:{OUT_H // 2},setsar=1[top];"
+            f"[vb]crop={b['cw']}:{b['ch']}:{b['cx']}:{b['cy']},"
+            f"scale={OUT_W}:{OUT_H // 2},setsar=1[bottom];"
+            f"[top][bottom]vstack=inputs=2{cap}[outv]"
+        )
     ff(
         [
             "ffmpeg", "-y", "-nostdin", "-hide_banner", "-nostats", "-v", "error",
@@ -115,7 +155,8 @@ def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
             "-t", f"{seg['end'] - seg['start']:.3f}",
             # Layout mentahan tidak punya filter sama sekali, dan `-vf ""`
             # ditolak ffmpeg — jadi flagnya harus hilang, bukan dikosongkan.
-            *(["-vf", vf] if vf else []),
+            *(["-filter_complex", kompleks, "-map", "[outv]", "-map", "0:a?"]
+              if kompleks else (["-vf", vf] if vf else [])),
             # Mentahan dikodekan lebih bagus: berkas ini akan diedit lalu
             # dikodekan ULANG, dan crf 23 di sini berarti dua generasi kompresi
             # bertumpuk pada hasil akhirnya.

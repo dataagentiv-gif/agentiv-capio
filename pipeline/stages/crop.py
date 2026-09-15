@@ -3,6 +3,7 @@
 Input  : ctx[source], ctx[segments_final], ctx[meta]
 Output : crop map -> {"c1": {"x": 712, "w": 608}}
 """
+import math
 import statistics
 from functools import lru_cache
 from pathlib import Path
@@ -101,6 +102,84 @@ def _face_center(frames: list) -> tuple[float, float] | None:
     return statistics.median(xs), statistics.median(ys)
 
 
+def _face_observations(frames: list) -> list[list[dict]]:
+    """Semua wajah per sampel dalam koordinat ternormalisasi."""
+    if not frames:
+        return []
+    det, mp = _detector()
+    hasil = []
+    for frame in frames:
+        res = det.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=frame))
+        baris = []
+        for d in res.detections:
+            b = d.bounding_box
+            baris.append({
+                "x": (b.origin_x + b.width / 2) / DET_W,
+                "y": (b.origin_y + b.height / 2) / DET_H,
+                "area": (b.width * b.height) / (DET_W * DET_H),
+            })
+        hasil.append(baris)
+    return hasil
+
+
+def _face_pair_from_observations(observations: list[list[dict]]) -> list[dict] | None:
+    """Pilih dua track terbesar yang hadir bersama pada >=30% sampel.
+
+    Asosiasi nearest-neighbour cukup untuk sampel berurutan dan sengaja tidak
+    menebak identitas biologis. Kontrak layout hanya membutuhkan posisi dua
+    wajah yang konsisten, bukan siapa nama orangnya.
+    """
+    if not observations:
+        return None
+    tracks: list[list[tuple[int, float, float, float]]] = []
+    for frame_i, faces in enumerate(observations):
+        terpakai = set()
+        # Wajah besar didahulukan agar deteksi kecil di latar tidak merebut
+        # track ketika posisinya berdekatan.
+        for face in sorted(faces, key=lambda f: f["area"], reverse=True):
+            kandidat = []
+            for ti, track in enumerate(tracks):
+                if ti in terpakai:
+                    continue
+                _, tx, ty, _ = track[-1]
+                jarak = math.hypot(face["x"] - tx, face["y"] - ty)
+                if jarak <= 0.25:
+                    kandidat.append((jarak, ti))
+            if kandidat:
+                ti = min(kandidat)[1]
+            else:
+                ti = len(tracks)
+                tracks.append([])
+            tracks[ti].append((frame_i, face["x"], face["y"], face["area"]))
+            terpakai.add(ti)
+
+    minimum = math.ceil(len(observations) * MIN_HIT_RATIO)
+    terbaik = None
+    for a in range(len(tracks)):
+        for b in range(a + 1, len(tracks)):
+            bersama = len({x[0] for x in tracks[a]} & {x[0] for x in tracks[b]})
+            if bersama < minimum:
+                continue
+            luas = statistics.median(x[3] for x in tracks[a]) + \
+                   statistics.median(x[3] for x in tracks[b])
+            skor = (bersama, min(len(tracks[a]), len(tracks[b])), luas)
+            if terbaik is None or skor > terbaik[0]:
+                terbaik = (skor, tracks[a], tracks[b])
+    if terbaik is None:
+        return None
+
+    def pusat(track):
+        return {"fx": statistics.median(x[1] for x in track),
+                "fy": statistics.median(x[2] for x in track)}
+
+    # Urutan ini adalah kontrak render: kiri sumber di atas, kanan di bawah.
+    return sorted((pusat(terbaik[1]), pusat(terbaik[2])), key=lambda p: p["fx"])
+
+
+def _face_pair(frames: list) -> list[dict] | None:
+    return _face_pair_from_observations(_face_observations(frames))
+
+
 def run(ctx: dict) -> dict:
     from config.settings import settings
     from pipeline import layout
@@ -134,7 +213,11 @@ def run(ctx: dict) -> dict:
     for seg in ctx["segments_final"]:
         try:
             frames = _sample(source, seg["start"], seg["end"] - seg["start"], deadline)
-            frac = _face_center(frames)
+            pasangan = _face_pair(frames) if lay.duo else None
+            # Fallback duo tetap memakai crop penuh yang face-aware. Hindari
+            # decode ulang; detector kedua hanya terjadi pada kegagalan duo.
+            frac = ((pasangan[0]["fx"], pasangan[0]["fy"])
+                    if pasangan else _face_center(frames))
         except Exception as e:  # noqa: BLE001 — fallback center crop, jangan gagalkan job
             # Dua kegagalan yang sangat berbeda lewat jalur ini. Satu klip yang
             # wajahnya tidak terbaca itu wajar, dan center crop memang jawaban
@@ -153,6 +236,7 @@ def run(ctx: dict) -> dict:
             else:
                 log.warning("deteksi wajah %s gagal (%s) — pakai center crop", seg["id"], e)
             frac = None
+            pasangan = None
 
         if frac is None:
             fx = fy = None
@@ -170,7 +254,11 @@ def run(ctx: dict) -> dict:
         # posisi wajah mentah, dipakai layout lain yang menentukan geometrinya
         # sendiri — mereka butuh tahu di mana orangnya, bukan jendela yang sudah
         # terlanjur diputuskan di sini.
-        crops[seg["id"]] = {"x": x, "w": win_w, "fx": fx, "fy": fy}
+        crops[seg["id"]] = {"x": x, "w": win_w, "fx": fx, "fy": fy,
+                            "duo": pasangan}
+        if lay.duo and not pasangan:
+            log.warning("duo %s: dua wajah stabil tidak ditemukan — fallback ke penuh",
+                        seg["id"])
 
     # Tidak ada satu pun wajah di SELURUH klip berarti sumbernya kemungkinan
     # bukan talking-head — screencast, gameplay, atau animasi. Center crop tetap

@@ -1644,13 +1644,42 @@ select:focus {
 /* `contain`, bukan `cover`. Contoh layout "Asli" sengaja 16:9 — memotongnya
    jadi 9:16 menghapus justru satu-satunya hal yang membedakannya dari layout
    lain. Bilah hitam di atas-bawahnya itu isi pesannya. */
-.layout-opt video {
+.layout-opt video,
+.duo-placeholder {
   display: block;
   width: 96px;
   height: 171px;
   object-fit: contain;
   border-radius: 4px;
   background: var(--color-ink);
+}
+
+.duo-placeholder {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  overflow: hidden;
+}
+
+.duo-placeholder i {
+  display: grid;
+  place-items: center;
+  color: rgba(255,255,255,.75);
+  font-style: normal;
+  font-size: 22px;
+  background: linear-gradient(135deg, #343a44, #181b21);
+}
+
+.duo-placeholder i + i { border-top: 2px solid #fff; }
+.duo-placeholder em {
+  position: absolute;
+  inset: auto 4px 6px;
+  padding: 3px;
+  color: #fff;
+  background: rgba(0,0,0,.72);
+  border-radius: 3px;
+  font-size: 9px;
+  font-style: normal;
 }
 
 .layout-opt:hover { border-color: var(--color-ash); }
@@ -1663,9 +1692,7 @@ select:focus {
 
 /* ---------- Panel pratinjau di halaman Submit ---------- */
 
-.submit-layout { display: block; }   /* bawaan: satu kolom, panel [hidden] */
-
-.submit-layout.picked {
+.submit-layout {
   display: grid;
   grid-template-columns: 1fr 320px;
   gap: 32px;
@@ -1677,6 +1704,7 @@ select:focus {
   top: calc(var(--nav-h) + 20px);   /* pola sama dengan .settings-sisi */
   display: flex;
   justify-content: center;
+  width: 320px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1684,8 +1712,12 @@ select:focus {
 }
 
 @media (max-width: 900px) {
-  .submit-layout.picked { grid-template-columns: 1fr; }
-  .submit-preview { position: static; }
+  .submit-layout { grid-template-columns: 1fr; }
+  .submit-preview {
+    position: static;
+    width: min(100%, 320px);
+    margin: 4px auto 24px;
+  }
 }
 
 /* ---------- Tab halaman Proses ---------- */
@@ -1739,10 +1771,56 @@ select:focus {
   display: flex;
   gap: 24px;
   align-items: flex-start;
-  margin-bottom: 20px;
+  margin-bottom: 0;
   padding: 20px;
-  background: var(--surface-soft);
+  background: transparent;
+}
+
+.layout-khusus {
+  margin: -4px 0 20px;
+  padding: 18px;
+  border: 1px solid var(--color-fog);
   border-radius: var(--radius-inputs);
+  background: var(--surface-soft);
+}
+
+.layout-khusus .field:last-child { margin-bottom: 0; }
+
+.caption-accordion {
+  margin-bottom: 20px;
+  border: 1px solid var(--color-fog);
+  border-radius: var(--radius-inputs);
+  background: var(--surface-canvas);
+}
+
+.caption-accordion > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.caption-accordion > summary::-webkit-details-marker { display: none; }
+.caption-accordion > summary span { font-weight: 600; color: var(--color-ink); }
+.caption-accordion > summary b {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-muted);
+  text-align: right;
+}
+.caption-accordion[open] > summary { border-bottom: 1px solid var(--color-fog); }
+
+.caption-group-label {
+  grid-column: 1 / -1;
+  padding-top: 4px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
 }
 
 .gaya-knob {
@@ -1831,7 +1909,7 @@ select:focus {
 
 .geser {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr) 44px;
+  grid-template-columns: 130px minmax(0, 1fr) 44px;
   gap: 12px;
   align-items: center;
   margin-top: 6px;
@@ -1856,6 +1934,9 @@ select:focus {
      panel level halaman) — dua kolom knob-nya sendiri yang diciutkan jadi
      satu supaya tidak sempit di layar HP. */
   .gaya-knob { width: 100%; grid-template-columns: 1fr; }
+  .caption-accordion > summary { align-items: flex-start; flex-direction: column; }
+  .caption-accordion > summary b { text-align: left; }
+  .geser { grid-template-columns: 112px minmax(0, 1fr) 38px; gap: 8px; }
 }
 
 /* Tombol hapus yang sedang memproses. Tanpa penanda, klik kedua terasa seperti

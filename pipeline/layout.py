@@ -15,10 +15,10 @@ from dataclasses import dataclass, field, replace
 
 OUT_W, OUT_H = 1080, 1920
 
-#: Rentang knob bayangan, dalam persen. Kegelapan di atas 85% menutup detail
-#: video; luas di bawah 20% tidak lagi sampai ke belakang teks, dan di atas 80%
+#: Rentang knob bayangan, dalam persen. Ujung 100% memang hitam penuh;
+#: luas di bawah 20% tidak lagi sampai ke belakang teks, dan di atas 80%
 #: gelapnya mulai merayap ke pembicara yang ditaruh di sepertiga kiri.
-REDUP_GELAP = (0, 85)
+REDUP_GELAP = (0, 100)
 REDUP_LUAS = (20, 80)
 
 
@@ -54,7 +54,7 @@ class Layout:
     kepala: float = 0.34
     #: Radius sudut kotak dalam piksel keluaran. 0 = siku.
     radius: int = 0
-    #: (mulai, alpha_maks) gradasi gelap dari kanan. None = tidak ada.
+    #: (mulai, alpha_maks) gradasi gelap menuju `redup_sisi`. None = tidak ada.
     #:
     #: `mulai` = di mana gelapnya MULAI muncul, pecahan lebar; dari situ ia
     #: menguat sampai `alpha_maks` di tepi kanan. Bukan kotak beralpha rata:
@@ -62,6 +62,11 @@ class Layout:
     #: jadi dua bidang, sementara yang dituju adalah tepi yang pekat lalu
     #: memudar tanpa batas yang bisa ditunjuk.
     redup: tuple[float, float] | None = None
+    #: Tepi yang dibuat paling gelap. Pada `samping`, nilainya selalu
+    #: berlawanan dengan posisi pembicara.
+    redup_sisi: str = "kanan"
+    #: Dua crop sumber ditumpuk menjadi panel 1080x960.
+    duo: bool = False
     #: Alignment .ass (numpad): 2 bawah-tengah, 5 tengah, 6 tengah-kanan.
     align: int = 2
     margin_v: int = 420
@@ -92,6 +97,17 @@ LAYOUTS = {
         keterangan="Video mengisi seluruh layar, caption di bawah tengah. "
                    "Paling aman dan paling banyak menampilkan gambar.",
     ),
+    "duo": Layout(
+        nama="duo",
+        judul="Duo pembicara",
+        keterangan="Dua pembicara tampil bersamaan: kiri di panel atas dan "
+                   "kanan di panel bawah. Jika pasangan wajah tidak stabil, "
+                   "CAPIO otomatis memakai tampilan Penuh.",
+        duo=True,
+        zoom=0.85,
+        align=5,
+        margin_v=0,
+    ),
     "kotak": Layout(
         nama="kotak",
         judul="Kotak tengah",
@@ -108,9 +124,9 @@ LAYOUTS = {
     ),
     "samping": Layout(
         nama="samping",
-        judul="Pembicara di kiri",
-        keterangan="Pita mendatar, pembicara digeser ke kiri, satu baris teks "
-                   "tenang di kanan. Paling cocok untuk podcast berlatar gelap. "
+        judul="Pembicara di samping",
+        keterangan="Pita mendatar, pembicara bisa di kiri atau kanan, dengan "
+                   "teks dan gradasi di sisi sebaliknya. "
                    "Sebagian teks tertutup UI TikTok — itu memang lazim di klip "
                    "sekarang.",
         kotak=True,
@@ -122,7 +138,7 @@ LAYOUTS = {
         # atas latar terang tetap sulit dibaca. 0.70 di tengah keduanya, dan
         # sekarang bisa diputar per video lewat knob (terapkan_knob) — jadi
         # angka ini cuma titik awal, bukan satu-satunya pilihan.
-        redup=(0.40, 0.70),
+        redup=(0.40, 1.0),
         align=6,
         margin_r=70,
         # Satu baris mendatar, bukan ditumpuk — mengikuti referensi.
@@ -175,9 +191,18 @@ def terapkan_knob(lay: Layout, knob: dict | None) -> Layout:
     layar ("60% lebar tertutup bayangan"); di dalam, `redup` menyimpan titik
     MULAINYA dari kiri.
     """
+    knob = knob or {}
+    if lay.nama == "samping" and knob.get("speaker_side") == "kanan":
+        lay = replace(
+            lay,
+            wajah_x=1 - lay.wajah_x,
+            align=4,
+            margin_l=lay.margin_r,
+            margin_r=lay.margin_l,
+            redup_sisi="kiri",
+        )
     if not lay.redup:
         return lay
-    knob = knob or {}
     mulai, maks = lay.redup
     if (luas := _jepit(knob.get("redup_luas"), *REDUP_LUAS)) is not None:
         mulai = 1 - luas / 100
@@ -232,6 +257,28 @@ def geometri(lay: Layout, crop: dict, src_w: int, src_h: int) -> dict:
 
     return {"cw": cw, "ch": ch, "cx": cx, "cy": cy,
             "bw": bw, "bh": bh, "bx": 0, "by": _genap((OUT_H - bh) / 2)}
+
+
+def geometri_duo(lay: Layout, crop: dict, src_w: int, src_h: int) -> list[dict]:
+    """Dua jendela medium-shot, kiri sumber menjadi atas lalu kanan bawah."""
+    wajah = crop.get("duo") or []
+    if len(wajah) != 2:
+        return []
+    hasil = []
+    for i, muka in enumerate(wajah):
+        ch = _genap(src_h * lay.zoom)
+        cw = _genap(ch * OUT_W / (OUT_H / 2))
+        if cw > src_w:
+            cw = _genap(src_w)
+            ch = _genap(cw * (OUT_H / 2) / OUT_W)
+        cx = _genap(muka["fx"] * src_w - cw / 2)
+        cy = _genap(muka["fy"] * src_h - ch * lay.kepala)
+        cx = max(0, min(src_w - cw, cx)) & ~1
+        cy = max(0, min(src_h - ch, cy)) & ~1
+        hasil.append({"cw": cw, "ch": ch, "cx": cx, "cy": cy,
+                      "bw": OUT_W, "bh": OUT_H // 2,
+                      "bx": 0, "by": i * (OUT_H // 2)})
+    return hasil
 
 
 def filtergraph(lay: Layout, g: dict, ass: str | None = None,

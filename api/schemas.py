@@ -28,6 +28,8 @@ class JobCreate(BaseModel):
         bersih = {k: v[k] for k in BOLEH if v.get(k) not in (None, "", 0, "0")}
         if v.get("active_word_style") in GAYA_AKTIF:
             bersih["active_word_style"] = v["active_word_style"]
+        if v.get("speaker_side") in ("kiri", "kanan"):
+            bersih["speaker_side"] = v["speaker_side"]
         # Angka yang NOL-nya bermakna — bayangan 0% berarti tanpa bayangan,
         # radius 0 berarti sudut siku — bukan "ikut default", jadi tidak boleh
         # lewat saringan di atas. Dipaksa jadi int sekalian: nilainya masuk ke

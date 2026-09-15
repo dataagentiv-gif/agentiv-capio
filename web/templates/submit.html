@@ -1,6 +1,6 @@
 {% extends "_layout.html" %}
 {% set page = 'submit' %}
-{% block main_class %}narrow{% endblock %}
+{% block main_class %}{% endblock %}
 {% block heading %}Ubah video panjang jadi klip siap posting.{% endblock %}
 {% block lede %}Tempel link YouTube atau unggah berkas videomu sendiri — hasilnya beberapa klip tegak siap unggah, teksnya sudah menempel di videonya, lengkap dengan judul dan hashtag.{% endblock %}
 
@@ -45,10 +45,34 @@
       <p class="sub" id="durasi"></p>
     </div>
 
-    <div class="field">
+    <div class="field" id="field-layout">
       <label>Tampilan klip</label>
       <div class="layouts" id="layouts"></div>
       <p class="sub" id="ket-layout"></p>
+    </div>
+
+    <div class="layout-khusus" id="opsi-samping" hidden>
+      <div class="field">
+        <label id="l-sisi-pembicara">Posisi pembicara</label>
+        <div class="chips" id="chips-sisi" role="radiogroup" aria-labelledby="l-sisi-pembicara">
+          <button type="button" class="chip on" role="radio" aria-checked="true" data-v="kiri">Kiri</button>
+          <button type="button" class="chip" role="radio" aria-checked="false" data-v="kanan">Kanan</button>
+        </div>
+        <input type="hidden" id="g-speaker-side" data-gaya="speaker_side" value="kiri">
+      </div>
+      <div class="field bayangan" id="f-bayangan">
+        <label>Gradasi sisi teks</label>
+        <div class="geser">
+          <label for="g-redup-gelap">Kepekatan ujung</label>
+          <input type="range" id="g-redup-gelap" data-gaya="redup_gelap" min="0" max="100" step="5">
+          <output for="g-redup-gelap"></output>
+        </div>
+        <div class="geser">
+          <label for="g-redup-luas">Luas</label>
+          <input type="range" id="g-redup-luas" data-gaya="redup_luas" min="20" max="80" step="5">
+          <output for="g-redup-luas"></output>
+        </div>
+      </div>
     </div>
 
     {# Knob tampilan ada DI SINI, bukan cuma di halaman Setting. Kontrol yang
@@ -56,6 +80,8 @@
        tahu dulu bahwa halaman itu ada, lalu bolak-balik untuk mencoba satu
        warna. Nilai awalnya diambil dari default di Setting; yang diubah di
        sini berlaku untuk VIDEO INI saja. #}
+    <details class="caption-accordion" id="caption-accordion">
+      <summary><span>Caption</span><b id="caption-ringkas">Poppins · 96 px · 4 kata · Warna teks</b></summary>
     <div class="gaya-grid">
      <div class="gaya-knob">
       {# Saklarnya di paling atas, bukan di antara knob lain: ia menentukan
@@ -67,13 +93,30 @@
         </label>
         <p class="sub" id="ket-caption"></p>
       </div>
+      <div class="caption-group-label">Tipografi</div>
       <div class="field teks">
         <label for="g-font">Font</label>
         <select id="g-font" data-gaya="font"></select>
       </div>
+      <div class="field teks">
+        <label for="g-ukuran">Ukuran</label>
+        <input type="number" id="g-ukuran" data-gaya="ukuran" min="40" max="220" step="4">
+      </div>
+      <div class="field teks">
+        <label for="g-kata">Kata per tampilan</label>
+        <input type="number" id="g-kata" data-gaya="kata" min="1" max="8">
+      </div>
+      <div class="field teks">
+        <label for="g-upper">Huruf besar semua</label>
+        <select id="g-upper" data-gaya="upper">
+          <option value="">tidak</option>
+          <option value="true">ya</option>
+        </select>
+      </div>
       {# Gaya kata aktif menentukan knob mana yang berarti: warna teks untuk
          gaya lama, warna + ukuran blok untuk dua gaya blok. Yang tidak
          berlaku disembunyikan, bukan cuma diburamkan. #}
+      <div class="caption-group-label">Gaya kata aktif</div>
       <div class="field teks gaya-aktif">
         <label id="l-gaya-aktif">Gaya kata aktif</label>
         <div class="chips" id="chips-aktif" role="radiogroup" aria-labelledby="l-gaya-aktif">
@@ -91,6 +134,7 @@
         </div>
       </div>
       <div class="field teks blok-opsi" id="f-blok" hidden>
+        <div class="caption-group-label">Detail blok</div>
         <div class="blok-warna">
           <div>
             <label for="g-blok-warna">Warna blok</label>
@@ -125,43 +169,11 @@
           <output for="g-blok-py" data-satuan=" px"></output>
         </div>
       </div>
-      <div class="field teks">
-        <label for="g-ukuran">Ukuran</label>
-        <input type="number" id="g-ukuran" data-gaya="ukuran" min="40" max="220" step="4">
-      </div>
-      <div class="field teks">
-        <label for="g-kata">Kata per tampilan</label>
-        <input type="number" id="g-kata" data-gaya="kata" min="1" max="8">
-      </div>
-      <div class="field teks">
-        <label for="g-upper">Huruf besar semua</label>
-        <select id="g-upper" data-gaya="upper">
-          <option value="">tidak</option>
-          <option value="true">ya</option>
-        </select>
-      </div>
-      {# Bukan .teks: bayangan tetap terpakai walau captionnya dimatikan, jadi
-         saklar caption tidak boleh ikut mematikannya. Muncul hanya untuk
-         layout yang punya bayangan (lihat segarkanBayangan). Rentang min/max
-         sama dengan REDUP_GELAP / REDUP_LUAS di pipeline/layout.py — server
-         menjepitnya lagi, jadi yang di sini cuma batas geser. #}
-      <div class="field bayangan" id="f-bayangan" hidden>
-        <label>Bayangan di belakang teks</label>
-        <div class="geser">
-          <label for="g-redup-gelap">Kegelapan</label>
-          <input type="range" id="g-redup-gelap" data-gaya="redup_gelap" min="0" max="85" step="5">
-          <output for="g-redup-gelap"></output>
-        </div>
-        <div class="geser">
-          <label for="g-redup-luas">Luas</label>
-          <input type="range" id="g-redup-luas" data-gaya="redup_luas" min="20" max="80" step="5">
-          <output for="g-redup-luas"></output>
-        </div>
-      </div>
      </div>
       {# .field.pratinjau dipindah ke luar sebagai #submit-preview — panel di
          samping halaman, bukan di dalam .gaya-grid. Lihat aside di bawah. #}
     </div>
+    </details>
 
     <div class="actions">
       <button type="submit" class="btn" id="go">Proses video</button>
@@ -177,12 +189,10 @@
 </p>
 </div>
 
-{# Panel pratinjau, di samping halaman — cuma muncul begitu satu tampilan
-   dipilih di pemilih layout. Sebelum itu halaman tetap satu kolom sempit
-   seperti sekarang, dan panel ini `hidden` supaya tidak menyisakan ruang
-   kosong. `.hp` polos (bukan `.kecil`): begitu berpindah ke sini ukurannya
-   boleh sebesar pratinjau di halaman Setting. #}
-<aside class="submit-preview" id="submit-preview" hidden>
+{# Panel pratinjau selalu disiapkan agar desktop tidak bergeser saat hasil
+   pertama selesai dirender. Di mobile JS memindahkannya setelah pemilih
+   layout, tanpa menggandakan video atau ID. #}
+<aside class="submit-preview" id="submit-preview">
   <div class="field pratinjau">
     <label>Pratinjau</label>
     {# `memuat` sejak awal: pratinjau pertama baru dipanggil setelah jeda
@@ -318,13 +328,6 @@ function drawChips() {
 let layoutPilih = null;
 let fontDisentuh = false;
 let layoutData = [];
-// Beda dari layoutPilih: layoutPilih SELALU ke-default begitu drawLayouts()
-// selesai (lihat di bawah), jadi tidak pernah ada state "belum dipilih" yang
-// sesungguhnya. Flag ini murni menandai klik eksplisit, dipakai untuk
-// menampilkan panel pratinjau — sebelum diklik, panelnya tetap tersembunyi
-// dan halaman tetap satu kolom sempit seperti sekarang.
-let layoutDisentuh = false;
-
 async function drawLayouts() {
   const el = document.getElementById('layouts');
   try {
@@ -340,13 +343,16 @@ async function drawLayouts() {
            memberitahu. Fragmen waktu memaksanya mengambil dan menampilkan frame
            di detik itu; `preload="auto"` juga menyembuhkannya, tapi dengan
            mengunduh tiga megabyte video yang belum tentu dilihat. #}
-        <video src="/static/contoh/${encodeURIComponent(l.nama)}.mp4#t=0.1"
-               muted loop playsinline preload="metadata" tabindex="-1"></video>
+        ${l.contoh
+          ? `<video src="/static/contoh/${encodeURIComponent(l.nama)}.mp4#t=0.1"
+                    muted loop playsinline preload="metadata" tabindex="-1"></video>`
+          : `<span class="duo-placeholder" aria-label="Diagram dua panel">
+               <i>1</i><i>2</i><em>Preview segera hadir</em>
+             </span>`}
         <span>${esc(l.judul)}</span>
       </button>`).join('');
     el.querySelectorAll('.layout-opt').forEach(b => b.onclick = () => {
       layoutPilih = b.dataset.l;
-      layoutDisentuh = true;
       // Tiap layout punya font yang paling cocok — serif untuk yang tenang,
       // sans padat untuk yang tegas. Dipasang sebagai nilai awal saja: begitu
       // font disentuh sendiri, pilihan itu menang dan tidak ditimpa lagi.
@@ -358,11 +364,13 @@ async function drawLayouts() {
       }
       segarkanCaption();
       segarkanBayangan();
+      segarkanOpsiLayout();
       tandaiLayout();
       segarkanPratinjau();
       segarkanPanel();
     });
     segarkanBayangan();
+    segarkanOpsiLayout();
     tandaiLayout();
     // Juga di sini, bukan cuma di onclick: kalau default di Setting kebetulan
     // layout tanpa caption, knobnya harus sudah mati sejak halaman dibuka.
@@ -409,10 +417,28 @@ function tandaiLayout() {
 // [hidden], jadi grid statis akan menyisakan ruang 320px walau panelnya
 // tersembunyi.
 function segarkanPanel() {
-  document.querySelector('main').classList.toggle('narrow', !layoutDisentuh);
-  document.getElementById('submit-layout').classList.toggle('picked', layoutDisentuh);
-  document.getElementById('submit-preview').hidden = !layoutDisentuh;
+  document.getElementById('submit-layout').classList.add('picked');
 }
+
+function segarkanOpsiLayout() {
+  const aktif = layoutData.find(x => x.nama === layoutPilih);
+  const tampil = !!aktif?.speaker_side;
+  document.getElementById('opsi-samping').hidden = !tampil;
+  document.getElementById('g-speaker-side').disabled = !tampil;
+}
+
+function pilihSisi(v) {
+  document.getElementById('g-speaker-side').value = v;
+  document.querySelectorAll('#chips-sisi .chip').forEach(b => {
+    const on = b.dataset.v === v;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+  segarkanPratinjau();
+}
+
+document.querySelectorAll('#chips-sisi .chip').forEach(b =>
+  b.onclick = () => pilihSisi(b.dataset.v));
 
 // Knob tampilan diisi dari default di Setting, lalu boleh diubah untuk video
 // ini saja. Yang kosong TIDAK dikirim — kosong berarti "ikut default", bukan
@@ -481,6 +507,18 @@ function tulisGeser() {
     const o = g.querySelector('output');
     o.textContent = g.querySelector('input').value + (o.dataset.satuan ?? '%');
   });
+  ringkasCaption();
+}
+
+function ringkasCaption() {
+  const font = document.getElementById('g-font')?.value || 'Poppins';
+  const ukuran = document.getElementById('g-ukuran')?.value || '96';
+  const kata = document.getElementById('g-kata')?.value || '4';
+  const gaya = document.getElementById('g-gaya-aktif')?.value || 'text_color';
+  const nama = gaya === 'text_color' ? 'Warna teks'
+             : gaya === 'background' ? 'Blok' : 'Blok + membesar';
+  document.getElementById('caption-ringkas').textContent =
+    `${font} · ${ukuran} px · ${kata} kata · ${nama}`;
 }
 
 // Gaya kata aktif: chip menulis ke input tersembunyi (yang dibaca nilaiGaya),
@@ -494,6 +532,7 @@ function pilihGayaAktif(v) {
   const blok = v !== 'text_color';
   document.getElementById('f-blok').hidden = !blok;
   document.getElementById('f-warna-teks').hidden = blok;
+  ringkasCaption();
 }
 
 // Dua kontrol menulis nilai yang sama: pemilih warna untuk yang mau menunjuk,
@@ -551,6 +590,8 @@ async function isiGaya() {
     // Kolom warna sudah memanggil pratinjau lewat pasangWarna.
     if (!el.closest('.warna-baris')) el.addEventListener('input', segarkanPratinjau);
     el.addEventListener('change', segarkanPratinjau);
+    el.addEventListener('input', ringkasCaption);
+    el.addEventListener('change', ringkasCaption);
   });
   document.querySelectorAll('.geser input').forEach(el =>
     el.addEventListener('input', tulisGeser));
@@ -590,7 +631,8 @@ function segarkanPratinjau() {
     const g = nilaiGaya() || {};
     const peta = { font: 'font', ukuran: 'ukuran', aktif: 'warna',
                    kata: 'kata', upper: 'upper', caption: 'caption',
-                   redup_luas: 'redup_luas', redup_gelap: 'redup_gelap' };
+                   redup_luas: 'redup_luas', redup_gelap: 'redup_gelap',
+                   speaker_side: 'speaker_side' };
     // Knob kata aktif memakai nama yang sama di gaya job dan di pratinjau.
     for (const k of Object.keys(g)) if (k.startsWith('active_word_')) peta[k] = k;
     for (const [k, param] of Object.entries(peta)) {
@@ -758,5 +800,17 @@ drawStatus();
 drawLayouts();
 isiGaya().then(segarkanPratinjau);
 segarkanPanel();
+
+// Desktop: sticky di kanan. Mobile: tepat setelah pemilih layout, sebelum
+// opsi dan caption, tanpa membuat salinan media atau ID ganda.
+function pasangPosisiPreview() {
+  const p = document.getElementById('submit-preview');
+  if (matchMedia('(max-width: 900px)').matches)
+    document.getElementById('field-layout').after(p);
+  else
+    document.getElementById('submit-layout').append(p);
+}
+addEventListener('resize', pasangPosisiPreview);
+pasangPosisiPreview();
 </script>
 {% endblock %}

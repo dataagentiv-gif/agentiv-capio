@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     # geometri kotak, dan arah gradien harus sepakat satu sama lain. Yang di
     # bawahnya adalah knob yang benar-benar berdiri sendiri — diputar
     # bagaimanapun tidak bisa menghasilkan kombinasi yang bertentangan.
-    CLIP_LAYOUT: str = "penuh"  # penuh | kotak | samping | ori
+    CLIP_LAYOUT: str = "penuh"  # penuh | duo | kotak | samping | ori
 
     # Font harus SUDAH ADA di image. Nama yang tidak terpasang tidak menghasilkan
     # error apa pun — libass diam-diam menggantinya, dan yang terlihat cuma
@@ -102,10 +102,10 @@ class Settings(BaseSettings):
     # VERSI ikut terkirim ke server lisensi sebagai agent_version dan tersimpan
     # di tabel activations — satu-satunya cara tahu versi berapa yang dipakai
     # client saat mereka melaporkan masalah. Naikkan bersamaan dengan tag image.
-    # Juga yang ditampilkan sebagai "v1.4.0" kecil di nav (_layout.html) dan
+    # Juga yang ditampilkan sebagai versi kecil di nav (_layout.html) dan
     # yang dibandingkan fitur notifikasi update (license._lebih_baru) — telat
     # menaikkan ini berarti kedua tempat itu ikut berbohong.
-    VERSI: str = "1.4.0"
+    VERSI: str = "1.5.0"
     AGENTIV_WA: str = "6285843570782"
 
     # Kosong = pakai alamat produksi yang tertulis di license/__init__.py.

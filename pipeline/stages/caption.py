@@ -337,6 +337,7 @@ def run(ctx: dict) -> dict:
     # Knob milik JOB menimpa default di setelan. Kosong berarti "ikut
     # default", bukan "kosongkan" — makanya disaring lebih dulu di schema.
     knob = {**knob_dari_settings(), **(ctx.get("gaya") or {})}
+    lay = layout.terapkan_knob(lay, knob)
 
     if not layout.pakai_caption(lay, knob):
         log.info("caption dimatikan — tidak ada .ass yang dibuat")
@@ -350,7 +351,10 @@ def run(ctx: dict) -> dict:
         # batasnya — index asli dari LLM tidak lagi mewakili batas yang dipakai.
         slice_ = [w for w in words if w["e"] > start and w["s"] < end]
         path = workdir / f"{seg['id']}.ass"
-        path.write_text(build_ass(slice_, start, end, lay, knob), encoding="utf-8")
+        seg_lay = lay
+        if lay.duo and not (ctx.get("crops", {}).get(seg["id"], {}).get("duo")):
+            seg_lay = layout.ambil("penuh")
+        path.write_text(build_ass(slice_, start, end, seg_lay, knob), encoding="utf-8")
         paths[seg["id"]] = path
         log.info("caption %s: %d kata", seg["id"], len(slice_))
 

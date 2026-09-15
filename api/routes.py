@@ -276,7 +276,9 @@ def daftar_layout():
             # `redup` dipakai UI untuk memunculkan knob bayangan hanya di
             # layout yang memang punya bayangan, beserta nilai awalnya.
             {"nama": l.nama, "judul": l.judul, "keterangan": l.keterangan,
-             "font_saran": l.font_saran, "teks": l.teks, "redup": l.redup}
+             "font_saran": l.font_saran, "teks": l.teks, "redup": l.redup,
+             "speaker_side": l.nama == "samping", "duo": l.duo,
+             "contoh": l.nama != "duo"}
             for l in layout_mod.LAYOUTS.values()
         ],
     }
@@ -293,7 +295,8 @@ def preview_tampilan(layout: str | None = None, font: str | None = None,
                      active_word_text_color: str | None = None,
                      active_word_border_radius: int | None = None,
                      active_word_padding_x: int | None = None,
-                     active_word_padding_y: int | None = None):
+                     active_word_padding_y: int | None = None,
+                     speaker_side: str | None = None):
     """Contoh caption dengan setelan tampilan yang sedang dipilih.
 
     Parameternya opsional supaya halaman Setting bisa menampilkan akibat sebuah
@@ -310,6 +313,7 @@ def preview_tampilan(layout: str | None = None, font: str | None = None,
         ("active_word_border_radius", active_word_border_radius),
         ("active_word_padding_x", active_word_padding_x),
         ("active_word_padding_y", active_word_padding_y),
+        ("speaker_side", speaker_side),
     ) if v is not None}
     try:
         isi, tipe = preview.render(layout, knob)
