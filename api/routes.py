@@ -598,15 +598,21 @@ def delete_job(job_id: str):
     diperiksa, dan isinya video sumber mentah — justru itu yang paling cepat
     memenuhi disk kalau tidak pernah dibersihkan.
 
-    Job yang sedang berjalan pun boleh dihapus. Itu disengaja: job yang
-    tersangkut karena worker-nya mati tidak punya cara lain untuk dihilangkan.
-    Worker yang masih menulis ke row yang sudah hilang akan berhenti sendiri
-    tanpa membuat keributan.
+    Job antre/berjalan tidak boleh dihapus. Menghapus row saja tidak membatalkan
+    eksekusi RQ: worker tetap sibuk tanpa terlihat di UI dan job lain tampak
+    menunggu selamanya. Job yang worker-nya mati akan otomatis menjadi gagal
+    ketika worker menyala lagi, lalu aman dihapus atau diproses ulang.
     """
     if not _UUID.match(job_id):
         raise HTTPException(404, "Job tidak ditemukan")
-    if not bersih.hapus_job(job_id):
+    hasil = bersih.hapus_job(job_id)
+    if hasil == "missing":
         raise HTTPException(404, "Job tidak ditemukan")
+    if hasil == "active":
+        raise HTTPException(
+            409,
+            "Job masih antre atau berjalan. Tunggu sampai selesai atau gagal sebelum menghapusnya.",
+        )
     log.info("job %s dihapus beserta berkasnya", job_id)
     return Response(status_code=204)
 

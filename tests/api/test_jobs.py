@@ -120,13 +120,19 @@ def test_submit_menulis_row_dan_masuk_antrean(client):
 
 
 def test_proses_ulang_memakai_job_dan_konfigurasi_yang_sama(client):
+    from datetime import datetime, timedelta, timezone
+
     from db import jobs as db_jobs
+    from db.models import Job, session_scope
 
     r = client.post("/jobs", json={
         "url": "https://youtu.be/abc", "target_clips": 4,
         "layout": "duo", "gaya": {"font": "Anton", "speaker_side": "kanan"},
     })
     job_id = r.json()["job_id"]
+    with session_scope() as s:
+        job = s.get(Job, job_id)
+        job.created_at = datetime.now(timezone.utc) - timedelta(days=1)
     sebelum = client.get(f"/jobs/{job_id}").json()
     db_jobs.fail(job_id, "gagal uji")
 
@@ -139,6 +145,26 @@ def test_proses_ulang_memakai_job_dan_konfigurasi_yang_sama(client):
     assert sesudah["status"] == "queued"
     assert sesudah["progress"] == 0
     assert sesudah["error"] is None
+    assert sesudah["created_at"] > sebelum["created_at"]
+
+
+def test_job_aktif_tidak_bisa_dihapus_dan_tetap_tercatat(client):
+    from db import jobs as db_jobs
+    from db.models import Status
+
+    r = client.post("/jobs", json={"url": "https://youtu.be/abc", "target_clips": 2})
+    job_id = r.json()["job_id"]
+
+    for status in (Status.QUEUED, Status.DOWNLOADING):
+        db_jobs.update_status(job_id, status)
+        hapus = client.delete(f"/jobs/{job_id}")
+        assert hapus.status_code == 409
+        assert "masih antre atau berjalan" in hapus.json()["detail"]
+        assert client.get(f"/jobs/{job_id}").status_code == 200
+
+    db_jobs.fail(job_id, "selesai gagal")
+    assert client.delete(f"/jobs/{job_id}").status_code == 204
+    assert client.get(f"/jobs/{job_id}").status_code == 404
 
 
 def test_proses_ulang_upload_mempertahankan_source(client, tmp_path, monkeypatch):
@@ -400,15 +426,19 @@ def test_id_rusak_ditolak_bukan_dieksekusi(client, job_id, clip_id):
     assert r.status_code in (404, 307)
 
 
-def test_worker_tidak_ribut_saat_row_sudah_dihapus(client):
-    """Menghapus job yang sedang berjalan adalah cara satu-satunya membersihkan
-    job yang tersangkut. Worker yang masih menulis ke row itu harus berhenti
-    diam-diam, bukan melempar KeyError."""
+def test_worker_tidak_ribut_saat_row_selesai_sudah_dihapus(client):
+    """Pembaruan terlambat setelah row selesai dihapus tidak boleh melempar.
+
+    API kini menolak penghapusan job aktif karena eksekusi RQ tidak ikut
+    berhenti. Perlindungan di lapisan DB tetap berguna untuk pembaruan worker
+    yang datang sesaat setelah job gagal/done dihapus.
+    """
     from db import jobs as db_jobs
 
     j = client.post(
         "/jobs", json={"url": "https://youtu.be/abc", "target_clips": 1}
     ).json()["job_id"]
+    db_jobs.fail(j, "gagal sebelum dihapus")
     assert client.delete(f"/jobs/{j}").status_code == 204
 
     db_jobs.update_status(j, "rendering", progress=50)   # tidak boleh melempar

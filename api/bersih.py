@@ -25,19 +25,22 @@ JEDA = 3600   # detik antar pengecekan
 AWAL = 60     # pengecekan pertama, dihitung dari API menyala
 
 
-def hapus_job(job_id: str) -> bool:
-    """Hapus job beserta seluruh berkasnya. False kalau barisnya sudah tidak ada.
+def hapus_job(job_id: str) -> str:
+    """Hapus job beserta seluruh berkasnya.
+
+    Mengembalikan ``deleted``, ``active``, atau ``missing`` dari lapisan DB.
 
     Dipakai tombol Hapus dan auto clear sekaligus, supaya "menghapus job" cuma
     punya satu arti. Ikut membuang workdir: workdir job gagal sengaja ditinggal
     untuk diperiksa, dan isinya video sumber mentah — justru itu yang paling
     cepat memenuhi disk.
     """
-    if not jobs.delete(job_id):
-        return False
+    hasil = jobs.delete(job_id)
+    if hasil != "deleted":
+        return hasil
     storage.delete_job(job_id)
     rmtree_retry(settings.WORK_DIR / job_id[:8])
-    return True
+    return hasil
 
 
 def rencana(daftar: list[dict], target: str) -> tuple[list[str], list[str]]:

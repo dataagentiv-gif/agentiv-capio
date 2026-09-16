@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select, update
 
 from db.models import Job, Status, session_scope
 from utils.logging import get
@@ -63,11 +63,8 @@ def kosongkan_clips(job_id: str | uuid.UUID) -> None:
 def _update(job_id: str | uuid.UUID, **fields) -> None:
     """Row yang hilang di tengah jalan bukan error.
 
-    Satu-satunya cara sebuah row lenyap saat worker masih mengerjakannya adalah
-    pengguna menghapusnya lewat UI, dan itu berarti "sudah tidak dipedulikan".
-    Kalau di sini melempar, worker justru gagal saat mencoba menulis status
-    gagal — dan yang muncul di log adalah KeyError yang membingungkan, bukan
-    penghapusan yang memang disengaja.
+    Ini tetap mungkin terjadi karena pembersihan manual/database, walaupun API
+    tidak lagi mengizinkan job aktif dihapus.
     """
     with session_scope() as s:
         job = s.get(Job, uuid.UUID(str(job_id)))
@@ -119,6 +116,10 @@ def retry(job_id: str | uuid.UUID) -> dict | None:
                 error=None,
                 clips=None,
                 worker_id=None,
+                # Retry adalah percobaan baru. Waktunya perlu ikut diperbarui
+                # agar urutan dan label "n menit lalu" di UI tidak memakai
+                # waktu submit percobaan pertama.
+                created_at=func.now(),
             )
             .returning(Job)
         )
@@ -164,18 +165,25 @@ def bereskan_gantung(worker_id: str = "slot-0") -> int:
         return len(rows)
 
 
-def delete(job_id: str | uuid.UUID) -> bool:
-    """Hapus satu job. False kalau memang sudah tidak ada."""
+def delete(job_id: str | uuid.UUID) -> str:
+    """Hapus job selesai secara atomik.
+
+    Mengembalikan ``deleted``, ``active``, atau ``missing``. Row dikunci agar
+    retry yang bersamaan tidak dapat mengubah job gagal menjadi antre tepat di
+    sela pemeriksaan status dan penghapusan.
+    """
     try:
         key = uuid.UUID(str(job_id))
     except ValueError:
-        return False
+        return "missing"
     with session_scope() as s:
-        job = s.get(Job, key)
+        job = s.get(Job, key, with_for_update=True)
         if job is None:
-            return False
+            return "missing"
+        if job.status == Status.QUEUED or job.status in Status.BERJALAN:
+            return "active"
         s.delete(job)
-        return True
+        return "deleted"
 
 
 def remove_clip(job_id: str | uuid.UUID, clip_id: str) -> bool:

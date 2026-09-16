@@ -39,7 +39,7 @@ function kepala(j, ekor = '') {
       <a class="job-url" href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>
       <span class="job-meta">${esc(waktu(j.created_at))}${ekor}</span>
       ${idJob(j.id)}
-      ${tombolHapus('Hapus', `job:${j.id}`)}
+      ${isRunning(j) ? '' : tombolHapus('Hapus', `job:${j.id}`)}
     </div>`;
 }
 
