@@ -27,7 +27,7 @@ WORKDIR /app
 # Disalin duluan dan sendirian supaya layer dependency tidak ikut ter-build
 # ulang setiap kali ada satu baris kode yang berubah.
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --timeout 600 --retries 10 -r requirements.txt
 
 COPY . .
 
