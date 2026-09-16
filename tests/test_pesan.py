@@ -129,6 +129,15 @@ def test_kegagalan_asing_tetap_dapat_penjelasan():
     assert "detail teknis" in m["saran"].lower()
 
 
+def test_worker_mati_menyuruh_nyalakan_docker_dan_proses_ulang():
+    m = pesan.terjemah(
+        "Worker berhenti saat job masih di tahap 'rendering'. Job tidak dilanjutkan otomatis."
+    )
+    assert "worker" in m["judul"].lower()
+    assert "docker" in m["saran"].lower()
+    assert "proses ulang" in m["saran"].lower()
+
+
 @pytest.mark.parametrize("kosong", [None, "", "   "])
 def test_tanpa_kegagalan_tidak_mengarang_masalah(kosong):
     assert pesan.terjemah(kosong) is None

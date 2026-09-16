@@ -670,6 +670,8 @@ input:focus {
   max-width: 74ch;
 }
 
+.masalah .ulang { margin-top: 14px; }
+
 .masalah details { margin-top: 12px; }
 
 .masalah summary {

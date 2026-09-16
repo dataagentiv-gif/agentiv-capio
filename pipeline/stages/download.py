@@ -193,18 +193,28 @@ def run(ctx: dict) -> dict:
 
     info_path = workdir / "source.info.json"
     raw = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {}
+    meta_path = workdir / "meta.json"
+    meta_lama = (
+        json.loads(meta_path.read_text(encoding="utf-8"))
+        if meta_path.exists()
+        else {}
+    )
     v = probe(source, deadline)
     meta = {
         # Nama berkas dipakai sebagai judul untuk sumber unggahan. Tanpa itu
         # judulnya kosong, dan stage metadata kehilangan satu-satunya petunjuk
         # tentang isi video selain transkripnya sendiri.
-        "title": raw.get("title", "") or unggah.nama_asli(ident or ""),
+        "title": (
+            raw.get("title", "")
+            or unggah.nama_asli(ident or "")
+            or meta_lama.get("title", "")
+        ),
         "channel": raw.get("uploader", ""),
         "duration": v["duration"] or float(raw.get("duration", 0)),
         "width": v["width"],
         "height": v["height"],
     }
-    (workdir / "meta.json").write_text(
+    meta_path.write_text(
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 

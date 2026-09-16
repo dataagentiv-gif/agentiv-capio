@@ -91,6 +91,7 @@ def test_pesan_menyebut_tahap_saat_berhenti(buat):
     pesan = jobs.get(jid)["error"]
     assert "rendering" in pesan
     assert "Worker berhenti" in pesan
+    assert "Proses ulang" in pesan
 
 
 def test_mengembalikan_jumlah_yang_dibereskan(buat):
