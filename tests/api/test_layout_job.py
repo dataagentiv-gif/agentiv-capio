@@ -77,7 +77,7 @@ def _buat(client, **extra):
 
 # --- jalur nilai ---
 
-@pytest.mark.parametrize("nama", ["penuh", "kotak", "samping"])
+@pytest.mark.parametrize("nama", ["penuh", "duo", "kotak", "samping"])
 def test_layout_pilihan_tersimpan_dan_terbaca(client, bersihkan, nama):
     """Regresi: kolomnya sempat tersimpan benar tapi tidak ikut as_dict(),
     sehingga UI selalu menampilkan 'penuh' tanpa satu pun error."""

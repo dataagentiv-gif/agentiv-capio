@@ -11,7 +11,9 @@ import pytest
 
 from pipeline.layout import ambil
 from pipeline.stages.caption import build_ass
-from pipeline.stages.render import OUT_H, OUT_W, _render_one
+from pipeline.stages.render import (
+    OUT_H, OUT_W, _gradient_alpha_at, _mask, _render_one,
+)
 from utils.ffmpeg_helpers import Deadline, probe
 
 pytestmark = pytest.mark.skipif(
@@ -132,3 +134,52 @@ def test_caption_mati_menghasilkan_gambar_yang_berbeda(workdir, seg):
     (workdir / "clips" / "c1.mp4").unlink()
     tanpa = render(workdir, seg, teks=False).read_bytes()
     assert dengan != tanpa
+
+
+def test_duo_render_persis_1080x1920(workdir, seg):
+    kata = [{"i": 0, "w": "SAMBUNGAN", "s": CLIP_START, "e": CLIP_END}]
+    ass = build_ass(kata, CLIP_START, CLIP_END, lay=ambil("duo"))
+    (workdir / "c1.ass").write_text(ass, encoding="utf-8")
+    style = next(x for x in ass.splitlines() if x.startswith("Style:"))
+    assert style.split(",")[18] == "5"
+    c = {"x": 656, "w": 608, "fx": .25, "fy": .35,
+         "duo": [{"fx": .25, "fy": .35}, {"fx": .75, "fy": .35}]}
+    info = probe(render(workdir, seg, crop=c, layout="duo"), Deadline(60))
+    assert (info["width"], info["height"]) == (1080, 1920)
+
+
+def test_gradasi_mirror_nol_sebelum_wajah_dan_255_di_ujung():
+    kiri = ambil("samping")
+    from pipeline import layout
+    kanan = layout.terapkan_knob(kiri, {"speaker_side": "kanan"})
+    assert _gradient_alpha_at(kiri, 0) == 0
+    assert _gradient_alpha_at(kiri, kiri.wajah_x * 1080) == 0
+    assert _gradient_alpha_at(kiri, 1080) == 255
+    assert _gradient_alpha_at(kanan, 0) == 255
+    assert _gradient_alpha_at(kanan, kanan.wajah_x * 1080) == 0
+    assert _gradient_alpha_at(kanan, 1080) == 0
+
+
+def test_png_gradasi_produksi_punya_alpha_yang_tepat(workdir):
+    from PIL import Image
+    from pipeline import layout
+
+    c = {"x": 656, "w": 608, "fx": .5, "fy": .4}
+    kiri = ambil("samping")
+    g = layout.geometri(kiri, c, 1920, 1080)
+    p_kiri = workdir / _mask(workdir, kiri, g, Deadline(60))
+    alpha = Image.open(p_kiri).convert("RGBA").getchannel("A")
+    assert alpha.getpixel((round(kiri.wajah_x * 1080), 960)) == 0
+    assert alpha.getpixel((1079, 960)) == 255
+
+    kanan = layout.terapkan_knob(kiri, {"speaker_side": "kanan"})
+    p_kanan = workdir / _mask(workdir, kanan, g, Deadline(60))
+    alpha = Image.open(p_kanan).convert("RGBA").getchannel("A")
+    assert alpha.getpixel((0, 960)) == 255
+    assert alpha.getpixel((round(kanan.wajah_x * 1080), 960)) == 0
+
+
+def test_duo_tanpa_pasangan_fallback_ke_penuh(workdir, seg):
+    c = {"x": 656, "w": 608, "fx": .5, "fy": .35, "duo": None}
+    info = probe(render(workdir, seg, crop=c, layout="duo"), Deadline(60))
+    assert (info["width"], info["height"]) == (1080, 1920)

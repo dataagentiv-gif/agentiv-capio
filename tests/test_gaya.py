@@ -44,3 +44,8 @@ def test_warna_blok_ikut_tersimpan():
 def test_bayangan_ngawur_dibuang_bukan_ditolak():
     """Form versi lama atau nilai rusak tidak boleh menggagalkan submit."""
     assert gaya(redup_gelap="abc", redup_luas=float("inf")) is None
+
+
+def test_sisi_pembicara_dikenal_lolos_dan_default_tidak_disimpan():
+    assert gaya(speaker_side="kanan") == {"speaker_side": "kanan"}
+    assert gaya(speaker_side="tengah") is None

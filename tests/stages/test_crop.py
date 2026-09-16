@@ -8,7 +8,9 @@ import shutil
 
 import pytest
 
-from pipeline.stages.crop import DET_H, DET_W, _face_center, _sample
+from pipeline.stages.crop import (
+    DET_H, DET_W, _face_center, _face_pair_from_observations, _sample,
+)
 from utils.ffmpeg_helpers import Deadline
 
 pytestmark = pytest.mark.skipif(
@@ -116,3 +118,29 @@ def test_jendela_lama_tidak_berubah(tmp_path, monkeypatch):
     out = _jalankan(tmp_path, monkeypatch, (0.5, 0.4))
     assert out["w"] == 608
     assert out["x"] == ((1920 - 608) // 2) & ~1
+
+
+def muka(x, y=.35, area=.08):
+    return {"x": x, "y": y, "area": area}
+
+
+def test_duo_memilih_dua_wajah_terbesar_dari_tiga():
+    obs = [[muka(.2, area=.10), muka(.55, area=.02), muka(.8, area=.09)]
+           for _ in range(20)]
+    assert _face_pair_from_observations(obs) == [
+        {"fx": .2, "fy": .35}, {"fx": .8, "fy": .35}]
+
+
+def test_duo_mengikuti_wajah_yang_bergerak_antar_sampel():
+    obs = [[muka(.18 + i * .005), muka(.82 - i * .005)] for i in range(20)]
+    pair = _face_pair_from_observations(obs)
+    assert pair and pair[0]["fx"] < .3 and pair[1]["fx"] > .7
+
+
+def test_duo_butuh_hadir_bersama_tiga_puluh_persen():
+    obs = [[muka(.2), muka(.8)] if i < 5 else [muka(.2)] for i in range(20)]
+    assert _face_pair_from_observations(obs) is None
+
+
+def test_duo_fallback_bila_hanya_satu_wajah():
+    assert _face_pair_from_observations([[muka(.4)] for _ in range(20)]) is None

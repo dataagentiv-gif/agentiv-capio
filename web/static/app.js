@@ -48,7 +48,8 @@ function badge(s) {
 const NAMA_LAYOUT = {
   penuh: 'Penuh',
   kotak: 'Kotak tengah',
-  samping: 'Pembicara di kiri',
+  samping: 'Pembicara di samping',
+  duo: 'Duo pembicara',
   ori: 'Asli (mentahan)',
 };
 

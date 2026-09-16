@@ -242,12 +242,38 @@ def test_samping_menyarankan_serif():
     assert L.ambil("samping").font_saran == "Lora"
 
 
-def test_gradasi_samping_di_antara_terlalu_tipis_dan_terlalu_pekat():
-    """Versi awal 0.88 terbaca sebagai bidang gelap; 0.45 sesudahnya ternyata
-    tidak cukup menahan latar terang di pemakaian nyata. Defaultnya harus di
-    antara keduanya — ujung-ujungnya masih bisa dicapai lewat knob."""
+def test_gradasi_samping_ujungnya_hitam_penuh():
     _, maks = L.ambil("samping").redup
-    assert 0.6 <= maks <= 0.8
+    assert maks == 1.0
+
+
+def test_samping_kanan_mencerminkan_seluruh_komposisi():
+    kiri = L.terapkan_knob(L.ambil("samping"), {"speaker_side": "kiri"})
+    kanan = L.terapkan_knob(L.ambil("samping"), {"speaker_side": "kanan"})
+    assert (kiri.wajah_x, kiri.align, kiri.redup_sisi) == (0.3, 6, "kanan")
+    assert (kanan.wajah_x, kanan.align, kanan.redup_sisi) == (0.7, 4, "kiri")
+    assert (kanan.margin_l, kanan.margin_r) == (kiri.margin_r, kiri.margin_l)
+
+
+def test_job_lama_tanpa_sisi_tetap_pembicara_kiri():
+    lama = L.terapkan_knob(L.ambil("samping"), {})
+    assert (lama.wajah_x, lama.align, lama.redup_sisi) == (0.3, 6, "kanan")
+
+
+def test_duo_dua_panel_tepat_dan_crop_aman():
+    c = crop()
+    c["duo"] = [{"fx": 0.22, "fy": 0.35}, {"fx": 0.78, "fy": 0.38}]
+    gs = L.geometri_duo(L.ambil("duo"), c, 1920, 1080)
+    assert [(g["bw"], g["bh"], g["by"]) for g in gs] == [
+        (1080, 960, 0), (1080, 960, 960)]
+    for g in gs:
+        assert g["cw"] % 2 == g["ch"] % 2 == 0
+        assert 0 <= g["cx"] <= 1920 - g["cw"]
+        assert 0 <= g["cy"] <= 1080 - g["ch"]
+
+
+def test_duo_caption_tepat_di_sambungan_panel():
+    assert L.ambil("duo").align == 5
 
 
 # --- knob bayangan per video ---

@@ -33,8 +33,8 @@ STAGES = [
     (Status.TRANSCRIBING, transcribe),
     (Status.SEGMENTING, segment),
     (Status.REFINING, refine),
-    (Status.CAPTIONING, caption),
     (Status.CROPPING, crop),
+    (Status.CAPTIONING, caption),
     (Status.RENDERING, render),
     (Status.METADATA, metadata),
 ]
