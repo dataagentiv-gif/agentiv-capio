@@ -74,6 +74,9 @@ docker compose pull
 docker compose up -d
 ```
 
+CAPIO memeriksa versi terbaru saat API menyala dan setiap satu jam setelahnya.
+Jika ada rilis baru, petunjuk update muncul sebagai banner di semua halaman.
+
 **Jangan memakai `docker compose down -v`.** Opsi `-v` menghapus volume
 Postgres, Redis, source upload, install ID, dan data lisensi. Perintah update di
 atas mempertahankan semuanya.

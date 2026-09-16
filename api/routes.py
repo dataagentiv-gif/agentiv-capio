@@ -39,6 +39,7 @@ log = get(__name__)
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 _CLIP = re.compile(r"^c\d{1,3}$")
+_JEDA_VERIFIKASI_LISENSI = 3600
 WEB = Path(__file__).resolve().parent.parent / "web"
 templates = Jinja2Templates(directory=str(WEB / "templates"))
 
@@ -66,6 +67,18 @@ templates.env.globals["wa"] = lisensi.tautan_wa
 # di FIELDS env_store.py) dan cuma berubah lewat build image baru — sama
 # seperti `v`, aman dihitung sekali saat start.
 templates.env.globals["versi"] = settings.VERSI
+
+
+async def _segarkan_lisensi_berkala():
+    """Ambil status rilis baru tanpa membuat polling UI menunggu jaringan."""
+    while True:
+        await asyncio.sleep(_JEDA_VERIFIKASI_LISENSI)
+        if not (settings.LICENSE_KEY or "").strip():
+            continue
+        try:
+            await asyncio.to_thread(lisensi.verifikasi)
+        except Exception as e:  # noqa: BLE001 — putaran berikutnya harus tetap hidup
+            log.warning("penyegaran lisensi berkala gagal: %s", e)
 
 
 @asynccontextmanager
@@ -108,8 +121,10 @@ async def lifespan(app: FastAPI):
     # Selalu dijalankan; nyala/mati dibaca dari setelan di tiap putarannya,
     # jadi mengubahnya di halaman Setting tidak butuh restart.
     sapuan = asyncio.create_task(bersih.loop())
+    penyegaran_lisensi = asyncio.create_task(_segarkan_lisensi_berkala())
     yield
     sapuan.cancel()
+    penyegaran_lisensi.cancel()
 
 
 class StaticSegar(StaticFiles):
