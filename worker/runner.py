@@ -38,22 +38,10 @@ def main() -> None:
     # container saat container DIBUAT, dan pydantic-settings memprioritaskan
     # environment di atas isi file.
     #
-    # Sisi API sudah memanggil ini saat halaman Setting menyimpan; worker
-    # terlewat, dan akibatnya baru terlihat di mesin yang key-nya mulai dari
-    # kosong — yaitu setiap pemasangan baru. Di sana worker membaca nilai kosong
-    # dari saat container lahir, check_config melempar, `restart: unless-stopped`
-    # mengulanginya selamanya, dan mengisi key lewat halaman Setting TIDAK
-    # menyembuhkannya: tulisannya masuk ke file, worker tetap membaca environment
-    # lama. Satu-satunya obatnya `docker compose up -d` sekali lagi, dan tidak
-    # ada pengguna yang akan menebak itu.
-    env_store.reload()
-
-    # Diperiksa SEBELUM worker menerima job: folder klip dibuat sekarang, dan
-    # key transkrip yang bolong ketahuan di detik pertama — bukan setelah
-    # download dan render selesai, yang berarti belasan menit terbuang untuk
-    # job yang sejak awal pasti gagal.
-    storage.check_config()
-    asr.check_config()
+    # Pemasangan baru memang dimulai tanpa key. Worker harus tetap hidup sambil
+    # membaca ulang file yang ditulis halaman Setting, bukan crash-loop dengan
+    # environment kosong yang dibekukan Compose saat container dibuat.
+    _tunggu_config()
 
     if os.environ.get("WORKER_CHILD") == "1":
         # Anak yang disupervisi mode multi: housekeeping berbasis filesystem
@@ -78,6 +66,26 @@ def main() -> None:
         _jalankan_slot(0)
     else:
         _supervisor(n)
+
+
+def _tunggu_config() -> None:
+    """Tetap hidup saat pemasangan baru belum mengisi API key.
+
+    Settings ditulis oleh API ke berkas .env yang sama. Worker membacanya ulang
+    tiap lima detik, lalu mulai menerima job begitu konfigurasinya lengkap.
+    """
+    while True:
+        env_store.reload()
+        try:
+            # Diperiksa SEBELUM worker menerima job: folder klip dibuat sekarang,
+            # dan key transkrip yang bolong tidak baru ketahuan setelah video
+            # selesai diunduh dan dirender.
+            storage.check_config()
+            asr.check_config()
+            return
+        except RuntimeError as exc:
+            log.info("%s — worker menunggu konfigurasi di halaman Setting", exc)
+            time.sleep(5)
 
 
 def _jalankan_slot(slot: int) -> None:
