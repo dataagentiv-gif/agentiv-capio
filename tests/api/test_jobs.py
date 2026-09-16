@@ -119,6 +119,71 @@ def test_submit_menulis_row_dan_masuk_antrean(client):
     assert any(j["id"] == job_id for j in client.get("/jobs").json())
 
 
+def test_proses_ulang_memakai_job_dan_konfigurasi_yang_sama(client):
+    from db import jobs as db_jobs
+
+    r = client.post("/jobs", json={
+        "url": "https://youtu.be/abc", "target_clips": 4,
+        "layout": "duo", "gaya": {"font": "Anton", "speaker_side": "kanan"},
+    })
+    job_id = r.json()["job_id"]
+    sebelum = client.get(f"/jobs/{job_id}").json()
+    db_jobs.fail(job_id, "gagal uji")
+
+    ulang = client.post(f"/jobs/{job_id}/retry")
+    assert ulang.status_code == 200
+    sesudah = client.get(f"/jobs/{job_id}").json()
+    assert sesudah["id"] == job_id
+    for k in ("url", "target_clips", "layout", "gaya"):
+        assert sesudah[k] == sebelum[k]
+    assert sesudah["status"] == "queued"
+    assert sesudah["progress"] == 0
+    assert sesudah["error"] is None
+
+
+def test_proses_ulang_upload_mempertahankan_source(client, tmp_path, monkeypatch):
+    from db import jobs as db_jobs
+
+    monkeypatch.setattr(settings, "WORK_DIR", tmp_path)
+    ident = "5f2a9c1e-8b47-4d3a-9f61-2c7e0a1b8d43"
+    r = client.post("/jobs", json={"url": f"unggah:{ident}", "target_clips": 2})
+    job_id = r.json()["job_id"]
+    source = tmp_path / job_id[:8] / "source.mp4"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"video-asli")
+    db_jobs.fail(job_id, "worker mati")
+
+    assert client.post(f"/jobs/{job_id}/retry").status_code == 200
+    assert source.read_bytes() == b"video-asli"
+    assert client.get(f"/jobs/{job_id}").json()["url"] == f"unggah:{ident}"
+
+
+def test_proses_ulang_hanya_sekali_dan_hanya_job_gagal(client):
+    from db import jobs as db_jobs
+
+    r = client.post("/jobs", json={"url": "https://youtu.be/abc", "target_clips": 2})
+    job_id = r.json()["job_id"]
+    assert client.post(f"/jobs/{job_id}/retry").status_code == 409
+    db_jobs.fail(job_id, "gagal uji")
+    assert client.post(f"/jobs/{job_id}/retry").status_code == 200
+    assert client.post(f"/jobs/{job_id}/retry").status_code == 409
+
+
+def test_queue_gagal_mengembalikan_retry_ke_status_gagal(client, monkeypatch):
+    from api import routes
+    from db import jobs as db_jobs
+
+    job = db_jobs.create("https://youtu.be/abc", 2)
+    db_jobs.fail(job["id"], "gagal pertama")
+    monkeypatch.setattr(routes, "enqueue", lambda _id: (_ for _ in ()).throw(RuntimeError("redis mati")))
+
+    r = client.post(f"/jobs/{job['id']}/retry")
+    assert r.status_code == 503
+    sesudah = client.get(f"/jobs/{job['id']}").json()
+    assert sesudah["status"] == "failed"
+    assert "redis mati" in sesudah["error"]
+
+
 def test_halaman_web_kebuka(client):
     assert client.get("/").status_code == 200
     assert client.get("/history").status_code == 200

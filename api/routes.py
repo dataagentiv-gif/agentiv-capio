@@ -459,17 +459,8 @@ def play_clip(job_id: str, clip_id: str, range: str | None = Header(default=None
 
 # --- REST API ---
 
-@app.post("/jobs", response_model=JobCreated, status_code=201)
-def create_job(payload: JobCreate):
-    # Ditolak SEKARANG, bukan dibiarkan gagal di tengah pipeline. Tanpa key,
-    # job tetap mengunduh videonya lebih dulu — beberapa menit sampai satu jam —
-    # baru berhenti di stage transkrip. Halaman Submit sudah mematikan
-    # tombolnya, tapi itu penjaga di browser saja: permintaan langsung ke API
-    # tetap bisa membuat job yang sejak awal pasti gagal.
-    # Gerbang lisensi ada DI SINI, bukan cuma di tombol halaman Submit: tombol
-    # yang di-disable bisa dilewati dengan satu perintah curl. Dibaca dari token
-    # tersimpan, tanpa memanggil server — submit tidak boleh pernah menunggu
-    # jaringan.
+def _pastikan_boleh_memproses() -> None:
+    """Gerbang bersama submit baru dan proses ulang."""
     boleh, alasan = lisensi.boleh_submit()
     if not boleh:
         raise HTTPException(403, alasan)
@@ -481,6 +472,20 @@ def create_job(payload: JobCreate):
             f"API key untuk {kurang} belum diisi. Buka halaman Setting dulu — "
             "tanpa itu job akan gagal setelah videonya terlanjur diunduh.",
         )
+
+
+@app.post("/jobs", response_model=JobCreated, status_code=201)
+def create_job(payload: JobCreate):
+    # Ditolak SEKARANG, bukan dibiarkan gagal di tengah pipeline. Tanpa key,
+    # job tetap mengunduh videonya lebih dulu — beberapa menit sampai satu jam —
+    # baru berhenti di stage transkrip. Halaman Submit sudah mematikan
+    # tombolnya, tapi itu penjaga di browser saja: permintaan langsung ke API
+    # tetap bisa membuat job yang sejak awal pasti gagal.
+    # Gerbang lisensi ada DI SINI, bukan cuma di tombol halaman Submit: tombol
+    # yang di-disable bisa dilewati dengan satu perintah curl. Dibaca dari token
+    # tersimpan, tanpa memanggil server — submit tidak boleh pernah menunggu
+    # jaringan.
+    _pastikan_boleh_memproses()
 
     # Layout kosong berarti ikut default di Setting. Diselesaikan di sini, bukan
     # dibiarkan kosong sampai render: nilai yang tersimpan di baris job harus
@@ -496,6 +501,31 @@ def create_job(payload: JobCreate):
         # Row sudah tertulis tapi tidak akan pernah diambil worker. Ditandai
         # gagal sekarang juga, supaya tidak menggantung di `queued` selamanya.
         jobs.fail(job["id"], f"Gagal push ke queue: {e}")
+        raise HTTPException(503, f"Queue tidak bisa dihubungi: {e}") from e
+    return JobCreated(job_id=job["id"], status=job["status"])
+
+
+@app.post("/jobs/{job_id}/retry", response_model=JobCreated)
+def retry_job(job_id: str):
+    """Ulangi job gagal dengan input, gaya, dan source yang sama."""
+    if not _UUID.match(job_id):
+        raise HTTPException(404, "Job tidak ditemukan")
+    lama = jobs.get(job_id)
+    if lama is None:
+        raise HTTPException(404, "Job tidak ditemukan")
+    if lama["status"] != "failed":
+        raise HTTPException(409, "Hanya job gagal yang dapat diproses ulang")
+
+    _pastikan_boleh_memproses()
+    job = jobs.retry(job_id)
+    if job is None:
+        # Status berubah setelah pemeriksaan di atas: biasanya tombol diklik
+        # dua kali atau poller sudah melihat job kembali berjalan.
+        raise HTTPException(409, "Job ini sudah diproses ulang")
+    try:
+        enqueue(job["id"])
+    except Exception as e:  # noqa: BLE001
+        jobs.fail(job["id"], f"Gagal push proses ulang ke queue: {e}")
         raise HTTPException(503, f"Queue tidak bisa dihubungi: {e}") from e
     return JobCreated(job_id=job["id"], status=job["status"])
 

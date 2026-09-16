@@ -10,6 +10,11 @@
   <a href="#riwayat"  data-tab="riwayat">Riwayat <span class="hitung" id="n-riwayat"></span></a>
 </nav>
 
+<div class="note warn" id="peringatan-jalan" hidden>
+  <b>Video sedang diproses.</b> Browser boleh ditutup, tetapi Docker, container
+  CAPIO, dan komputer harus tetap menyala. Pastikan komputer tidak masuk mode sleep.
+</div>
+
 <div id="p-berjalan"></div>
 <div id="p-riwayat" hidden></div>
 {% endblock %}
@@ -59,6 +64,8 @@ function masalahHtml(j) {
     <div class="masalah">
       <strong>${esc(j.masalah.judul)}</strong>
       <p>${esc(j.masalah.saran)}</p>
+      ${j.status === 'failed' ? `<button type="button" class="btn sm ghost ulang"
+        data-aksi="retry:${j.id}">Proses ulang</button>` : ''}
       ${j.error ? `<details>
         <summary>Detail teknis</summary>
         <div class="error-box">${esc(j.error)}</div>
@@ -110,6 +117,7 @@ async function tick() {
 
     document.getElementById('n-jalan').textContent = jalan.length || '';
     document.getElementById('n-riwayat').textContent = selesai.length || '';
+    document.getElementById('peringatan-jalan').hidden = jalan.length === 0;
     pilihTab();
     return jalan.length > 0;
   } catch (e) {
@@ -125,7 +133,26 @@ async function tick() {
 document.body.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-aksi]');
   if (!b) return;
-  const id = b.dataset.aksi.split(':')[1];
+  const [aksi, id] = b.dataset.aksi.split(':');
+  if (aksi === 'retry') {
+    b.disabled = true;
+    b.classList.add('sibuk');
+    try {
+      const r = await fetch(`/jobs/${id}/retry`, { method: 'POST' });
+      if (!r.ok) {
+        const d = await r.json().catch(() => null);
+        alert(d?.detail || 'Job gagal diproses ulang.');
+      } else {
+        location.hash = 'berjalan';
+        tick();
+      }
+    } catch {
+      alert('CAPIO tidak merespons. Pastikan Docker dan container sudah menyala.');
+    } finally {
+      if (b.isConnected) { b.disabled = false; b.classList.remove('sibuk'); }
+    }
+    return;
+  }
   if (await hapus(`/jobs/${id}`,
       'Hapus video ini beserta semua klipnya? Berkasnya ikut hilang dari komputer dan tidak bisa dikembalikan.',
       b)) tick();

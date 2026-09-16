@@ -103,6 +103,12 @@ def _sambung(teks: str) -> tuple[str, str]:
 #: kehabisan kuota akan salah dilaporkan sebagai key yang salah — dan orangnya
 #: menghapus key yang sebetulnya baik-baik saja.
 ATURAN: list[tuple[tuple[str, ...], object]] = [
+    (("worker berhenti saat job",), (
+        "Pemrosesan terhenti karena worker berhenti",
+        "Nyalakan kembali Docker dan container CAPIO, lalu tekan Proses ulang "
+        "pada job ini. Browser boleh ditutup saat proses berjalan, tetapi "
+        "Docker, container worker, dan komputer harus tetap menyala.",
+    )),
     (("quota_exceeded", "exceeds your quota", "insufficient_quota",
       "credits remaining", "resource_exhausted", "out of credits"), _kuota),
     # Diperiksa SEBELUM aturan "key ditolak": nama model yang salah dijawab 404,

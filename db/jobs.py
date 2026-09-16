@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 
 from db.models import Job, Status, session_scope
 from utils.logging import get
@@ -98,6 +98,33 @@ def fail(job_id, error: str) -> None:
     _update(job_id, status=Status.FAILED, error=error[-2000:])
 
 
+def retry(job_id: str | uuid.UUID) -> dict | None:
+    """Antrekan ulang satu job gagal tanpa mengganti input atau workdir-nya.
+
+    UPDATE bersyarat membuat klik ganda aman: hanya permintaan pertama yang
+    melihat status ``failed``. Memakai row dan workdir lama juga berarti sumber
+    upload yang sudah dipindah tidak perlu disalin atau diunggah ulang.
+    """
+    try:
+        key = uuid.UUID(str(job_id))
+    except ValueError:
+        return None
+    with session_scope() as s:
+        job = s.scalar(
+            update(Job)
+            .where(Job.id == key, Job.status == Status.FAILED)
+            .values(
+                status=Status.QUEUED,
+                progress=0,
+                error=None,
+                clips=None,
+                worker_id=None,
+            )
+            .returning(Job)
+        )
+        return job.as_dict() if job else None
+
+
 def bereskan_gantung(worker_id: str = "slot-0") -> int:
     """Tandai job yang tertinggal di status berjalan sebagai gagal.
 
@@ -131,8 +158,8 @@ def bereskan_gantung(worker_id: str = "slot-0") -> int:
             job.status = Status.FAILED
             job.error = (
                 f"Worker berhenti saat job masih di tahap '{tahap}'. "
-                "Job tidak dilanjutkan otomatis — kirim ulang link-nya "
-                "kalau masih dibutuhkan."
+                "Job tidak dilanjutkan otomatis — nyalakan Docker kembali "
+                "lalu gunakan tombol Proses ulang."
             )
         return len(rows)
 
