@@ -11,8 +11,9 @@ tersentuh bot-detection YouTube maupun urusan cookies.
 Semua pemrosesan berat berjalan di mesin sendiri. Klip jadi mendarat sebagai
 file mp4 biasa di folder `clips/`, bukan di storage cloud mana pun.
 
-**Layanan berbayar yang dibutuhkan cuma dua:** satu untuk transkrip, satu untuk
-LLM. Keduanya punya tingkat gratis yang cukup untuk pemakaian pribadi.
+CAPIO memakai **satu layanan AI: Gemini**, untuk transkrip, pemilihan momen,
+dan metadata. Satu key dapat menjalankan semuanya dan tersedia tingkat gratis
+untuk pemakaian ringan.
 
 ---
 
@@ -36,6 +37,15 @@ LLM. Keduanya punya tingkat gratis yang cukup untuk pemakaian pribadi.
 
 Cuma butuh **Docker**. Tidak perlu Python, ffmpeg, maupun database.
 
+Untuk pemakai rilis, unduh `capio.zip` dari tab **Cara pakai** di portal
+Agentiv, ekstrak, lalu jalankan dari folder hasil ekstraknya:
+
+```bash
+docker compose up -d
+```
+
+Perintah clone di bawah khusus pengembangan dari source repo:
+
 ```bash
 git clone <repo-ini>
 cd video-clipper
@@ -43,14 +53,30 @@ cp .env.example .env        # copy di Windows
 docker compose up -d
 ```
 
-Buka **http://localhost:8000**, lalu ke halaman **Setting** untuk mengisi dua
-API key (petunjuknya ada di halaman itu). Klik **Simpan**, lalu **Tes** untuk
-memastikan key-nya benar. Setelah itu langsung bisa submit video.
+Buka **http://localhost:8000**, lalu ke halaman **Setting** untuk mengisi API
+key Gemini dan license key (petunjuknya ada di halaman itu). Klik **Simpan**,
+lalu **Tes** untuk memastikan key Gemini benar dan verifikasi lisensinya.
+Setelah itu langsung bisa submit video.
 
 ```bash
 docker compose logs -f worker   # ikuti prosesnya
 docker compose down             # matikan; data tetap tersimpan
 ```
+
+Saat job berjalan, browser boleh ditutup tetapi Docker, container CAPIO, dan
+komputer harus tetap menyala; komputer juga tidak boleh masuk mode sleep.
+Matikan CAPIO dengan `docker compose down` hanya setelah job selesai.
+
+Update rilis tanpa menghapus data:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+**Jangan memakai `docker compose down -v`.** Opsi `-v` menghapus volume
+Postgres, Redis, source upload, install ID, dan data lisensi. Perintah update di
+atas mempertahankan semuanya.
 
 Kalau port 8000 sudah dipakai proses lain, ubah `HOST_PORT` di `.env` lalu
 `docker compose up -d`. Port di dalam container tetap 8000 — yang berubah hanya
@@ -96,9 +122,9 @@ venv/Scripts/python main.py worker
 | Halaman | Isi |
 |---|---|
 | **Submit** `/` | Link YouTube atau unggah berkas sendiri, jumlah klip, pemilih layout dengan contoh videonya, dan knob gaya caption — semuanya per video. Begitu satu layout dipilih, halaman melebar dan panel pratinjau caption (dirender lewat jalur yang sama dengan produksi, bukan tiruan CSS) muncul di sebelah kanan. Strip di atas menunjukkan provider aktif, status lisensi, dan apakah konfigurasi sudah lengkap, jadi yang bolong ketahuan *sebelum* submit, bukan belasan menit kemudian. |
-| **Proses** `/process` | Job berjalan dengan penanda 9 tahap, plus job gagal beserta error-nya. Tiap job bisa dihapus. |
+| **Proses** `/process` | Job berjalan dengan penanda 9 tahap dan peringatan agar Docker/komputer tetap menyala. Job gagal menampilkan sebab, detail tahap terakhir, tombol **Proses ulang**, dan tombol hapus. Retry memakai source, jumlah klip, layout, serta gaya yang sama—upload lokal tidak perlu diunggah ulang. |
 | **Hasil** `/results` | Klip jadi, bisa diputar, diunduh, atau dihapus — satu per satu maupun sekaligus per job. |
-| **Setting** `/settings` | Semua konfigurasi dalam lima tab — API Key, Lisensi, Klip, Kinerja, Infra — dengan tombol tes per provider. Penjelasan tiap setelan tersembunyi di balik ikon `?`, dan setelan yang jarang disentuh (model, kalibrasi) dilipat di bagian *Lanjutan*. |
+| **Setting** `/settings` | Semua konfigurasi dalam lima tab — API Key, Lisensi, Klip, Kinerja, Infra — dengan tombol tes Gemini dan verifikasi lisensi. Penjelasan tiap setelan tersembunyi di balik ikon `?`, dan setelan yang jarang disentuh (model, kalibrasi) dilipat di bagian *Lanjutan*. |
 
 Klip juga bisa diambil langsung dari folder `clips/<job-id>/` lewat file
 manager — tidak perlu lewat aplikasi.
@@ -248,6 +274,12 @@ paralel bisa membuat semuanya lebih lambat, bukan lebih cepat. Naikkan
 `WORKER_COUNT` bertahap sambil memperhatikan beban CPU. Keduanya baru berlaku
 setelah worker di-restart (`docker compose restart worker`).
 
+Patokan perangkat: minimum 4 core/8 thread, RAM 8 GB, dan SSD kosong 20 GB;
+lebih nyaman 6 core/12 thread dengan RAM 16 GB. Untuk multi-worker, siapkan
+sekitar 8 logical thread dan cadangan RAM 1,2 GB per worker aktif. Mulai dari 2
+worker. Multi-worker menaikkan jumlah video yang diproses bersamaan, **bukan**
+mempercepat satu video.
+
 ---
 
 ## Kalibrasi
@@ -352,9 +384,9 @@ Aturan yang dipegang konsisten dan sebaiknya dijaga:
 - **`utils/` dan `config/` foundational** — tidak mengimpor folder lain.
 - **`api/routes.py` tidak pernah menjalankan pipeline secara sinkron.**
 
-Folder `asr/` dan `llm/` berbentuk paket berisi beberapa provider karena memang
-punya lebih dari satu implementasi; `storage/` sengaja satu file, karena
-lapisan pemilih untuk satu implementasi hanyalah indirection.
+Folder `asr/` dan `llm/` tetap dipisah karena kontrak transkrip dan chat berbeda,
+tetapi provider aktif keduanya sekarang hanya Gemini. `storage/` sengaja satu
+file; lapisan pemilih untuk satu implementasi hanyalah indirection.
 
 > Folder antrean bernama `jobqueue/`, bukan `queue/`. `queue` adalah nama modul
 > stdlib Python, dan root project berada di `sys.path[0]` saat `main.py`
