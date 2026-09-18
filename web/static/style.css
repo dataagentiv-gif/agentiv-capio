@@ -1646,42 +1646,13 @@ select:focus {
 /* `contain`, bukan `cover`. Contoh layout "Asli" sengaja 16:9 — memotongnya
    jadi 9:16 menghapus justru satu-satunya hal yang membedakannya dari layout
    lain. Bilah hitam di atas-bawahnya itu isi pesannya. */
-.layout-opt video,
-.duo-placeholder {
+.layout-opt video {
   display: block;
   width: 96px;
   height: 171px;
   object-fit: contain;
   border-radius: 4px;
   background: var(--color-ink);
-}
-
-.duo-placeholder {
-  position: relative;
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  overflow: hidden;
-}
-
-.duo-placeholder i {
-  display: grid;
-  place-items: center;
-  color: rgba(255,255,255,.75);
-  font-style: normal;
-  font-size: 22px;
-  background: linear-gradient(135deg, #343a44, #181b21);
-}
-
-.duo-placeholder i + i { border-top: 2px solid #fff; }
-.duo-placeholder em {
-  position: absolute;
-  inset: auto 4px 6px;
-  padding: 3px;
-  color: #fff;
-  background: rgba(0,0,0,.72);
-  border-radius: 3px;
-  font-size: 9px;
-  font-style: normal;
 }
 
 .layout-opt:hover { border-color: var(--color-ash); }

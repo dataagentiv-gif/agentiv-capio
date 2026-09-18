@@ -31,6 +31,42 @@ def test_kosong_menghasilkan_string_kosong():
     assert _rincian({}) == ""
 
 
+def test_hasil_menandai_duo_yang_fallback(monkeypatch):
+    from worker import orchestrator
+
+    monkeypatch.setattr(
+        orchestrator.storage, "save_clip", lambda job, cid, path: f"/{job}/{cid}")
+    meta = {"title": "Judul", "caption": "Caption", "hashtags": []}
+    seg = {"id": "c1", "start": 0.0, "end": 8.0, "score": 90,
+           "hook": "Hook", "reason": "Alasan"}
+    ctx = {
+        "layout": "duo", "segments_final": [seg],
+        "metadata": {"c1": meta}, "rendered": {"c1": "hasil.mp4"},
+        "crops": {"c1": {"duo": None}},
+    }
+    clip = orchestrator._build_clips(ctx, "job-1")[0]
+    assert clip["layout"] == "penuh"
+    assert clip["layout_fallback"] is True
+
+
+def test_hasil_mempertahankan_podcast_jika_pasangan_stabil(monkeypatch):
+    from worker import orchestrator
+
+    monkeypatch.setattr(
+        orchestrator.storage, "save_clip", lambda job, cid, path: f"/{job}/{cid}")
+    seg = {"id": "c1", "start": 0.0, "end": 8.0, "score": 90,
+           "hook": "Hook", "reason": "Alasan"}
+    ctx = {
+        "layout": "duo", "segments_final": [seg],
+        "metadata": {"c1": {"title": "Judul", "caption": "Caption", "hashtags": []}},
+        "rendered": {"c1": "hasil.mp4"},
+        "crops": {"c1": {"duo": [{"x": 0}, {"x": 960}]}},
+    }
+    clip = orchestrator._build_clips(ctx, "job-1")[0]
+    assert clip["layout"] == "duo"
+    assert clip["layout_fallback"] is False
+
+
 # --- pesan kegagalan ---
 
 @pytest.fixture

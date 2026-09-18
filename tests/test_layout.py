@@ -270,6 +270,21 @@ def test_duo_dua_panel_tepat_dan_crop_aman():
         assert g["cw"] % 2 == g["ch"] % 2 == 0
         assert 0 <= g["cx"] <= 1920 - g["cw"]
         assert 0 <= g["cy"] <= 1080 - g["ch"]
+        assert g["ch"] >= 700, "Duo harus medium shot, bukan wajah terlalu dekat"
+    assert gs[0]["cx"] + gs[0]["cw"] < c["duo"][1]["fx"] * 1920
+    assert gs[1]["cx"] > c["duo"][0]["fx"] * 1920
+
+
+def test_duo_wajah_rapat_tetap_fokus_dan_menghadap_tengah():
+    c = crop()
+    c["duo"] = [{"fx": .41953125, "fy": .428}, {"fx": .59765625, "fy": .394}]
+    kiri, kanan = L.geometri_duo(L.ambil("duo"), c, 1280, 720)
+    posisi_kiri = (c["duo"][0]["fx"] * 1280 - kiri["cx"]) / kiri["cw"]
+    posisi_kanan = (c["duo"][1]["fx"] * 1280 - kanan["cx"]) / kanan["cw"]
+    assert .60 <= posisi_kiri <= .70
+    assert .30 <= posisi_kanan <= .40
+    assert kiri["cx"] + kiri["cw"] < c["duo"][1]["fx"] * 1280
+    assert kanan["cx"] > c["duo"][0]["fx"] * 1280
 
 
 def test_duo_caption_tepat_di_sambungan_panel():

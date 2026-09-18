@@ -329,6 +329,33 @@ def test_prompt_menyebut_patokan_nilai():
     assert "SELURUH RENTANG" in PROMPT
 
 
+def test_balasan_kosong_dicoba_ulang(monkeypatch, tmp_path):
+    """Satu jawaban kosong dari LLM tidak boleh menggagalkan video panjang."""
+    from pipeline.stages import segment
+
+    balasan = iter([
+        {"segments": []},
+        {"segments": [seg(100, 220)]},
+    ])
+    panggilan = []
+
+    def llm(prompt, schema):
+        panggilan.append(prompt)
+        return next(balasan)
+
+    monkeypatch.setattr(segment, "call_llm", llm)
+    out = segment.run({
+        "words": WORDS,
+        "sentences": [],
+        "target_clips": 1,
+        "workdir": tmp_path,
+    })
+
+    assert len(panggilan) == 2
+    assert "jangan kembalikan array kosong" in panggilan[1]
+    assert len(out["segments_raw"]) == 1
+
+
 # --- hook menang atas index ---
 #
 # LLM mengembalikan dua hal yang menunjuk momen yang sama: `hook` (kalimat

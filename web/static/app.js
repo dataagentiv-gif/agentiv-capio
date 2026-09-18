@@ -49,7 +49,7 @@ const NAMA_LAYOUT = {
   penuh: 'Penuh',
   kotak: 'Kotak tengah',
   samping: 'Pembicara di samping',
-  duo: 'Duo pembicara',
+  duo: 'Podcast 2 Orang',
   ori: 'Asli (mentahan)',
 };
 

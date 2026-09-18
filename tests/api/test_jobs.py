@@ -312,6 +312,12 @@ def test_api_status_merangkum_kesiapan(client):
     assert isinstance(d["ready"], bool)
 
 
+def test_process_mengabaikan_poll_lama_setelah_retry(client):
+    html = client.get("/process").text
+    assert "urutan !== urutanTick" in html
+    assert "await tick();" in html
+
+
 # --- autentikasi opsional ---
 #
 # Mati secara default (aman selama server hanya di loopback). Begitu diisi,

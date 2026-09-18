@@ -55,6 +55,10 @@ def _build_clips(ctx: dict, job_id: str) -> list[dict]:
     for seg in ctx["segments_final"]:
         meta = ctx["metadata"][seg["id"]]
         url = storage.save_clip(job_id, seg["id"], ctx["rendered"][seg["id"]])
+        fallback_duo = (
+            ctx.get("layout") == "duo"
+            and not ctx.get("crops", {}).get(seg["id"], {}).get("duo")
+        )
         clips.append(
             {
                 "id": seg["id"],
@@ -66,6 +70,8 @@ def _build_clips(ctx: dict, job_id: str) -> list[dict]:
                 "title": meta["title"],
                 "caption": meta["caption"],
                 "hashtags": meta["hashtags"],
+                "layout": "penuh" if fallback_duo else ctx.get("layout", "penuh"),
+                "layout_fallback": fallback_duo,
             }
         )
     return clips

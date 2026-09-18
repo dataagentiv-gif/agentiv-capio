@@ -292,8 +292,7 @@ def daftar_layout():
             # layout yang memang punya bayangan, beserta nilai awalnya.
             {"nama": l.nama, "judul": l.judul, "keterangan": l.keterangan,
              "font_saran": l.font_saran, "teks": l.teks, "redup": l.redup,
-             "speaker_side": l.nama == "samping", "duo": l.duo,
-             "contoh": l.nama != "duo"}
+             "speaker_side": l.nama == "samping", "duo": l.duo}
             for l in layout_mod.LAYOUTS.values()
         ],
     }

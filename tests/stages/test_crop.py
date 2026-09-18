@@ -5,11 +5,13 @@ fallback — dan justru itu jalur yang paling sering kepakai di produksi (video
 tanpa wajah, wajah membelakangi kamera, shot b-roll).
 """
 import shutil
+from pathlib import Path
 
 import pytest
 
 from pipeline.stages.crop import (
-    DET_H, DET_W, _face_center, _face_pair_from_observations, _sample,
+    DET_H, DET_W, _face_center, _face_pair, _face_pair_from_observations,
+    _pair_fits_duo, _sample,
 )
 from utils.ffmpeg_helpers import Deadline
 
@@ -124,23 +126,98 @@ def muka(x, y=.35, area=.08):
     return {"x": x, "y": y, "area": area}
 
 
-def test_duo_memilih_dua_wajah_terbesar_dari_tiga():
+def test_podcast_dua_orang_stabil_mengunci_posisi_median():
+    obs = [[muka(.24 + (i % 3) * .01), muka(.74 + (i % 3) * .01)]
+           for i in range(20)]
+    pair = _face_pair_from_observations(obs)
+    assert pair == [{"fx": .25, "fy": .35}, {"fx": .75, "fy": .35}]
+
+
+def test_podcast_menerima_dua_dropout_detector():
+    obs = [[muka(.2), muka(.8)] for _ in range(18)] + [[], [muka(.2)]]
+    assert _face_pair_from_observations(obs) is not None
+
+
+def test_podcast_menolak_tiga_dropout_detector():
+    obs = [[muka(.2), muka(.8)] for _ in range(17)] + [[], [], [muka(.2)]]
+    assert _face_pair_from_observations(obs) is None
+
+
+def test_podcast_closeup_bergantian_fallback_penuh():
+    obs = [[muka(.3 if i < 10 else .7)] for i in range(20)]
+    assert _face_pair_from_observations(obs) is None
+
+
+def test_podcast_tiga_orang_fallback_penuh():
     obs = [[muka(.2, area=.10), muka(.55, area=.02), muka(.8, area=.09)]
            for _ in range(20)]
-    assert _face_pair_from_observations(obs) == [
-        {"fx": .2, "fy": .35}, {"fx": .8, "fy": .35}]
-
-
-def test_duo_mengikuti_wajah_yang_bergerak_antar_sampel():
-    obs = [[muka(.18 + i * .005), muka(.82 - i * .005)] for i in range(20)]
-    pair = _face_pair_from_observations(obs)
-    assert pair and pair[0]["fx"] < .3 and pair[1]["fx"] > .7
-
-
-def test_duo_butuh_hadir_bersama_tiga_puluh_persen():
-    obs = [[muka(.2), muka(.8)] if i < 5 else [muka(.2)] for i in range(20)]
     assert _face_pair_from_observations(obs) is None
+
+
+def test_podcast_posisi_kamera_berubah_fallback_penuh():
+    obs = [[muka(.2), muka(.8)] for _ in range(10)] + \
+          [[muka(.4), muka(.6)] for _ in range(10)]
+    assert _face_pair_from_observations(obs) is None
+
+
+def test_podcast_posisi_vertikal_berubah_fallback_penuh():
+    obs = [[muka(.2, y=.2), muka(.8, y=.2)] for _ in range(10)] + \
+          [[muka(.2, y=.5), muka(.8, y=.5)] for _ in range(10)]
+    assert _face_pair_from_observations(obs) is None
+
+
+def test_duo_menolak_pasangan_yang_hanya_muncul_sesekali():
+    obs = [[muka(.2), muka(.8)] if i < 15 else [muka(.2)] for i in range(20)]
+    assert _face_pair_from_observations(obs) is None
+
+
+def test_duo_menerima_pasangan_stabil_sembilan_puluh_persen():
+    obs = [[muka(.2), muka(.8)] if i < 18 else [muka(.2)] for i in range(20)]
+    assert _face_pair_from_observations(obs) is not None
 
 
 def test_duo_fallback_bila_hanya_satu_wajah():
     assert _face_pair_from_observations([[muka(.4)] for _ in range(20)]) is None
+
+
+def test_duo_mengabaikan_wajah_kecil_di_latar():
+    obs = [[muka(.2, area=.08), muka(.8, area=.07), muka(.5, area=.002)]
+           for _ in range(20)]
+    assert _face_pair_from_observations(obs) is not None
+
+
+def test_podcast_menolak_duo_yang_cropnya_terlalu_sempit():
+    pair = _face_pair_from_observations([[muka(.08), muka(.28)] for _ in range(20)])
+    assert pair is not None
+    assert _pair_fits_duo(pair, 1920, 1080) is False
+
+
+def test_podcast_menerima_dua_pembicara_yang_duduk_rapat():
+    pair = _face_pair_from_observations([[muka(.41), muka(.588)] for _ in range(20)])
+    assert pair is not None
+    assert _pair_fits_duo(pair, 1280, 720) is True
+
+
+def test_duo_mendeteksi_wide_shot_dua_pembicara(tmp_path):
+    """Regresi nyata: model short-range hanya melihat kedua wajah pada 3/20
+    sampel fixture ini, sehingga versi lama selalu fallback ke Penuh."""
+    import subprocess
+
+    contoh = Path(__file__).resolve().parents[2] / "web/static/contoh/penuh.mp4"
+    out = tmp_path / "wide.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error",
+            "-f", "lavfi", "-i", "color=c=gray:s=1280x720:d=1",
+            "-ss", "2", "-i", str(contoh), "-ss", "6", "-i", str(contoh),
+            "-t", "1", "-filter_complex",
+            "[1:v]scale=-2:360[a];[2:v]scale=-2:360[b];"
+            "[0:v][a]overlay=220:360[x];[x][b]overlay=860:360[v]",
+            "-map", "[v]", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            str(out),
+        ],
+        check=True, timeout=120,
+    )
+    frames = _sample(out, 0, 1, Deadline(120))
+    pasangan = _face_pair(frames)
+    assert pasangan and pasangan[0]["fx"] < .4 and pasangan[1]["fx"] > .6

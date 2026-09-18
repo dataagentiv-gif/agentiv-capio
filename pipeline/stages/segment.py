@@ -398,6 +398,18 @@ def run(ctx: dict) -> dict:
 
     result = call_llm(prompt, SCHEMA)
     raw = result.get("segments", []) if isinstance(result, dict) else result
+    if not raw:
+        log.warning("LLM mengembalikan 0 kandidat — minta ulang sekali")
+        result = call_llm(
+            prompt
+            + "\n\nBalasan sebelumnya kosong. Video ini panjang dan memiliki banyak "
+              "percakapan. WAJIB pilih kandidat; jangan kembalikan array kosong. "
+              "Balas tepat sebagai JSON: "
+              '{"segments":[{"start_idx":0,"end_idx":100,"hook":"...",'
+              '"reason":"...","score":80}]}',
+            SCHEMA,
+        )
+        raw = result.get("segments", []) if isinstance(result, dict) else result
     anchors = _anchors(words, sentences) if sentences else []
     segments = _validate(raw, words, target, anchors)
 

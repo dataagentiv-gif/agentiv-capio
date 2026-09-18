@@ -36,6 +36,7 @@ function clipHtml(c, jobId) {
       </button>
       <div>
         <h3>${esc(c.title || c.id)}</h3>
+        ${c.layout_fallback ? `<div class="note warn"><b>Podcast 2 Orang memakai Penuh</b>Video tidak konsisten menampilkan tepat dua orang dalam satu frame.</div>` : ''}
         ${c.hook ? `<p class="hook">${esc(c.hook)}</p>` : ''}
         ${c.caption ? `<div class="row potong" title="${esc(c.caption)}"><b>Caption</b>${esc(c.caption)}</div>` : ''}
         ${c.reason ? `<details class="alasan">

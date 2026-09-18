@@ -99,12 +99,13 @@ LAYOUTS = {
     ),
     "duo": Layout(
         nama="duo",
-        judul="Duo pembicara",
-        keterangan="Dua pembicara tampil bersamaan: kiri di panel atas dan "
-                   "kanan di panel bawah. Jika pasangan wajah tidak stabil, "
-                   "CAPIO otomatis memakai tampilan Penuh.",
+        judul="Podcast 2 Orang",
+        keterangan="Untuk wide-shot yang terus menampilkan tepat dua orang. "
+                   "Posisi keduanya dikunci sepanjang klip; video multicam, "
+                   "close-up bergantian, atau tiga orang otomatis memakai Penuh.",
         duo=True,
-        zoom=0.85,
+        # Medium shot yang sedikit lebih rapat agar wajah tetap menjadi fokus.
+        zoom=0.65,
         align=5,
         margin_v=0,
     ),
@@ -271,9 +272,19 @@ def geometri_duo(lay: Layout, crop: dict, src_w: int, src_h: int) -> list[dict]:
         if cw > src_w:
             cw = _genap(src_w)
             ch = _genap(cw * (OUT_H / 2) / OUT_W)
-        cx = _genap(muka["fx"] * src_w - cw / 2)
-        cy = _genap(muka["fy"] * src_h - ch * lay.kepala)
+        # Keduanya menghadap ke sambungan panel: orang kiri berada di 65%
+        # lebar panel, orang kanan di 35%. Crop boleh melewati titik tengah
+        # sumber, tetapi pusat wajah lawan tetap di luar dengan sedikit jarak.
+        target_x = 0.65 if i == 0 else 0.35
+        cx = _genap(muka["fx"] * src_w - cw * target_x)
+        aman = _genap(src_w * 0.05)
+        lawan_x = wajah[1 - i]["fx"] * src_w
+        if i == 0:
+            cx = min(cx, _genap(lawan_x - aman - cw))
+        else:
+            cx = max(cx, _genap(lawan_x + aman))
         cx = max(0, min(src_w - cw, cx)) & ~1
+        cy = _genap(muka["fy"] * src_h - ch * lay.kepala)
         cy = max(0, min(src_h - ch, cy)) & ~1
         hasil.append({"cw": cw, "ch": ch, "cx": cx, "cy": cy,
                       "bw": OUT_W, "bh": OUT_H // 2,

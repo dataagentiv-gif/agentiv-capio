@@ -135,7 +135,10 @@ def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
         a, b = layout.geometri_duo(lay, crop, src_w, src_h)
         cap = f",subtitles={seg['id']}.ass" if teks else ""
         kompleks = (
-            f"[0:v]split=2[va][vb];"
+            # Satu timeline video hidup dibelah menjadi dua. setpts dilakukan
+            # sebelum split supaya kedua panel selalu memakai frame dan waktu
+            # yang sama; crop-nya tetap, isi kedua panel tidak pernah dibekukan.
+            f"[0:v]setpts=PTS-STARTPTS,split=2[va][vb];"
             f"[va]crop={a['cw']}:{a['ch']}:{a['cx']}:{a['cy']},"
             f"scale={OUT_W}:{OUT_H // 2},setsar=1[top];"
             f"[vb]crop={b['cw']}:{b['ch']}:{b['cx']}:{b['cy']},"

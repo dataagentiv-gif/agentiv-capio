@@ -357,12 +357,8 @@ async function drawLayouts() {
            memberitahu. Fragmen waktu memaksanya mengambil dan menampilkan frame
            di detik itu; `preload="auto"` juga menyembuhkannya, tapi dengan
            mengunduh tiga megabyte video yang belum tentu dilihat. #}
-        ${l.contoh
-          ? `<video src="/static/contoh/${encodeURIComponent(l.nama)}.mp4#t=0.1"
-                    muted loop playsinline preload="metadata" tabindex="-1"></video>`
-          : `<span class="duo-placeholder" aria-label="Diagram dua panel">
-               <i>1</i><i>2</i><em>Preview segera hadir</em>
-             </span>`}
+        <video src="/static/contoh/${encodeURIComponent(l.nama)}.mp4#t=0.1"
+               muted loop playsinline preload="metadata" tabindex="-1"></video>
         <span>${esc(l.judul)}</span>
       </button>`).join('');
     el.querySelectorAll('.layout-opt').forEach(b => b.onclick = () => {

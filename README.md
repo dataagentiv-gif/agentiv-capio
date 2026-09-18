@@ -250,10 +250,11 @@ kanan, dengan gradasi pada sisi sebaliknya. Kepekatan ujung (0–100%) dan luasn
 (20–80% lebar) bisa digeser per
 video di halaman Submit.
 
-Layout **Duo pembicara** (`duo`) mengambil dua wajah yang konsisten dari 20
-sampel, lalu menaruh pembicara kiri di panel atas dan kanan di panel bawah.
-Kalau dua wajah tidak hadir bersama pada sedikitnya 30% sampel, klip itu tetap
-berhasil dengan fallback otomatis ke layout `penuh`.
+Layout **Podcast 2 Orang** (key kompatibilitas: `duo`) mengambil 20 sampel
+sepanjang klip. Jika tepat dua wajah terlihat stabil pada sedikitnya 90% sampel,
+posisi median keduanya dikunci: pembicara kiri di panel atas dan kanan di panel
+bawah sepanjang klip. Video multicam, close-up bergantian, atau tiga orang
+otomatis memakai `penuh`, dan halaman Hasil menampilkan peringatan fallback.
 
 ### Auto clear
 

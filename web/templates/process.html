@@ -100,9 +100,14 @@ function pilihTab() {
     a.classList.toggle('on', a.dataset.tab === target));
 }
 
+let urutanTick = 0;
 async function tick() {
+  const urutan = ++urutanTick;
   try {
     const semua = await getJobs();
+    // Poll otomatis dan refresh setelah klik retry bisa tumpang tindih. Respons
+    // lama tidak boleh menggambar status lama di atas hasil request terbaru.
+    if (urutan !== urutanTick) return true;
     const jalan = semua.filter(isRunning);
     const selesai = semua.filter(j => !isRunning(j));
 
@@ -121,6 +126,7 @@ async function tick() {
     pilihTab();
     return jalan.length > 0;
   } catch (e) {
+    if (urutan !== urutanTick) return true;
     document.getElementById('p-berjalan').innerHTML =
       empty('CAPIO tidak merespons',
               'Coba muat ulang halaman ini. Kalau tetap begini, CAPIO di komputermu kemungkinan sedang tidak berjalan.');
@@ -144,7 +150,7 @@ document.body.addEventListener('click', async (e) => {
         alert(d?.detail || 'Job gagal diproses ulang.');
       } else {
         location.hash = 'berjalan';
-        tick();
+        await tick();
       }
     } catch {
       alert('CAPIO tidak merespons. Pastikan Docker dan container sudah menyala.');

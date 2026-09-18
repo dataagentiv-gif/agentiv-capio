@@ -6,6 +6,7 @@ di stage ini bukan logika Python-nya, melainkan urutan argumen ffmpeg — dan
 salah urut `-ss` tetap menghasilkan exit code 0 dengan caption yang lenyap.
 """
 import shutil
+import subprocess
 
 import pytest
 
@@ -136,7 +137,7 @@ def test_caption_mati_menghasilkan_gambar_yang_berbeda(workdir, seg):
     assert dengan != tanpa
 
 
-def test_duo_render_persis_1080x1920(workdir, seg):
+def test_duo_statis_render_1080x1920_dengan_audio_dan_durasi_utuh(workdir, seg):
     kata = [{"i": 0, "w": "SAMBUNGAN", "s": CLIP_START, "e": CLIP_END}]
     ass = build_ass(kata, CLIP_START, CLIP_END, lay=ambil("duo"))
     (workdir / "c1.ass").write_text(ass, encoding="utf-8")
@@ -146,6 +147,81 @@ def test_duo_render_persis_1080x1920(workdir, seg):
          "duo": [{"fx": .25, "fy": .35}, {"fx": .75, "fy": .35}]}
     info = probe(render(workdir, seg, crop=c, layout="duo"), Deadline(60))
     assert (info["width"], info["height"]) == (1080, 1920)
+    assert abs(info["duration"] - 8.0) < .5
+
+    import json
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "stream=codec_type",
+         "-of", "json", str(workdir / "clips" / "c1.mp4")],
+        capture_output=True, text=True, check=True,
+    )
+    assert {s["codec_type"] for s in json.loads(out.stdout)["streams"]} == {"video", "audio"}
+
+
+def test_duo_kedua_panel_tetap_video_live_dan_tidak_tertukar(tmp_path):
+    """Crop boleh diam, tetapi kedua cabang harus terus membaca frame sumber.
+
+    Sisi kiri merah bergerak mendatar dan sisi kanan biru bergerak vertikal.
+    Hash membuktikan tidak ada panel yang berubah menjadi still frame; rerata
+    warna membuktikan kiri tetap di atas dan kanan tetap di bawah.
+    """
+    source = tmp_path / "source.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error",
+            "-f", "lavfi", "-i", "color=red:s=960x1080:r=10:d=4",
+            "-f", "lavfi", "-i", "color=white:s=140x140:r=10:d=4",
+            "-f", "lavfi", "-i", "color=blue:s=960x1080:r=10:d=4",
+            "-f", "lavfi", "-i", "color=white:s=140x140:r=10:d=4",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=4",
+            "-filter_complex",
+            "[0:v][1:v]overlay=x='100+100*t':y=250[left];"
+            "[2:v][3:v]overlay=x=400:y='100+100*t'[right];"
+            "[left][right]hstack=inputs=2[v]",
+            "-map", "[v]", "-map", "4:a", "-c:v", "libx264",
+            "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac",
+            str(source),
+        ],
+        check=True,
+    )
+    (tmp_path / "clips").mkdir()
+    crop = {"x": 656, "w": 608, "fx": .25, "fy": .35,
+            "duo": [{"fx": .25, "fy": .35}, {"fx": .75, "fy": .35}]}
+    out = _render_one(
+        source, tmp_path, {"id": "live", "start": 0.0, "end": 4.0}, crop,
+        1920, 1080, Deadline(120), ambil("duo"), teks=False,
+    )
+
+    def panel(y: int) -> tuple[list[str], tuple[int, int, int]]:
+        hashes = subprocess.run(
+            [
+                "ffmpeg", "-v", "error", "-i", str(out), "-map", "0:v:0",
+                "-vf", f"crop=1080:800:0:{y},fps=5", "-an",
+                "-f", "framemd5", "-",
+            ],
+            capture_output=True, text=True, check=True,
+        ).stdout
+        frame_hashes = [
+            line.rsplit(",", 1)[-1].strip()
+            for line in hashes.splitlines() if line.startswith("0,")
+        ]
+        rgb = subprocess.run(
+            [
+                "ffmpeg", "-v", "error", "-ss", "2", "-i", str(out),
+                "-map", "0:v:0", "-vf", f"crop=1080:800:0:{y},scale=1:1",
+                "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "-",
+            ],
+            capture_output=True, check=True,
+        ).stdout
+        return frame_hashes, tuple(rgb[:3])
+
+    atas, warna_atas = panel(0)
+    bawah, warna_bawah = panel(1120)
+    assert len(atas) == len(bawah) >= 15
+    assert len(set(atas)) == len(atas)
+    assert len(set(bawah)) == len(bawah)
+    assert warna_atas[0] > warna_atas[2] * 2  # sumber kiri merah -> atas
+    assert warna_bawah[2] > warna_bawah[0] * 2  # sumber kanan biru -> bawah
 
 
 def test_gradasi_mirror_nol_sebelum_wajah_dan_255_di_ujung():
