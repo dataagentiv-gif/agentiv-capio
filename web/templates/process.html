@@ -64,7 +64,7 @@ function masalahHtml(j) {
     <div class="masalah">
       <strong>${esc(j.masalah.judul)}</strong>
       <p>${esc(j.masalah.saran)}</p>
-      ${j.status === 'failed' ? `<button type="button" class="btn sm ghost ulang"
+      ${j.retryable ? `<button type="button" class="btn sm ghost ulang"
         data-aksi="retry:${j.id}">Proses ulang</button>` : ''}
       ${j.error ? `<details>
         <summary>Detail teknis</summary>

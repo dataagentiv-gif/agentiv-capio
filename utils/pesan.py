@@ -103,6 +103,10 @@ def _sambung(teks: str) -> tuple[str, str]:
 #: kehabisan kuota akan salah dilaporkan sebagai key yang salah — dan orangnya
 #: menghapus key yang sebetulnya baik-baik saja.
 ATURAN: list[tuple[tuple[str, ...], object]] = [
+    (("job lama tidak memakai library template",), (
+        "Job memakai tampilan versi lama",
+        "Job ini tidak dapat diproses ulang. Kirim lagi sumber videonya dari halaman Submit dan pilih salah satu template baru.",
+    )),
     (("worker berhenti saat job",), (
         "Pemrosesan terhenti karena worker berhenti",
         "Nyalakan kembali Docker dan container CAPIO, lalu tekan Proses ulang "

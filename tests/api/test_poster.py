@@ -24,8 +24,9 @@ def client():
 
     from api.routes import app
 
-    with TestClient(app) as c:
-        yield c
+    client = TestClient(app)
+    yield client
+    client.close()
 
 
 @pytest.fixture

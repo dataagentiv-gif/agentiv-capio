@@ -187,6 +187,8 @@ FIELDS = [
             "job tetap ada di halaman Proses."),
 ]
 
+# Nilai tampilan lama tetap boleh ada di .env, tetapi bukan kontrol job baru.
+FIELDS = [f for f in FIELDS if f.get("bagian") != "Tampilan"]
 WRITABLE = {f["key"] for f in FIELDS}
 KIND = {f["key"]: f["kind"] for f in FIELDS}
 # Ditampilkan tapi tidak bisa diubah dari UI.

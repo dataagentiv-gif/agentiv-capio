@@ -85,12 +85,17 @@ class Job(Base):
     )
 
     def as_dict(self) -> dict:
+        from pipeline.templates import TEMPLATES
+
         return {
             "id": str(self.id),
             "url": self.url,
             "target_clips": self.target_clips,
             "layout": self.layout,
             "gaya": self.gaya or {},
+            "template_id": self.layout if self.layout in TEMPLATES else None,
+            "adjustments": self.gaya or {},
+            "retryable": self.status == Status.FAILED and self.layout in TEMPLATES,
             "status": self.status,
             "progress": self.progress,
             "error": self.error,

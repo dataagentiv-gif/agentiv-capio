@@ -1610,6 +1610,8 @@ select:focus {
   object-fit: cover;
 }
 
+#pv-v { object-fit: contain; }
+
 .hp [hidden] { display: none; }
 
 .hp-spin {
@@ -1663,6 +1665,22 @@ select:focus {
   font-weight: 500;
 }
 
+.layout-opt { width: 124px; text-align: center; }
+.layout-opt small { font-size: 11px; font-weight: 400; line-height: 1.25; }
+.template-mini { position: relative; display: block; width: 96px; height: 171px; overflow: hidden; border-radius: 5px; background: #15191f; }
+.template-mini i { position: absolute; display: block; background: #687585; }
+.template-mini b { position: absolute; display: block; left: 6px; right: 6px; bottom: 27px; color: #fff; font-size: 12px; line-height: 1.1; }
+.template-mini.mentahan i { left: 0; right: 0; top: 55px; height: 61px; }
+.template-mini.mentahan b { display: none; }
+.template-mini.full_screen i { inset: 0; }
+.template-mini.pembicara_samping i { left: 0; right: 0; top: 53px; height: 65px; background: linear-gradient(90deg,#687585 20%,#101216); }
+.template-mini.pembicara_samping b { left: 46px; right: 4px; bottom: 73px; font: 800 9px Georgia, serif; text-shadow: 0 0 5px #fff; }
+.template-mini.blur_atas_bawah { background: linear-gradient(#232c37,#687585 30%,#687585 70%,#232c37); }
+.template-mini.blur_atas_bawah i { left: 0; right: 0; top: 47px; height: 77px; }
+.template-mini.blur_atas_bawah b { bottom: auto; top: 17px; font-weight: 900; letter-spacing: .02em; }
+.template-mini.kotak_tengah i { left: 0; right: 0; top: 42px; height: 88px; border-radius: 10px; }
+.template-mini.kotak_tengah b { bottom: 50px; font: 800 15px Georgia, serif; text-shadow: 1px 1px #000; }
+
 /* ---------- Panel pratinjau di halaman Submit ---------- */
 
 .submit-layout {
@@ -1679,6 +1697,8 @@ select:focus {
   justify-content: center;
   width: 320px;
 }
+
+.submit-preview[hidden] { display: none; }
 
 @media (prefers-reduced-motion: no-preference) {
   main:not(.narrow) { transition: max-width .25s ease; }

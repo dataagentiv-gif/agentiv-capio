@@ -44,10 +44,11 @@ SCHEMA = {
                     "start_idx": {"type": "integer"},
                     "end_idx": {"type": "integer"},
                     "hook": {"type": "string"},
+                    "hook_title": {"type": "string"},
                     "reason": {"type": "string"},
                     "score": {"type": "integer"},
                 },
-                "required": ["start_idx", "end_idx", "hook", "reason", "score"],
+                "required": ["start_idx", "end_idx", "hook", "hook_title", "reason", "score"],
                 "additionalProperties": False,
             },
         }
@@ -101,6 +102,7 @@ sering: rentang yang isinya menarik tapi cuma 10-20 detik akan dibuang.
 Isi tiap field:
 - start_idx / end_idx: index kata awal dan akhir klip.
 - hook: kalimat pembuka klip, disalin apa adanya dari transkrip.
+- hook_title: headline topik yang singkat (maksimal 7 kata), bukan kutipan transkrip.
 - reason: satu kalimat, kenapa momen ini layak jadi klip.
 - score: seberapa kuat momennya, dengan patokan berikut:
     90-100 = luar biasa, jarang ada. Paling banyak SATU per video, sering nol.
@@ -361,6 +363,7 @@ def _validate(
                 "start_idx": a,
                 "end_idx": b,
                 "hook": hook,
+                "hook_title": str(s.get("hook_title", "")).strip(),
                 "reason": str(s.get("reason", "")).strip(),
                 "score": max(0, min(100, int(s.get("score", 0)))),
             }
@@ -406,7 +409,7 @@ def run(ctx: dict) -> dict:
               "percakapan. WAJIB pilih kandidat; jangan kembalikan array kosong. "
               "Balas tepat sebagai JSON: "
               '{"segments":[{"start_idx":0,"end_idx":100,"hook":"...",'
-              '"reason":"...","score":80}]}',
+              '"hook_title":"...","reason":"...","score":80}]}',
             SCHEMA,
         )
         raw = result.get("segments", []) if isinstance(result, dict) else result

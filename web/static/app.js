@@ -46,6 +46,11 @@ function badge(s) {
 // Nama yang tidak dikenal jatuh ke nilai aslinya, jadi layout baru tidak
 // menghasilkan sel kosong.
 const NAMA_LAYOUT = {
+  mentahan: 'Mentahan',
+  full_screen: 'Full Screen',
+  pembicara_samping: 'Pembicara di samping',
+  blur_atas_bawah: 'Blur atas-bawah',
+  kotak_tengah: 'Kotak tengah',
   penuh: 'Penuh',
   kotak: 'Kotak tengah',
   samping: 'Pembicara di samping',

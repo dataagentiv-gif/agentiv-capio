@@ -71,7 +71,7 @@ def test_submit_tanpa_lisensi_ditolak_di_endpoint(client, bersihkan, monkeypatch
     import license as lisensi
 
     monkeypatch.setattr(lisensi, "boleh_submit", lambda: (False, "Lisensi belum aktif."))
-    r = client.post("/jobs", json={"url": URL, "target_clips": 2})
+    r = client.post("/jobs", json={"url": URL, "target_clips": 2, "template_id": "full_screen"})
     assert r.status_code == 403
     assert "Lisensi" in r.text
 
@@ -84,7 +84,7 @@ def test_lisensi_diperiksa_sebelum_api_key(client, bersihkan, monkeypatch):
 
     monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
     monkeypatch.setattr(lisensi, "boleh_submit", lambda: (False, "Lisensi belum aktif."))
-    r = client.post("/jobs", json={"url": URL, "target_clips": 2})
+    r = client.post("/jobs", json={"url": URL, "target_clips": 2, "template_id": "full_screen"})
     assert r.status_code == 403
 
 
@@ -93,7 +93,7 @@ def test_retry_tetap_memeriksa_lisensi(client, monkeypatch):
     import license as lisensi
     from db import jobs
 
-    job = jobs.create(URL, 2)
+    job = jobs.create(URL, 2, "full_screen", {})
     jobs.fail(job["id"], "gagal")
     monkeypatch.setattr(lisensi, "boleh_submit", lambda: (False, "Lisensi belum aktif."))
     r = client.post(f"/jobs/{job['id']}/retry")
@@ -120,7 +120,7 @@ def test_tanpa_key_gemini_ditolak(client, monkeypatch):
     key kosong memblokir keduanya sekaligus."""
     monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
 
-    r = client.post("/jobs", json={"url": URL, "target_clips": 2})
+    r = client.post("/jobs", json={"url": URL, "target_clips": 2, "template_id": "full_screen"})
     assert r.status_code == 400
     assert "gemini" in r.text
 
@@ -128,7 +128,7 @@ def test_tanpa_key_gemini_ditolak(client, monkeypatch):
 def test_retry_tetap_memeriksa_api_key(client, monkeypatch):
     from db import jobs
 
-    job = jobs.create(URL, 2)
+    job = jobs.create(URL, 2, "full_screen", {})
     jobs.fail(job["id"], "gagal")
     monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
     r = client.post(f"/jobs/{job['id']}/retry")
@@ -140,14 +140,14 @@ def test_pesan_menyebut_akibatnya_bukan_cuma_larangan(client, monkeypatch):
     """"Key belum diisi" saja tidak memberitahu kenapa itu penting SEKARANG."""
     monkeypatch.setattr(settings, "GEMINI_API_KEYS", "")
 
-    teks = client.post("/jobs", json={"url": URL}).text.lower()
+    teks = client.post("/jobs", json={"url": URL, "template_id": "full_screen"}).text.lower()
     assert "setting" in teks
     assert "diunduh" in teks
 
 
 def test_konfigurasi_lengkap_tetap_lolos(client):
     """Penjaganya jangan sampai menghalangi jalur normal."""
-    r = client.post("/jobs", json={"url": URL, "target_clips": 2})
+    r = client.post("/jobs", json={"url": URL, "target_clips": 2, "template_id": "full_screen"})
     assert r.status_code in (200, 201), r.text
 
 
@@ -164,26 +164,25 @@ def test_konfigurasi_lengkap_tetap_lolos(client):
     ({"url": URL, "target_clips": -3}, "negatif"),
 ])
 def test_parameter_tidak_sah_ditolak(client, payload, kenapa):
-    assert client.post("/jobs", json=payload).status_code == 422, kenapa
+    assert client.post("/jobs", json={"template_id": "full_screen", **payload}).status_code == 422, kenapa
 
 
-def test_gaya_hanya_menerima_kunci_yang_dikenal(client):
+def test_adjustment_asing_ditolak(client):
     """Batas kepercayaan: isi kolom ini masuk ke generator .ass dan tersimpan
     di database."""
     r = client.post("/jobs", json={
         "url": URL, "target_clips": 2,
-        "gaya": {"font": "Anton", "__proto__": "x", "perintah": "rm -rf /"},
+        "template_id": "full_screen", "adjustments": {"font": "Anton", "__proto__": "x"},
     })
-    assert r.status_code in (200, 201)
-    gaya = client.get(f"/jobs/{r.json()['job_id']}").json()["gaya"]
-    assert gaya == {"font": "Anton"}
+    assert r.status_code == 422
 
 
-def test_gaya_kosong_tidak_menimpa_default(client):
+def test_adjustment_kosong_memakai_default_tersimpan(client):
     """Kosong berarti 'ikut default', bukan 'kosongkan' — nilai kosong yang
     tersimpan akan menimpa setelan dan menghasilkan caption tanpa gaya."""
     r = client.post("/jobs", json={
         "url": URL, "target_clips": 2,
-        "gaya": {"font": "", "ukuran": 0, "aktif": None},
+        "template_id": "full_screen", "adjustments": {},
     })
-    assert client.get(f"/jobs/{r.json()['job_id']}").json()["gaya"] == {}
+    from pipeline.templates import resolve
+    assert client.get(f"/jobs/{r.json()['job_id']}").json()["adjustments"] == resolve("full_screen", {})
