@@ -9,6 +9,7 @@ from config import env_store
 from config.settings import settings
 from db import jobs
 from db.models import Status
+from llm.telemetry import stage as usage_stage
 from pipeline.stages import (
     caption,
     crop,
@@ -131,7 +132,8 @@ def run(job_id: str) -> None:
                                 worker_id=_worker_id)
             log.info("stage %s", status)
             t0 = time.monotonic()
-            ctx.update(stage.run(ctx))
+            with usage_stage(job_id, status):
+                ctx.update(stage.run(ctx))
             lama[status] = time.monotonic() - t0
 
         jobs.update_status(job_id, Status.UPLOADING, progress=int(8 / TOTAL_STEPS * 100),

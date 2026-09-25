@@ -10,6 +10,11 @@
   <a href="#riwayat"  data-tab="riwayat">Riwayat <span class="hitung" id="n-riwayat"></span></a>
 </nav>
 
+<section class="process-tools" aria-label="Aktivitas CAPIO">
+  <div class="section-head"><h2>Aktivitas CAPIO</h2><label>Periode <select id="usage-period"><option value="day">Hari ini</option><option value="7d" selected>7 hari</option><option value="30d">30 hari</option><option value="all">Semua waktu</option></select></label></div>
+  <div class="process-stats usage-stats"><button><b id="usage-clips">—</b><span>klip selesai</span></button><button><b id="usage-videos">—</b><span>video selesai</span></button><button><b id="usage-tokens">—</b><span>token Gemini</span></button><button><b id="usage-cost">—</b><span>estimasi biaya</span></button><button><b id="usage-savings">—</b><span>nilai dihemat</span></button></div>
+</section>
+
 <div class="note warn" id="peringatan-jalan" hidden>
   <b>Video sedang diproses.</b> Browser boleh ditutup, tetapi Docker, container
   CAPIO, dan komputer harus tetap menyala. Pastikan komputer tidak masuk mode sleep.
@@ -27,6 +32,8 @@
 {% block script %}
 <script>
 document.getElementById('p-berjalan').innerHTML = skJob(2);
+async function loadUsage() { try { const p=document.getElementById('usage-period').value; const d=await (await fetch('/api/usage/summary?period='+p)).json(); document.getElementById('usage-clips').textContent=d.clips; document.getElementById('usage-videos').textContent=d.videos; document.getElementById('usage-tokens').textContent=(d.total_tokens||0).toLocaleString('id-ID')+(d.estimated_tokens?' ~':''); const cur=d.prices.currency||'USD'; document.getElementById('usage-cost').textContent=cur+' '+Number(d.estimated_cost||0).toFixed(2); document.getElementById('usage-savings').textContent=(d.savings<0?'biaya bersih ':'')+cur+' '+Math.abs(Number(d.savings||0)).toFixed(2); } catch {} }
+document.getElementById('usage-period').addEventListener('change', loadUsage); loadUsage();
 function stepper(status, progress) {
   const now = STAGES.findIndex(([k]) => k === status);
   const langkah = STAGES.map(([k, label], i) => {

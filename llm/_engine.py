@@ -13,6 +13,7 @@ import httpx
 
 import keypool
 from llm import rute
+from llm import telemetry
 from utils.logging import get
 
 log = get(__name__)
@@ -212,10 +213,20 @@ def call(
                 timeout=180.0,
             )
             r.raise_for_status()
-            last_raw = r.json()["choices"][0]["message"]["content"]
+            payload = r.json()
+            last_raw = payload["choices"][0]["message"]["content"]
+            meta = payload.get("usage") or {}
+            inp = meta.get("prompt_tokens", meta.get("input_tokens", 0)) or 0
+            out = meta.get("completion_tokens", meta.get("output_tokens", 0)) or 0
+            estimated = not bool(meta)
+            if estimated:
+                inp, out = max(1, len(prompt) // 4), max(1, len(last_raw) // 4)
+            telemetry.record(payload.get("model", model), inp, out,
+                             meta.get("total_tokens") or inp + out, estimated, True)
             return _extract_json(last_raw)
 
         except httpx.HTTPStatusError as e:
+            telemetry.record(model, 0, 0, 0, False, False)
             code = e.response.status_code
             badan = e.response.text
             last_err, last_raw = f"HTTP {code}", ""
@@ -245,6 +256,7 @@ def call(
             )
 
         except httpx.HTTPError as e:
+            telemetry.record(model, 0, 0, 0, False, False)
             last_err, last_raw = f"koneksi: {e}", ""
             if attempt == attempts - 1:
                 raise LLMError(f"{label} gagal setelah {attempts}x: {e}") from e

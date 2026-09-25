@@ -108,6 +108,21 @@ class Job(Base):
         }
 
 
+class GeminiUsage(Base):
+    __tablename__ = "gemini_usage"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    stage: Mapped[str] = mapped_column(String(40), default="unknown")
+    model: Mapped[str] = mapped_column(String(120), default="unknown")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    total_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    estimated: Mapped[bool] = mapped_column(default=False)
+    success: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # pool_pre_ping: worker bisa idle berjam-jam antar job, dan Postgres di container
 # memutus koneksi menganggur. Tanpa ini job pertama setelah idle gagal.
 engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True, future=True)

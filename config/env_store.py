@@ -65,6 +65,10 @@ FIELDS = [
             "dimatikan Google untuk akun baru sementara akun lama tetap bisa "
             "memakainya, jadi setelan yang disalin dari mesin lain bisa mati "
             "di sini saja."),
+    _f("GEMINI_INPUT_PRICE_PER_MILLION", "Harga input / 1 juta token", "API Key", kind="number", bagian="Estimasi biaya", help="Isi sesuai harga provider; 0 berarti belum diatur."),
+    _f("GEMINI_OUTPUT_PRICE_PER_MILLION", "Harga output / 1 juta token", "API Key", kind="number", bagian="Estimasi biaya", help="Isi sesuai harga provider; 0 berarti belum diatur."),
+    _f("CLIP_SERVICE_PRICE", "Biaya jasa pembanding / klip", "API Key", kind="number", bagian="Estimasi biaya"),
+    _f("USAGE_CURRENCY", "Mata uang", "API Key", bagian="Estimasi biaya", help="Contoh: USD atau IDR."),
 
     # --- Lisensi ---
     _f("LICENSE_KEY", "License key", "Lisensi",

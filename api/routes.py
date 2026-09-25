@@ -30,6 +30,7 @@ from api.schemas import JobCreate, JobCreated, JobOut
 import keypool
 from config import env_store
 from config.settings import settings
+from db import usage
 from db import jobs, models
 from jobqueue.client import enqueue
 import license as lisensi
@@ -219,6 +220,44 @@ def history_page():
 @app.get("/api/settings")
 def read_settings():
     return env_store.read_public()
+
+@app.get("/api/usage/settings")
+def usage_settings():
+    return usage.prices()
+
+@app.get("/api/usage/jobs/{job_id}")
+def usage_job(job_id: str):
+    rows = usage.rows("all", job_id)
+    return {"job_id": job_id, "rows": [
+        {"stage": r.stage, "model": r.model, "input_tokens": r.input_tokens,
+         "output_tokens": r.output_tokens, "total_tokens": r.total_tokens,
+         "estimated": r.estimated, "success": r.success,
+         "created_at": r.created_at.isoformat() if r.created_at else None}
+        for r in rows
+    ]}
+
+@app.get("/api/usage/summary")
+def usage_summary(period: str = "7d"):
+    if period not in {"day", "7d", "30d", "all"}:
+        raise HTTPException(400, "period harus day, 7d, 30d, atau all")
+    rows = usage.rows(period)
+    p = usage.prices()
+    inp = sum(r.input_tokens for r in rows); out = sum(r.output_tokens for r in rows)
+    from datetime import datetime, timedelta, timezone
+    since = None if period == "all" else datetime.now(timezone.utc) - timedelta(days={"day":1,"7d":7,"30d":30}[period])
+    def _job_in_period(j):
+        if not since: return True
+        stamp = datetime.fromisoformat(j["created_at"])
+        if stamp.tzinfo is None: stamp = stamp.replace(tzinfo=timezone.utc)
+        return stamp >= since
+    done = [j for j in jobs.list_all(10000) if j.get("status") == "done" and _job_in_period(j)]
+    clips = sum(len(j.get("clips") or []) for j in done)
+    cost = inp / 1_000_000 * p["input_per_million"] + out / 1_000_000 * p["output_per_million"]
+    savings = clips * p["service_per_clip"] - cost
+    return {"period": period, "clips": clips, "videos": len(done), "avg_clips_per_video": round(clips / len(done), 2) if done else 0,
+            "input_tokens": inp, "output_tokens": out, "total_tokens": inp + out,
+            "estimated_tokens": any(r.estimated for r in rows), "estimated_cost": round(cost, 6),
+            "service_value": round(clips * p["service_per_clip"], 6), "savings": round(savings, 6), "prices": p}
 
 
 @app.post("/api/settings")

@@ -25,6 +25,7 @@ from pathlib import Path
 import httpx
 
 import keypool
+from llm import telemetry
 from asr import rasio_non_latin, sentences_from_words
 from config.settings import settings
 from utils.ffmpeg_helpers import Deadline, ffmpeg, probe, run, silences
@@ -223,7 +224,15 @@ def _minta(key: str, path: Path) -> list[dict]:
             time.sleep(jeda)
             ditunggu += jeda
         _wajib_ok(r, "mentranskrip audio")
-        return _annotations(r.json(), 0.0)
+        payload = r.json()
+        meta = payload.get("usage", payload.get("usage_metadata", {})) or {}
+        inp = meta.get("promptTokenCount", meta.get("prompt_tokens", 0)) or 0
+        out = meta.get("candidatesTokenCount", meta.get("completion_tokens", 0)) or 0
+        estimated = not bool(meta)
+        if estimated:
+            inp = max(1, path.stat().st_size // 4)
+        telemetry.record(MODEL, inp, out, meta.get("totalTokenCount", meta.get("total_tokens", inp + out)), estimated, True)
+        return _annotations(payload, 0.0)
     finally:
         if name:
             _hapus(key, name)
