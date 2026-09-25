@@ -9,6 +9,7 @@ class JobCreate(BaseModel):
     target_clips: int = Field(default=settings.TARGET_CLIPS_DEFAULT, ge=1, le=20)
     template_id: str
     adjustments: dict = Field(default_factory=dict)
+    client_request_id: str | None = Field(default=None, max_length=100)
 
     @model_validator(mode="after")
     def _template_valid(self):
@@ -83,6 +84,9 @@ class JobOut(BaseModel):
     clips: list[Clip] = []
     created_at: str | None = None
     updated_at: str | None = None
+    queue_position: int | None = None
+    queued_ahead: int | None = None
+    worker_id: str | None = None
 
     @model_validator(mode="after")
     def _terjemahkan(self):

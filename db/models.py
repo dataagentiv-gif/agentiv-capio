@@ -77,6 +77,7 @@ class Job(Base):
     # cuma membereskan job miliknya sendiri, bukan job worker lain yang masih
     # sehat. Bukan untuk ditampilkan — tidak masuk as_dict().
     worker_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    client_request_id: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -102,6 +103,8 @@ class Job(Base):
             "clips": self.clips or [],
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "worker_id": self.worker_id,
+            "client_request_id": self.client_request_id,
         }
 
 
@@ -146,5 +149,7 @@ def init() -> None:
             "layout VARCHAR(20) NOT NULL DEFAULT 'penuh'",
             "gaya JSONB",
             "worker_id VARCHAR(64)",
+            "client_request_id VARCHAR(100)",
         ):
             c.execute(text(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {kolom}"))
+        c.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_jobs_client_request_id ON jobs (client_request_id) WHERE client_request_id IS NOT NULL"))

@@ -50,10 +50,12 @@ function kepala(j, ekor = '') {
 }
 
 function jobJalan(j) {
-  return `<div class="job ${localStorage.getItem(`capio-job-collapsed-${j.id}`)==='true'?'job-collapsed':''}">
+  const antrean = j.status === 'queued' && j.queue_position ? ` · antrean #${j.queue_position} (${j.queued_ahead || 0} di depan)` : '';
+  return `<div class="job ${localStorage.getItem(`capio-job-collapsed-${j.id}`)==='true'?'job-collapsed':''}"
+    data-last-update="${esc(j.updated_at || '')}">
     ${kepala(j, ` · minta ${j.target_clips} klip`)}
     ${ringkasanGaya(j)}
-    <div class="job-body">${stepper(j.status, j.progress)}</div>
+    <div class="job-body">${antrean ? `<p class="sub antrean-info">Menunggu giliran${antrean}</p>` : ''}${stepper(j.status, j.progress)}</div>
   </div>`;
 }
 

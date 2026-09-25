@@ -72,6 +72,15 @@ def test_custom_disimpan_dengan_default(client, cleanup):
     assert job["adjustments"] == resolve("custom", {})
 
 
+def test_submit_idempotent_dengan_client_request_id(client, cleanup):
+    payload = {"url": URL, "target_clips": 1, "template_id": "mentahan",
+               "client_request_id": "uji-idempotensi-001"}
+    pertama = client.post("/jobs", json=payload)
+    kedua = client.post("/jobs", json=payload)
+    assert pertama.status_code == kedua.status_code == 201
+    assert pertama.json()["job_id"] == kedua.json()["job_id"]
+
+
 def test_retry_lama_ditolak(client, cleanup):
     from db.models import Job, Status, session_scope
     with session_scope() as session:

@@ -11,13 +11,25 @@ log = get(__name__)
 
 
 def create(url: str, target_clips: int, layout: str = "penuh",
-           gaya: dict | None = None) -> dict:
+           gaya: dict | None = None, client_request_id: str | None = None) -> dict:
     with session_scope() as s:
+        if client_request_id:
+            old = s.scalar(select(Job).where(Job.client_request_id == client_request_id))
+            if old:
+                return old.as_dict()
         job = Job(url=url, target_clips=target_clips, layout=layout,
-                  gaya=gaya or None, status=Status.QUEUED)
+                  gaya=gaya or None, status=Status.QUEUED,
+                  client_request_id=client_request_id)
         s.add(job)
         s.flush()
         return job.as_dict()
+
+def get_by_client_request_id(client_request_id: str | None) -> dict | None:
+    if not client_request_id:
+        return None
+    with session_scope() as s:
+        job = s.scalar(select(Job).where(Job.client_request_id == client_request_id))
+        return job.as_dict() if job else None
 
 
 def get(job_id: str | uuid.UUID) -> dict | None:
@@ -29,7 +41,13 @@ def get(job_id: str | uuid.UUID) -> dict | None:
         return None
     with session_scope() as s:
         job = s.get(Job, key)
-        return job.as_dict() if job else None
+        if not job:
+            return None
+        result = job.as_dict()
+        if job.status == Status.QUEUED:
+            ahead = s.scalar(select(func.count(Job.id)).where(Job.status == Status.QUEUED, Job.created_at < job.created_at)) or 0
+            result["queued_ahead"], result["queue_position"] = ahead, ahead + 1
+        return result
 
 
 def list_all(limit: int = 100) -> list[dict]:
@@ -37,7 +55,14 @@ def list_all(limit: int = 100) -> list[dict]:
         rows = s.scalars(
             select(Job).order_by(Job.created_at.desc()).limit(limit)
         ).all()
-        return [r.as_dict() for r in rows]
+        result = []
+        for r in rows:
+            item = r.as_dict()
+            if r.status == Status.QUEUED:
+                ahead = s.scalar(select(func.count(Job.id)).where(Job.status == Status.QUEUED, Job.created_at < r.created_at)) or 0
+                item["queued_ahead"], item["queue_position"] = ahead, ahead + 1
+            result.append(item)
+        return result
 
 
 def list_selesai_sebelum(batas: datetime) -> list[dict]:

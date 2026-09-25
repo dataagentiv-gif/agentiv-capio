@@ -171,7 +171,7 @@ def test_api_menyimpan_default_per_job(monkeypatch):
 
     saved = {}
     monkeypatch.setattr(routes, "_pastikan_boleh_memproses", lambda: None)
-    monkeypatch.setattr(routes.jobs, "create", lambda url, n, template_id, adjustments: saved.update(
+    monkeypatch.setattr(routes.jobs, "create", lambda url, n, template_id, adjustments, client_request_id=None: saved.update(
         url=url, n=n, template_id=template_id, adjustments=adjustments) or {"id": "job", "status": "queued"})
     monkeypatch.setattr(routes, "enqueue", lambda job_id: None)
     routes.create_job(JobCreate(url=URL, template_id="full_screen"))

@@ -9,6 +9,7 @@ import io
 import re
 import secrets
 import subprocess
+from sqlalchemy.exc import IntegrityError
 import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -532,10 +533,22 @@ def create_job(payload: JobCreate):
     # jaringan.
     _pastikan_boleh_memproses()
 
-    job = jobs.create(
-        payload.url, payload.target_clips,
-        payload.template_id, payload.adjustments,
-    )
+    existing = jobs.get_by_client_request_id(payload.client_request_id)
+    if existing:
+        return JobCreated(job_id=existing["id"], status=existing["status"])
+
+    try:
+        job = jobs.create(
+            payload.url, payload.target_clips,
+            payload.template_id, payload.adjustments, payload.client_request_id,
+        )
+    except IntegrityError:
+        # Dua browser yang mengirim request id sama persis bersamaan bisa
+        # melewati pre-check; unique index menjadi pagar terakhir.
+        existing = jobs.get_by_client_request_id(payload.client_request_id)
+        if not existing:
+            raise HTTPException(409, "Permintaan submit sedang diproses ulang")
+        return JobCreated(job_id=existing["id"], status=existing["status"])
     try:
         enqueue(job["id"])
     except Exception as e:  # noqa: BLE001
