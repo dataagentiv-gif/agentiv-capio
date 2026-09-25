@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     # Juga yang ditampilkan sebagai versi kecil di nav (_layout.html) dan
     # yang dibandingkan fitur notifikasi update (license._lebih_baru) — telat
     # menaikkan ini berarti kedua tempat itu ikut berbohong.
-    VERSI: str = "1.5.2"
+    VERSI: str = "1.6.0"
     AGENTIV_WA: str = "6285843570782"
 
     # Kosong = pakai alamat produksi yang tertulis di license/__init__.py.

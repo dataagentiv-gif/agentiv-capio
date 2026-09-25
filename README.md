@@ -33,6 +33,10 @@ untuk pemakaian ringan.
 
 ## Cara pakai
 
+> Panduan publik instalasi, update, dan multi-worker tersedia di portal Agentiv.
+> Tutorial penggunaan harian dan cara memilih style dibahas di video channel
+> pribadi Agentiv, agar dokumentasi bisnis tetap ringkas.
+
 ### Tampilan output
 
 Pada halaman Submit, pilih salah satu jalur berikut:
