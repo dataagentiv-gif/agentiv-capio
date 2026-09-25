@@ -1,64 +1,21 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from config.settings import settings
 
 
 class JobCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     url: str
     target_clips: int = Field(default=settings.TARGET_CLIPS_DEFAULT, ge=1, le=20)
-    # Bentuk tampilan dipilih di sini, bukan di halaman Setting: tiap video
-    # bisa menuntut bentuk yang berbeda, dan keputusannya diambil saat menempel
-    # link. Kosong = ikut default yang dipilih di Setting.
-    layout: str | None = None
-    # Knob tampilan untuk video INI. Kosong = ikut default di halaman Setting.
-    gaya: dict | None = None
+    template_id: str
+    adjustments: dict = Field(default_factory=dict)
 
-    @field_validator("gaya")
-    @classmethod
-    def _gaya_bersih(cls, v):
-        """Batas kepercayaan: isinya masuk ke generator .ass dan ikut tersimpan
-        di database. Hanya kunci yang dikenal yang lolos — sisanya dibuang
-        diam-diam, bukan ditolak, supaya form versi lama tetap bisa submit."""
-        if not v:
-            return None
-        from pipeline.stages.caption import GAYA_AKTIF
+    @model_validator(mode="after")
+    def _template_valid(self):
+        from pipeline.templates import resolve
 
-        BOLEH = {"font", "ukuran", "aktif", "kata", "upper",
-                 "active_word_background_color", "active_word_text_color"}
-        bersih = {k: v[k] for k in BOLEH if v.get(k) not in (None, "", 0, "0")}
-        if v.get("active_word_style") in GAYA_AKTIF:
-            bersih["active_word_style"] = v["active_word_style"]
-        if v.get("speaker_side") in ("kiri", "kanan"):
-            bersih["speaker_side"] = v["speaker_side"]
-        # Angka yang NOL-nya bermakna — bayangan 0% berarti tanpa bayangan,
-        # radius 0 berarti sudut siku — bukan "ikut default", jadi tidak boleh
-        # lewat saringan di atas. Dipaksa jadi int sekalian: nilainya masuk ke
-        # rumus ffmpeg dan path gambar .ass. Rentangnya dijepit di tempat
-        # pemakaiannya, bukan di sini.
-        for k in ("redup_luas", "redup_gelap", "active_word_border_radius",
-                  "active_word_padding_x", "active_word_padding_y"):
-            try:
-                bersih[k] = int(float(v[k]))
-            except (KeyError, TypeError, ValueError, OverflowError):
-                pass
-        # `caption` disaring terpisah, dan itu bukan gaya-gayaan: ia satu-satunya
-        # knob yang nilai bermaknanya False, sementara `False == 0` di Python
-        # membuat saringan di atas MEMBUANGNYA justru saat caption dimatikan.
-        # Hanya False yang disimpan — tidak adanya kunci berarti nyala.
-        if v.get("caption") is False or str(v.get("caption")).lower() in ("false", "0"):
-            bersih["caption"] = False
-        return bersih or None
-
-    @field_validator("layout")
-    @classmethod
-    def _layout_dikenal(cls, v):
-        if v is None or v == "":
-            return None
-        from pipeline.layout import LAYOUTS
-
-        if v not in LAYOUTS:
-            raise ValueError(f"Layout '{v}' tidak dikenal")
-        return v
+        self.adjustments = resolve(self.template_id, self.adjustments)
+        return self
 
     @field_validator("url")
     @classmethod
@@ -112,6 +69,9 @@ class JobOut(BaseModel):
     target_clips: int
     layout: str = "penuh"
     gaya: dict = {}
+    template_id: str | None = None
+    adjustments: dict = {}
+    retryable: bool = False
     status: str
     progress: int
     error: str | None = None

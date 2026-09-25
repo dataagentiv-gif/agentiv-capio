@@ -152,10 +152,15 @@ def build_ass(words: list[dict], clip_start: float, clip_end: float,
     # Layout yang tidak menyorot memakai warna yang sama untuk kata aktif —
     # bukan menghapus tag warnanya, supaya bentuk baris tetap identik dan
     # tidak ada cabang khusus di perakitan teks di bawah.
+    warna_aktif = _l._bgr(knob.get("aktif") or "FFE500")
     aktif = (
-        "{\\c&H" + _l._bgr(knob.get("aktif") or "FFE500") + "&}"
+        "{\\c&H" + warna_aktif + "&"
+        + ("\\3c&H" + warna_aktif + "&\\bord5\\blur5" if knob.get("active_word_glow") else "")
+        + "}"
         if lay.sorot else pasif
     )
+    if knob.get("active_word_glow"):
+        pasif = "{\\r}"
     besar = bool(knob.get("upper"))
     # Penumpukan vertikal cuma soal pemisah baris: \N di .ass memaksa baris
     # baru, sementara spasi biasa membiarkan teks mengalir mendatar.
@@ -328,6 +333,36 @@ def knob_dari_settings() -> dict:
 
 
 def run(ctx: dict) -> dict:
+    if "template_id" in ctx:
+        from pipeline import emphasis, motion
+        from pipeline.reference_caption import CaptionEngine, MOTIONS, render_overlay
+        paths = {}
+        if ctx["template_id"] == "mentahan":
+            return {"captions": paths}
+        for seg in ctx["segments_final"]:
+            words = [w for w in ctx["words"] if w["e"] > seg["start"] and w["s"] < seg["end"]]
+            if ctx["template_id"] == "custom":
+                from pipeline.custom import caption_ass, output_size
+                if ctx["adjustments"].get("caption"):
+                    w, h = output_size(ctx["adjustments"])
+                    path = ctx["workdir"] / f"{seg['id']}.ass"
+                    path.write_text(caption_ass(words, seg, ctx["adjustments"], w, h), encoding="utf-8")
+                    paths[seg["id"]] = path
+                continue
+            selected = set()
+            if ctx["adjustments"].get("caption_motion") in {"editorial_focus", "scatter_emphasis"}:
+                selected = emphasis.choose(words, seg["start"], seg["end"])
+            if ctx["adjustments"].get("caption_motion") in MOTIONS:
+                path = ctx["workdir"] / f"{seg['id']}.mov"
+                engine = CaptionEngine(words, seg, ctx["template_id"],
+                                       ctx["adjustments"], ctx["crops"][seg["id"]], selected)
+                paths[seg["id"]] = render_overlay(engine, path, ctx["deadline"])
+                continue
+            path = ctx["workdir"] / f"{seg['id']}.ass"
+            path.write_text(motion.build(words, seg, ctx["template_id"],
+                                         ctx["adjustments"], ctx["crops"][seg["id"]], selected), encoding="utf-8")
+            paths[seg["id"]] = path
+        return {"captions": paths}
     from config.settings import settings
     from pipeline import layout
 

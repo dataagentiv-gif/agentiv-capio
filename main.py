@@ -36,6 +36,9 @@ def main() -> None:
     mode = sys.argv[1] if len(sys.argv) > 1 else ""
     if mode not in MODES:
         sys.exit(f"Pemakaian: python main.py [{' | '.join(MODES)}]")
+    from pipeline.reference_caption import verify_fonts
+
+    verify_fonts()
     MODES[mode]()
 
 

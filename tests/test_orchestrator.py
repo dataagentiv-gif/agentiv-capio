@@ -31,7 +31,7 @@ def test_kosong_menghasilkan_string_kosong():
     assert _rincian({}) == ""
 
 
-def test_hasil_menandai_duo_yang_fallback(monkeypatch):
+def test_hasil_menyimpan_template(monkeypatch):
     from worker import orchestrator
 
     monkeypatch.setattr(
@@ -40,16 +40,16 @@ def test_hasil_menandai_duo_yang_fallback(monkeypatch):
     seg = {"id": "c1", "start": 0.0, "end": 8.0, "score": 90,
            "hook": "Hook", "reason": "Alasan"}
     ctx = {
-        "layout": "duo", "segments_final": [seg],
+        "template_id": "pembicara_samping", "segments_final": [seg],
         "metadata": {"c1": meta}, "rendered": {"c1": "hasil.mp4"},
-        "crops": {"c1": {"duo": None}},
+        "crops": {"c1": {"speaker_side": "kiri"}},
     }
     clip = orchestrator._build_clips(ctx, "job-1")[0]
-    assert clip["layout"] == "penuh"
-    assert clip["layout_fallback"] is True
+    assert clip["layout"] == "pembicara_samping"
+    assert clip["layout_fallback"] is False
 
 
-def test_hasil_mempertahankan_podcast_jika_pasangan_stabil(monkeypatch):
+def test_hasil_mentahan(monkeypatch):
     from worker import orchestrator
 
     monkeypatch.setattr(
@@ -57,13 +57,13 @@ def test_hasil_mempertahankan_podcast_jika_pasangan_stabil(monkeypatch):
     seg = {"id": "c1", "start": 0.0, "end": 8.0, "score": 90,
            "hook": "Hook", "reason": "Alasan"}
     ctx = {
-        "layout": "duo", "segments_final": [seg],
+        "template_id": "mentahan", "segments_final": [seg],
         "metadata": {"c1": {"title": "Judul", "caption": "Caption", "hashtags": []}},
         "rendered": {"c1": "hasil.mp4"},
-        "crops": {"c1": {"duo": [{"x": 0}, {"x": 960}]}},
+        "crops": {"c1": {}},
     }
     clip = orchestrator._build_clips(ctx, "job-1")[0]
-    assert clip["layout"] == "duo"
+    assert clip["layout"] == "mentahan"
     assert clip["layout_fallback"] is False
 
 
@@ -80,7 +80,8 @@ def jalankan(monkeypatch, tmp_path):
 
     monkeypatch.setattr(orchestrator.env_store, "reload", lambda: None)
     monkeypatch.setattr(orchestrator.jobs, "get", lambda j: {
-        "url": "https://youtu.be/x", "target_clips": 3})
+        "url": "https://youtu.be/x", "target_clips": 3,
+        "layout": "full_screen", "gaya": {}})
     monkeypatch.setattr(orchestrator.jobs, "update_status", lambda *a, **k: None)
     monkeypatch.setattr(orchestrator.jobs, "fail",
                         lambda jid, err: dicatat.update(error=err))
@@ -155,7 +156,8 @@ def test_kegagalan_biasa_tidak_ikut_dibungkus(monkeypatch, tmp_path):
     dicatat = {}
     monkeypatch.setattr(orchestrator.env_store, "reload", lambda: None)
     monkeypatch.setattr(orchestrator.jobs, "get", lambda j: {
-        "url": "https://youtu.be/x", "target_clips": 3})
+        "url": "https://youtu.be/x", "target_clips": 3,
+        "layout": "full_screen", "gaya": {}})
     monkeypatch.setattr(orchestrator.jobs, "update_status", lambda *a, **k: None)
     monkeypatch.setattr(orchestrator.jobs, "fail",
                         lambda jid, err: dicatat.update(error=err))

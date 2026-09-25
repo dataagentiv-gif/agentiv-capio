@@ -31,6 +31,17 @@ RUN pip install --no-cache-dir --timeout 600 --retries 10 -r requirements.txt
 
 COPY . .
 
+# A release image must carry licensed copies of the exact reference fonts.
+# Local test builds may set this to 0 and mount a read-only font directory.
+ARG CAPIO_REQUIRE_LICENSED_FONTS=1
+RUN if [ "$CAPIO_REQUIRE_LICENSED_FONTS" = 1 ]; then \
+        for font in georgiab.ttf impact.ttf arialbd.ttf; do \
+            test -f "/app/assets/reference-fonts/$font" || \
+                { echo "Missing licensed caption font: $font" >&2; exit 1; }; \
+        done; \
+    fi
+ENV CAPIO_REFERENCE_FONT_DIR=/app/assets/reference-fonts
+
 # Font caption dipasang ke sistem supaya libass menemukannya lewat fontconfig.
 #
 # Tanpa ini image cuma punya DejaVu, dan nama font apa pun yang ditulis di .ass

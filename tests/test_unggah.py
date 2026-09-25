@@ -32,8 +32,9 @@ def client():
 
     from api.routes import app
 
-    with TestClient(app) as c:
-        yield c
+    client = TestClient(app)
+    yield client
+    client.close()
 
 
 # --- batas kepercayaan ---
@@ -64,14 +65,14 @@ def test_schema_menolak_penanda_unggahan_yang_ngawur():
     from api.schemas import JobCreate
 
     with pytest.raises(ValueError):
-        JobCreate(url="unggah:../../etc/passwd")
+        JobCreate(url="unggah:../../etc/passwd", template_id="mentahan")
 
 
 def test_schema_menerima_penanda_unggahan_yang_sah():
     from api.schemas import JobCreate
 
     nilai = "unggah:5f2a9c1e-8b47-4d3a-9f61-2c7e0a1b8d43"
-    assert JobCreate(url=nilai).url == nilai
+    assert JobCreate(url=nilai, template_id="mentahan").url == nilai
 
 
 # --- endpoint unggah ---

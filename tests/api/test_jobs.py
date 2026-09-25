@@ -82,18 +82,18 @@ def client():
 
 
 def test_url_bukan_youtube_ditolak(client):
-    r = client.post("/jobs", json={"url": "https://evil.example/x", "target_clips": 3})
+    r = client.post("/jobs", json={"url": "https://evil.example/x", "target_clips": 3, "template_id": "full_screen"})
     assert r.status_code == 422
 
 
 def test_url_kosong_ditolak(client):
-    assert client.post("/jobs", json={"url": "", "target_clips": 3}).status_code == 422
+    assert client.post("/jobs", json={"url": "", "target_clips": 3, "template_id": "full_screen"}).status_code == 422
 
 
 def test_target_clips_di_luar_batas_ditolak(client):
     r = client.post(
         "/jobs",
-        json={"url": "https://www.youtube.com/watch?v=abc", "target_clips": 999},
+        json={"url": "https://www.youtube.com/watch?v=abc", "target_clips": 999, "template_id": "full_screen"},
     )
     assert r.status_code == 422
 
@@ -106,7 +106,7 @@ def test_job_tidak_dikenal_balas_404(client):
 def test_submit_menulis_row_dan_masuk_antrean(client):
     r = client.post(
         "/jobs",
-        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "target_clips": 2},
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "target_clips": 2, "template_id": "full_screen"},
     )
     assert r.status_code == 201
     job_id = r.json()["job_id"]
@@ -127,7 +127,7 @@ def test_proses_ulang_memakai_job_dan_konfigurasi_yang_sama(client):
 
     r = client.post("/jobs", json={
         "url": "https://youtu.be/abc", "target_clips": 4,
-        "layout": "duo", "gaya": {"font": "Anton", "speaker_side": "kanan"},
+        "template_id": "pembicara_samping", "adjustments": {"caption_motion": "kinetic_words"},
     })
     job_id = r.json()["job_id"]
     with session_scope() as s:
@@ -140,7 +140,7 @@ def test_proses_ulang_memakai_job_dan_konfigurasi_yang_sama(client):
     assert ulang.status_code == 200
     sesudah = client.get(f"/jobs/{job_id}").json()
     assert sesudah["id"] == job_id
-    for k in ("url", "target_clips", "layout", "gaya"):
+    for k in ("url", "target_clips", "template_id", "adjustments"):
         assert sesudah[k] == sebelum[k]
     assert sesudah["status"] == "queued"
     assert sesudah["progress"] == 0
@@ -152,7 +152,7 @@ def test_job_aktif_tidak_bisa_dihapus_dan_tetap_tercatat(client):
     from db import jobs as db_jobs
     from db.models import Status
 
-    r = client.post("/jobs", json={"url": "https://youtu.be/abc", "target_clips": 2})
+    r = client.post("/jobs", json={"url": "https://youtu.be/abc", "target_clips": 2, "template_id": "full_screen"})
     job_id = r.json()["job_id"]
 
     for status in (Status.QUEUED, Status.DOWNLOADING):
@@ -172,7 +172,7 @@ def test_proses_ulang_upload_mempertahankan_source(client, tmp_path, monkeypatch
 
     monkeypatch.setattr(settings, "WORK_DIR", tmp_path)
     ident = "5f2a9c1e-8b47-4d3a-9f61-2c7e0a1b8d43"
-    r = client.post("/jobs", json={"url": f"unggah:{ident}", "target_clips": 2})
+    r = client.post("/jobs", json={"url": f"unggah:{ident}", "target_clips": 2, "template_id": "full_screen"})
     job_id = r.json()["job_id"]
     source = tmp_path / job_id[:8] / "source.mp4"
     source.parent.mkdir(parents=True)
@@ -187,7 +187,7 @@ def test_proses_ulang_upload_mempertahankan_source(client, tmp_path, monkeypatch
 def test_proses_ulang_hanya_sekali_dan_hanya_job_gagal(client):
     from db import jobs as db_jobs
 
-    r = client.post("/jobs", json={"url": "https://youtu.be/abc", "target_clips": 2})
+    r = client.post("/jobs", json={"url": "https://youtu.be/abc", "target_clips": 2, "template_id": "full_screen"})
     job_id = r.json()["job_id"]
     assert client.post(f"/jobs/{job_id}/retry").status_code == 409
     db_jobs.fail(job_id, "gagal uji")
@@ -199,7 +199,7 @@ def test_queue_gagal_mengembalikan_retry_ke_status_gagal(client, monkeypatch):
     from api import routes
     from db import jobs as db_jobs
 
-    job = db_jobs.create("https://youtu.be/abc", 2)
+    job = db_jobs.create("https://youtu.be/abc", 2, "full_screen", {})
     db_jobs.fail(job["id"], "gagal pertama")
     monkeypatch.setattr(routes, "enqueue", lambda _id: (_ for _ in ()).throw(RuntimeError("redis mati")))
 
@@ -227,7 +227,7 @@ E2E_URL = os.getenv("TEST_YOUTUBE_URL", "")
 )
 def test_end_to_end_sampai_done(client):
     """Jalankan `python main.py worker` di terminal lain sebelum test ini."""
-    job_id = client.post("/jobs", json={"url": E2E_URL, "target_clips": 3}).json()["job_id"]
+    job_id = client.post("/jobs", json={"url": E2E_URL, "target_clips": 3, "template_id": "full_screen"}).json()["job_id"]
 
     deadline = time.time() + settings.JOB_TIMEOUT_SEC + 120
     while time.time() < deadline:
@@ -373,7 +373,7 @@ def job_berklip(client, tmp_path, monkeypatch):
     from db import jobs as db_jobs
 
     j = client.post(
-        "/jobs", json={"url": "https://youtu.be/abc", "target_clips": 2}
+        "/jobs", json={"url": "https://youtu.be/abc", "target_clips": 2, "template_id": "full_screen"}
     ).json()["job_id"]
 
     src = tmp_path / "x.mp4"
@@ -442,7 +442,7 @@ def test_worker_tidak_ribut_saat_row_selesai_sudah_dihapus(client):
     from db import jobs as db_jobs
 
     j = client.post(
-        "/jobs", json={"url": "https://youtu.be/abc", "target_clips": 1}
+        "/jobs", json={"url": "https://youtu.be/abc", "target_clips": 1, "template_id": "full_screen"}
     ).json()["job_id"]
     db_jobs.fail(j, "gagal sebelum dihapus")
     assert client.delete(f"/jobs/{j}").status_code == 204

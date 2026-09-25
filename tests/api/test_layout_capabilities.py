@@ -1,27 +1,26 @@
-"""Kontrak layout yang dipakai Submit tanpa aturan nama hard-coded."""
+"""Kontrak library template yang dipakai Submit."""
 from api import routes
 
 
-def test_layouts_mengekspos_duo_dan_arah_pembicara():
+def test_library_mengekspos_lima_template():
     data = routes.daftar_layout()
-    per_nama = {x["nama"]: x for x in data["layouts"]}
-    assert list(per_nama) == ["penuh", "duo", "kotak", "samping", "ori"]
-    assert per_nama["duo"]["duo"] is True
-    assert per_nama["duo"]["judul"] == "Podcast 2 Orang"
-    assert per_nama["samping"]["speaker_side"] is True
-    assert all(not x["speaker_side"] for n, x in per_nama.items() if n != "samping")
+    per_nama = {x["id"]: x for x in data["templates"]}
+    assert list(per_nama) == ["mentahan", "full_screen", "pembicara_samping", "blur_atas_bawah", "kotak_tengah"]
+    assert per_nama["mentahan"]["defaults"] == {}
+    assert per_nama["pembicara_samping"]["defaults"]["caption_motion"] == "soft_focus"
 
 
-def test_preview_meneruskan_sisi_pembicara(monkeypatch):
+def test_preview_meneruskan_adjustment(monkeypatch):
     terlihat = {}
 
     def palsu(nama, knob):
-        terlihat.update(layout=nama, knob=knob)
-        return b"mp4", "video/mp4"
+        terlihat.update(template_id=nama, adjustments=knob)
+        return b"mp4"
 
-    monkeypatch.setattr(routes.preview, "render", palsu)
-    response = routes.preview_tampilan(layout="samping", speaker_side="kanan")
-    assert terlihat == {"layout": "samping", "knob": {"speaker_side": "kanan"}}
+    from api import template_preview
+    monkeypatch.setattr(template_preview, "render", palsu)
+    response = routes.template_preview({"template_id": "kotak_tengah", "adjustments": {"caption_motion": "soft_phrase"}})
+    assert terlihat == {"template_id": "kotak_tengah", "adjustments": {"caption_motion": "soft_phrase"}}
     assert response.body == b"mp4"
 
 
@@ -31,7 +30,7 @@ def test_schema_clip_meneruskan_status_fallback_layout():
     clip = Clip.model_validate({
         "id": "c1", "url": "/c1", "duration": 10, "score": 80,
         "hook": "h", "reason": "r", "title": "t", "caption": "c",
-        "hashtags": [], "layout": "duo", "layout_fallback": True,
+        "hashtags": [], "layout": "full_screen", "layout_fallback": False,
     })
-    assert clip.model_dump()["layout"] == "duo"
-    assert clip.model_dump()["layout_fallback"] is True
+    assert clip.model_dump()["layout"] == "full_screen"
+    assert clip.model_dump()["layout_fallback"] is False

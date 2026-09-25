@@ -180,6 +180,8 @@ def _render_one(source: Path, workdir: Path, seg: dict, crop: dict,
 
 
 def run(ctx: dict) -> dict:
+    if "template_id" in ctx:
+        return _render_templates(ctx)
     workdir: Path = ctx["workdir"]
     source: Path = ctx["source"]
     src_w = int(ctx["meta"]["width"])
@@ -205,4 +207,45 @@ def run(ctx: dict) -> dict:
         log.info("render %s: %.1f MB, %.1fs", seg["id"], size_mb, seg["end"] - seg["start"])
         rendered[seg["id"]] = path
 
+    return {"rendered": rendered}
+
+
+def _render_templates(ctx: dict) -> dict:
+    from pipeline.composition import filters
+
+    workdir = ctx["workdir"]
+    (workdir / "clips").mkdir(exist_ok=True)
+    rendered = {}
+    for seg in ctx["segments_final"]:
+        caption = ctx["captions"].get(seg["id"])
+        overlay = caption is not None and caption.suffix == ".mov"
+        ass = f"{seg['id']}.ass" if caption is not None and not overlay else None
+        graph, complex_graph = filters(ctx["template_id"], ctx["crops"][seg["id"]],
+                                       int(ctx["meta"]["width"]), int(ctx["meta"]["height"]),
+                                       ass, workdir, ctx["deadline"])
+        out = Path("clips") / f"{seg['id']}.mp4"
+        args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-nostats", "-v", "error",
+                "-ss", f"{seg['start']:.3f}", "-i", str(ctx["source"]),
+                "-t", f"{seg['end'] - seg['start']:.3f}"]
+        if overlay:
+            args += ["-i", str(caption)]
+            if complex_graph:
+                base = graph.removesuffix("[outv]") + "[base]"
+            else:
+                base = f"[0:v]{graph}[base]"
+            args += ["-filter_complex", base + ";[base][1:v]overlay=0:0:shortest=1:format=auto[outv]",
+                     "-map", "[outv]", "-map", "0:a?", "-r", "30"]
+        elif complex_graph:
+            args += ["-filter_complex", graph, "-map", "[outv]", "-map", "0:a?"]
+        elif graph:
+            args += ["-vf", graph]
+        args += ["-c:v", "libx264", "-preset", "veryfast", "-crf",
+                 "18" if ctx["template_id"] == "mentahan" else "23",
+                 "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+                 "-movflags", "+faststart", str(out)]
+        retry(attempts=2, backoff=2.0)(ff)(args, ctx["deadline"], cwd=workdir, cap=900)
+        path = workdir / out
+        if path.stat().st_size < 1000:
+            raise RuntimeError(f"Render {seg['id']} terlalu kecil")
+        rendered[seg["id"]] = path
     return {"rendered": rendered}

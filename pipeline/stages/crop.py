@@ -190,6 +190,8 @@ def _pair_fits_duo(pair: list[dict], src_w: int, src_h: int) -> bool:
 
 
 def run(ctx: dict) -> dict:
+    if "template_id" in ctx:
+        return _template_crops(ctx)
     from config.settings import settings
     from pipeline import layout
 
@@ -296,3 +298,31 @@ def run(ctx: dict) -> dict:
         )
 
     return {"crops": crops}
+
+
+def _template_crops(ctx: dict) -> dict:
+    """Satu keputusan wajah dan sisi untuk seluruh durasi setiap klip."""
+    src_w, src_h = int(ctx["meta"]["width"]), int(ctx["meta"]["height"])
+    win_w = max(2, min(src_w, round(src_h * 9 / 16)) & ~1)
+    result = {}
+    custom = ctx.get("template_id") == "custom"
+    options = ctx.get("adjustments", {})
+    for seg in ctx["segments_final"]:
+        face = None
+        if ctx["template_id"] != "mentahan" and (not custom or options.get("focus_mode") == "face"):
+            try:
+                face = _face_center(_sample(ctx["source"], seg["start"],
+                                            seg["end"] - seg["start"], ctx["deadline"]))
+            except Exception as exc:  # noqa: BLE001 - center crop tetap valid
+                log.warning("deteksi wajah %s gagal: %s; memakai tengah", seg["id"], exc)
+        fx, fy = face if face else (None, None)
+        px = fx if fx is not None else 0.5
+        x = max(0, min(src_w - win_w, round(px * src_w - win_w / 2))) & ~1
+        # Wajah di kanan => ruang lebih aman di kiri. Saat pusat/no-face,
+        # pilih pembicara kiri secara deterministik untuk seluruh klip.
+        side = "kanan" if fx is not None and fx > 0.55 else "kiri"
+        result[seg["id"]] = {"x": x, "w": win_w, "fx": fx, "fy": fy,
+                              "speaker_side": side}
+        if custom:
+            result[seg["id"]]["custom_options"] = options
+    return {"crops": result}

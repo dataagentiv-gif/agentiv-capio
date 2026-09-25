@@ -5,6 +5,11 @@
 {% block lede %}Tiap klip datang dengan nilai dan alasan kenapa momen itu yang dipilih — supaya kamu bisa menilai sendiri sebelum mengunggah.{% endblock %}
 
 {% block content %}
+<section class="results-tools" aria-label="Filter hasil">
+  <label for="results-search">Cari hasil</label><input id="results-search" type="search" placeholder="URL, job ID, atau style">
+  <label for="results-template">Tampilan</label><select id="results-template"><option value="all">Semua</option><option value="custom">Custom</option><option value="template">Template library</option></select>
+  <label for="results-ratio">Rasio</label><select id="results-ratio"><option value="all">Semua</option><option>9:16</option><option>1:1</option><option>16:9</option></select>
+</section>
 <div id="list">{{ '' }}</div>
 {% endblock %}
 
@@ -81,9 +86,16 @@ function jobHtml(j) {
         ${idJob(j.id)}
         ${tombolHapus('Hapus semua', `job:${j.id}`)}
       </div>
+      ${ringkasanGaya(j)}
+      <div class="job-actions"><a class="btn sm ghost" href="/jobs/${encodeURIComponent(j.id)}/clips.zip">Unduh semua klip</a><button type="button" class="btn sm ghost" data-copy-style="${esc(JSON.stringify(j.adjustments || j.gaya || {}))}">Salin konfigurasi</button><a class="btn sm ghost" href="/process#riwayat">Buka di Proses</a></div>
       <div class="clips">${(j.clips || []).map(c => clipHtml(c, j.id)).join('')}</div>
     </div>`;
 }
+
+const resultState = {search: '', template: 'all', ratio: 'all'};
+for (const [id,key] of [['results-search','search'],['results-template','template'],['results-ratio','ratio']]) document.getElementById(id)?.addEventListener('input', e => { resultState[key]=e.target.value; drawResults(); });
+function cocokHasil(j) { const text=JSON.stringify([j.id,j.url,j.template_id,j.layout,j.adjustments,j.gaya]).toLowerCase(); if(resultState.search && !text.includes(resultState.search.toLowerCase())) return false; const custom=(j.template_id||j.layout)==='custom'; if(resultState.template==='custom'&&!custom || resultState.template==='template'&&custom) return false; return resultState.ratio==='all' || (j.adjustments||{}).output_ratio===resultState.ratio; }
+function drawResults() { const jobs = window._hasilJobs || [], shown = jobs.filter(cocokHasil); document.getElementById('list').innerHTML = shown.length ? shown.map(jobHtml).join('') : empty(jobs.length ? 'Tidak ada hasil yang cocok' : 'Belum ada klip', jobs.length ? 'Coba ubah filter pencarian atau tampilannya.' : 'Video yang sudah selesai atau gagal akan muncul di sini.'); }
 
 // Tanda tangan isi halaman. Tanpa ini, tiap putaran polling menggambar ulang
 // SELURUH daftar walau tidak ada yang berubah — dan menggambar ulang bukan
@@ -106,9 +118,8 @@ async function tick() {
       jobs.map(j => [j.id, (j.clips || []).map(c => c.id)]));
     if (tanda !== tandaTangan) {
       tandaTangan = tanda;
-      el.innerHTML = jobs.length
-        ? jobs.map(jobHtml).join('')
-        : empty('Belum ada klip', 'Tempel link YouTube di <a href="/">halaman depan</a> untuk mulai.');
+      window._hasilJobs = jobs;
+      drawResults();
     }
     return semua.some(isRunning);
   } catch (e) {
@@ -122,6 +133,8 @@ async function tick() {
 // Delegasi di container: isinya digambar ulang tiap polling, jadi handler yang
 // dipasang ke tombol satu per satu akan hilang di render berikutnya.
 document.getElementById('list').addEventListener('click', async (e) => {
+  const copy = e.target.closest('[data-copy-style]');
+  if (copy) { try { await navigator.clipboard.writeText(copy.dataset.copyStyle); copy.textContent='Konfigurasi tersalin'; setTimeout(()=>copy.textContent='Salin konfigurasi',1400); } catch { copy.textContent='Gagal menyalin'; } return; }
   const b = e.target.closest('[data-aksi]');
   if (!b) return;
   const [jenis, jobId, clipId] = b.dataset.aksi.split(':');

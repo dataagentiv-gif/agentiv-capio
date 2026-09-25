@@ -55,10 +55,6 @@ def _build_clips(ctx: dict, job_id: str) -> list[dict]:
     for seg in ctx["segments_final"]:
         meta = ctx["metadata"][seg["id"]]
         url = storage.save_clip(job_id, seg["id"], ctx["rendered"][seg["id"]])
-        fallback_duo = (
-            ctx.get("layout") == "duo"
-            and not ctx.get("crops", {}).get(seg["id"], {}).get("duo")
-        )
         clips.append(
             {
                 "id": seg["id"],
@@ -70,8 +66,8 @@ def _build_clips(ctx: dict, job_id: str) -> list[dict]:
                 "title": meta["title"],
                 "caption": meta["caption"],
                 "hashtags": meta["hashtags"],
-                "layout": "penuh" if fallback_duo else ctx.get("layout", "penuh"),
-                "layout_fallback": fallback_duo,
+                "layout": ctx["template_id"],
+                "layout_fallback": False,
             }
         )
     return clips
@@ -104,8 +100,8 @@ def run(job_id: str) -> None:
         # menempel link, dan job yang mengantre beberapa jam harus tetap keluar
         # dengan bentuk yang dipilih waktu itu — bukan bentuk yang kebetulan
         # aktif saat gilirannya tiba.
-        "layout": job.get("layout") or "penuh",
-        "gaya": job.get("gaya") or {},
+        "template_id": job.get("layout"),
+        "adjustments": job.get("gaya") or {},
         "workdir": workdir,
         "deadline": Deadline(settings.JOB_TIMEOUT_SEC),
     }
@@ -125,6 +121,10 @@ def run(job_id: str) -> None:
     from worker.runner import WORKER_ID as _worker_id
 
     try:
+        from pipeline.templates import TEMPLATES, resolve
+        if ctx["template_id"] not in TEMPLATES and ctx["template_id"] != "custom":
+            raise ValueError("Job lama tidak memakai library template; submit ulang")
+        ctx["adjustments"] = resolve(ctx["template_id"], ctx["adjustments"])
         for i, (status, stage) in enumerate(STAGES):
             ctx["deadline"].check(status)
             jobs.update_status(job_id, status, progress=int(i / TOTAL_STEPS * 100),

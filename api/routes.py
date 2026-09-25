@@ -5,9 +5,11 @@ Route di sini tidak pernah menjalankan pipeline secara sinkron: terima request
 """
 import asyncio
 import base64
+import io
 import re
 import secrets
 import subprocess
+import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -279,23 +281,27 @@ def test_provider(provider: str):
     return {"provider": provider, **checks.run(provider)}
 
 
+@app.get("/api/templates")
 @app.get("/api/layouts")
 def daftar_layout():
-    """Pilihan tampilan untuk halaman Submit."""
-    return {
-        "default": layout_mod.ambil(settings.CLIP_LAYOUT).nama,
-        "layouts": [
-            # `teks` dipakai UI untuk mematikan seluruh knob caption saat
-            # layoutnya memang tidak memakai caption — bukan menampilkan kontrol
-            # yang diputar tanpa akibat apa pun.
-            # `redup` dipakai UI untuk memunculkan knob bayangan hanya di
-            # layout yang memang punya bayangan, beserta nilai awalnya.
-            {"nama": l.nama, "judul": l.judul, "keterangan": l.keterangan,
-             "font_saran": l.font_saran, "teks": l.teks, "redup": l.redup,
-             "speaker_side": l.nama == "samping", "duo": l.duo}
-            for l in layout_mod.LAYOUTS.values()
-        ],
-    }
+    from pipeline.templates import TEMPLATES
+
+    return {"default": "full_screen", "templates": [
+        {"id": key, **value} for key, value in TEMPLATES.items()
+    ]}
+
+
+@app.post("/api/templates/preview.mp4")
+def template_preview(payload: dict):
+    from api.template_preview import render
+    try:
+        video = render(payload.get("template_id"), payload.get("adjustments", {}))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001 - preview tidak mengubah konfigurasi job
+        log.warning("preview template gagal: %s", exc)
+        raise HTTPException(500, "Preview gagal dibuat") from exc
+    return Response(content=video, media_type="video/mp4", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/preview.png")
@@ -471,6 +477,31 @@ def play_clip(job_id: str, clip_id: str, range: str | None = Header(default=None
     )
 
 
+@app.get("/jobs/{job_id}/clips.zip")
+def download_clips(job_id: str):
+    """Unduh semua klip job sebagai satu arsip lokal."""
+    if not _UUID.match(job_id):
+        raise HTTPException(404, "Job tidak ditemukan")
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Job tidak ditemukan")
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
+        count = 0
+        for clip in job.get("clips", []):
+            clip_id = clip.get("id", "")
+            if not _CLIP.match(clip_id):
+                continue
+            path = storage.clip_path(job_id, clip_id)
+            if path.is_file():
+                z.write(path, f"{clip_id}.mp4")
+                count += 1
+    if not count:
+        raise HTTPException(404, "Belum ada klip untuk diunduh")
+    archive.seek(0)
+    return StreamingResponse(archive, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="capio-{job_id[:8]}.zip"'})
+
+
 # --- REST API ---
 
 def _pastikan_boleh_memproses() -> None:
@@ -501,13 +532,9 @@ def create_job(payload: JobCreate):
     # jaringan.
     _pastikan_boleh_memproses()
 
-    # Layout kosong berarti ikut default di Setting. Diselesaikan di sini, bukan
-    # dibiarkan kosong sampai render: nilai yang tersimpan di baris job harus
-    # tetap menjelaskan bentuk klipnya walau defaultnya berubah setelah itu.
     job = jobs.create(
         payload.url, payload.target_clips,
-        payload.layout or layout_mod.ambil(settings.CLIP_LAYOUT).nama,
-        payload.gaya,
+        payload.template_id, payload.adjustments,
     )
     try:
         enqueue(job["id"])
@@ -529,6 +556,9 @@ def retry_job(job_id: str):
         raise HTTPException(404, "Job tidak ditemukan")
     if lama["status"] != "failed":
         raise HTTPException(409, "Hanya job gagal yang dapat diproses ulang")
+    from pipeline.templates import TEMPLATES
+    if lama.get("layout") not in TEMPLATES and lama.get("layout") != "custom":
+        raise HTTPException(409, "Job lama tidak dapat diulang; submit ulang dengan template baru")
 
     _pastikan_boleh_memproses()
     job = jobs.retry(job_id)
