@@ -142,19 +142,17 @@ susunan kata, ukuran relatif, dan transisinya sendiri.
 
 | Parameter | Nilai yang tersedia | Keterangan |
 |---|---|---|
-| `hook_title_style` | `bold_caps`, `normal` | Gaya headline putih di area blur atas. |
-| `spoken_layout` | `single_word`, `phrase` | Susunan caption bawah: satu kata besar atau frasa pendek tebal. Default `phrase`. |
+| `hook_block` | `none`, `white` | Tanpa blok: judul putih. Blok putih: judul hitam di dalam kotak putih. |
 | `caption_style` | `text_color`, `background`, `background_scale` | Gaya kata yang sedang diucapkan di area blur bawah. |
 | `active_text_color` | warna hex RGB | Warna huruf kata aktif. Dipakai pada `text_color`, serta teks di dalam blok pada dua gaya blok. |
 | `active_background_color` | warna hex RGB | Warna blok kata aktif. Hanya dipakai pada `background` dan `background_scale`. |
 
 ### Aturan hook title
 
-- Hook selalu berwarna putih.
-- **`bold_caps`** memakai huruf kapital semua, besar, dan tebal; cocok untuk
-  hook singkat yang menonjol.
-- **`normal`** memakai penulisan kalimat biasa dengan ukuran dan ketebalan
-  lebih tenang.
+- Susunan, ukuran, dan ketebalan hook tetap: judul tebal dengan kapitalisasi
+  aslinya, maksimal dua baris.
+- `none` menampilkan teks putih langsung di atas blur; `white` menampilkan
+  teks hitam di dalam satu kotak putih yang mengikuti lebar judul.
 
 ### Aturan spoken caption
 
@@ -162,9 +160,8 @@ susunan kata, ukuran relatif, dan transisinya sendiri.
 - `text_color` menandai kata aktif lewat perubahan warna huruf.
 - `background` menandai kata aktif dengan blok berwarna di belakangnya.
 - `background_scale` memakai blok yang sama, dengan kata aktif membesar.
-- `spoken_layout` berdiri sendiri dari pilihan warna/blok. `single_word`
-  mengikuti rasa caption video referensi 8–9, sedangkan `phrase` mengikuti
-  komposisi frasa video 10.
+- Susunan spoken caption dikunci ke frasa pendek; adjustment gaya kata aktif
+  sama dengan template Full Screen.
 
 ---
 
@@ -258,7 +255,7 @@ muncul setelah pengguna memilih template atau mode custom.
 5. Pratinjau diperbarui berdasarkan template dan adjustment yang dipilih.
 
 Contoh: memilih `pembicara_samping` hanya membuka pilihan `caption_motion`;
-memilih `blur_atas_bawah` membuka gaya hook, pola spoken caption, dan gaya kata aktif; memilih
+memilih `blur_atas_bawah` membuka pilihan blok hook dan gaya kata aktif; memilih
 `kotak_tengah` membuka motion caption serta warna aksen hanya ketika
 `scatter_emphasis` dipilih.
 

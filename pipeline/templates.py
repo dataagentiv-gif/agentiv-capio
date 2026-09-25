@@ -15,7 +15,7 @@ TEMPLATES = {
     "blur_atas_bawah": {"title": "Blur atas-bawah", "description": "Judul di atas, ucapan di bawah.",
                         "visual": {"canvas": "1080x1920", "panel_height": 930, "background": "blur_source",
                                    "caption_zone": "blur_bawah", "hook_zone": "blur_atas"},
-                        "defaults": {"hook_title_style": "bold_caps", "spoken_layout": "phrase", "caption_style": "text_color",
+                        "defaults": {"hook_block": "none", "caption_style": "text_color",
                                      "active_text_color": "FFE500"}},
     "kotak_tengah": {"title": "Kotak tengah", "description": "Kartu video dengan caption di dalamnya.",
                      "visual": {"canvas": "1080x1920", "panel_height": 950, "radius": 64,
@@ -49,10 +49,8 @@ def resolve(template_id: str, adjustments: dict | None) -> dict:
                 result["active_text_color"] = "000000"
     if template_id in MOTIONS and motion not in MOTIONS[template_id]:
         raise ValueError("Motion caption tidak sesuai template")
-    if template_id == "blur_atas_bawah" and result["hook_title_style"] not in {"bold_caps", "normal"}:
-        raise ValueError("Gaya hook tidak dikenal")
-    if template_id == "blur_atas_bawah" and result["spoken_layout"] not in {"single_word", "phrase"}:
-        raise ValueError("Pola caption tidak dikenal")
+    if template_id == "blur_atas_bawah" and result["hook_block"] not in {"none", "white"}:
+        raise ValueError("Blok hook tidak dikenal")
     if template_id == "kotak_tengah" and motion == "scatter_emphasis":
         allowed.add("scatter_accent_color")
         result.setdefault("scatter_accent_color", "FFE500")

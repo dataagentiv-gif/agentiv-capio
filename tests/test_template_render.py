@@ -17,8 +17,8 @@ CASES = [(template_id, {"caption_motion": motion} if motion else {})
 CASES += [
     ("full_screen", {"caption_style": "background", "active_background_color": "#FF3300"}),
     ("full_screen", {"caption_style": "background_scale"}),
-    ("blur_atas_bawah", {"hook_title_style": "normal", "caption_style": "background"}),
-    ("blur_atas_bawah", {"spoken_layout": "single_word", "caption_style": "background_scale"}),
+    ("blur_atas_bawah", {"hook_block": "white", "caption_style": "background"}),
+    ("blur_atas_bawah", {"hook_block": "none", "caption_style": "background_scale"}),
     ("kotak_tengah", {"caption_motion": "scatter_emphasis", "scatter_accent_color": "#33FFAA"}),
 ]
 

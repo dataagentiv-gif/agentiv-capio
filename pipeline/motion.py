@@ -125,6 +125,8 @@ def build(words, seg, template_id, options, crop, emphasized=()):
         return ""
     if template_id in ("full_screen", "blur_atas_bawah"):
         blur = template_id == "blur_atas_bawah"
+        # Job lama membawa kedua knob ini; pilihan baru tidak lagi menampilkannya.
+        legacy_blur = blur and ("hook_title_style" in options or "spoken_layout" in options)
         spoken = options.get("spoken_layout", "phrase")
         single = blur and spoken == "single_word"
         base_size = 150 if single else (108 if blur else 96)
@@ -145,12 +147,36 @@ def build(words, seg, template_id, options, crop, emphasized=()):
         ass = build_ass(words, seg["start"], seg["end"], lay, knob)
         if blur:
             title = title_lines(seg.get("hook_title", ""), seg.get("hook", ""))
-            bold = options["hook_title_style"] == "bold_caps"
-            if bold:
-                title = title.upper()
-            for j, line in enumerate(title.split(r"\N")[:2]):
-                ass += _event(0, seg["end"] - seg["start"], line, 540, 185 + j * 115,
-                              114 if bold else 86, font="Archivo Black" if bold else "Poppins",
-                              width=900, extra=r"\bord3\shad3") + "\n"
+            lines = title.split(r"\N")[:2]
+            if legacy_blur:
+                bold = options.get("hook_title_style") == "bold_caps"
+                if bold:
+                    lines = [line.upper() for line in lines]
+                for j, line in enumerate(lines):
+                    ass += _event(0, seg["end"] - seg["start"], line, 540, 185 + j * 115,
+                                  114 if bold else 86, font="Archivo Black" if bold else "Poppins",
+                                  width=900, extra=r"\bord3\shad3") + "\n"
+            else:
+                sizes = []
+                for line in lines:
+                    size = 86
+                    while size > 6 and metrik.lebar(line, "Poppins", size, True) > 840:
+                        size -= 2
+                    sizes.append(size)
+                if options["hook_block"] == "white" and lines:
+                    box_w = min(900, max(metrik.lebar(line, "Poppins", size, True)
+                                         for line, size in zip(lines, sizes)) + 60)
+                    box_h = 86 + (len(lines) - 1) * 115 + 56
+                    x, y = round(540 - box_w / 2), 185 - 43 - 28
+                    duration = seg["end"] - seg["start"]
+                    ass += (f"Dialogue: 0,{_ts(0)},{_ts(duration)},Cap,,0,0,0,,"
+                            f"{{\\an7\\pos({x},{y})\\p1\\1c&HFFFFFF&\\bord0\\shad0}}"
+                            f"m 0 0 l {round(box_w)} 0 {round(box_w)} {box_h} 0 {box_h}{{\\p0}}\n")
+                for j, (line, size) in enumerate(zip(lines, sizes)):
+                    ass += _event(0, seg["end"] - seg["start"], line, 540, 185 + j * 115,
+                                  size, font="Poppins", width=840,
+                                  color="000000" if options["hook_block"] == "white" else "FFFFFF",
+                                  extra=r"\bord0\shad0" if options["hook_block"] == "white" else r"\bord3\shad3",
+                                  layer=1) + "\n"
         return ass
     return _motion(words, seg["start"], seg["end"], template_id, options, crop, set(emphasized))

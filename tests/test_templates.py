@@ -116,14 +116,28 @@ def test_kata_tanpa_spasi_mengecil_tanpa_mengubah_teks():
     assert "Style: Cap,Poppins,17," in ass
 
 
-def test_blur_pola_spoken_terpisah_dari_gaya_warna():
-    assert resolve("blur_atas_bawah", {})["spoken_layout"] == "phrase"
-    assert resolve("blur_atas_bawah", {"spoken_layout": "single_word",
-                                      "caption_style": "background"})["spoken_layout"] == "single_word"
+def test_blur_hanya_blok_hook_dan_gaya_caption():
+    assert resolve("blur_atas_bawah", {})["hook_block"] == "none"
+    assert resolve("blur_atas_bawah", {"hook_block": "white",
+                                      "caption_style": "background"})["hook_block"] == "white"
     with pytest.raises(ValueError):
-        resolve("blur_atas_bawah", {"spoken_layout": "acak"})
+        resolve("blur_atas_bawah", {"hook_block": "acak"})
     with pytest.raises(ValueError):
-        resolve("full_screen", {"spoken_layout": "single_word"})
+        resolve("blur_atas_bawah", {"spoken_layout": "single_word"})
+    with pytest.raises(ValueError):
+        resolve("blur_atas_bawah", {"hook_title_style": "normal"})
+
+
+def test_blur_hook_putih_atau_blok_putih_teks_hitam():
+    words = [{"i": 0, "w": "Halo", "s": 0.0, "e": .5}]
+    seg = {"start": 0., "end": 2., "hook_title": "Ini hook", "hook": "Halo"}
+    plain = build(words, seg, "blur_atas_bawah", resolve("blur_atas_bawah", {}), {})
+    block = build(words, seg, "blur_atas_bawah",
+                  resolve("blur_atas_bawah", {"hook_block": "white"}), {})
+    assert r"\p1" not in plain
+    assert r"\p1" in block
+    assert r"\1c&H000000&" in block
+    assert "Ini hook" in plain and "Ini hook" in block
 
 
 def test_tipografi_motion_dan_fallback_per_grup():
