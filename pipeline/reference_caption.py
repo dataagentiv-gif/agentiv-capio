@@ -20,13 +20,14 @@ from pipeline.templates import TEMPLATES
 W, H, FPS = 1080, 1920, 30
 MOTIONS = {"soft_focus", "kinetic_words", "editorial_focus",
            "single_word_float", "soft_phrase", "scatter_emphasis"}
-FONT_FILES = {"serif": "georgiab.ttf", "condensed": "impact.ttf", "sans": "arialbd.ttf"}
+FONT_FILES = {"serif": "SourceSerif4-Bold.ttf", "condensed": "Anton-Regular.ttf", "sans": "Poppins-Bold.ttf"}
 
 
 def font_path(name: str) -> Path:
     directory = os.environ.get("CAPIO_REFERENCE_FONT_DIR")
     if not directory and os.name == "nt":
-        directory = str(Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts")
+        bundled = Path(__file__).resolve().parent.parent / "assets" / "fonts"
+        directory = str(bundled if bundled.is_dir() else Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts")
     if not directory:
         directory = "/app/reference-fonts"
     path = Path(directory) / FONT_FILES[name]

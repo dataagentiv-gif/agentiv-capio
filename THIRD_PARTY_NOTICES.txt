@@ -1,0 +1,29 @@
+CAPIO third-party notices
+=========================
+
+Direct dependencies are distributed under their upstream licenses:
+
+- FastAPI / Starlette / Uvicorn — MIT
+- Pydantic / pydantic-settings — MIT
+- Jinja2 — BSD-3-Clause
+- SQLAlchemy — MIT
+- psycopg — LGPL-3.0-or-later
+- redis-py — MIT
+- RQ — BSD-2-Clause
+- yt-dlp — The Unlicense
+- httpx — BSD-3-Clause
+- fonttools — MIT
+- Pillow — HPND
+- MediaPipe — Apache-2.0
+- cryptography — Apache-2.0 / BSD-3-Clause components
+- pytest — MIT
+
+Fonts bundled in assets/fonts are under SIL Open Font License 1.1. The full
+license text is kept beside the fonts in OFL-*.txt.
+
+The Docker base image, Debian packages, FFmpeg, libass, PostgreSQL, and Redis
+remain under their respective upstream licenses and notices. PostgreSQL and
+Redis are pulled as separate compose images.
+
+This is an index, not a replacement for each upstream license. Consult exact
+package metadata in the built image for a release audit.

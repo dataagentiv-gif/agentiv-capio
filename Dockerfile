@@ -31,16 +31,16 @@ RUN pip install --no-cache-dir --timeout 600 --retries 10 -r requirements.txt
 
 COPY . .
 
-# A release image must carry licensed copies of the exact reference fonts.
-# Local test builds may set this to 0 and mount a read-only font directory.
+# A release image carries only redistributable fonts. Windows fonts are never
+# copied into the image; the reference engines use their open-source matches.
 ARG CAPIO_REQUIRE_LICENSED_FONTS=1
 RUN if [ "$CAPIO_REQUIRE_LICENSED_FONTS" = 1 ]; then \
-        for font in georgiab.ttf impact.ttf arialbd.ttf; do \
-            test -f "/app/assets/reference-fonts/$font" || \
+        for font in SourceSerif4-Bold.ttf Anton-Regular.ttf Poppins-Bold.ttf; do \
+            test -f "/app/assets/fonts/$font" || \
                 { echo "Missing licensed caption font: $font" >&2; exit 1; }; \
         done; \
     fi
-ENV CAPIO_REFERENCE_FONT_DIR=/app/assets/reference-fonts
+ENV CAPIO_REFERENCE_FONT_DIR=/app/assets/fonts
 
 # Font caption dipasang ke sistem supaya libass menemukannya lewat fontconfig.
 #

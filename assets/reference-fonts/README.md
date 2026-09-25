@@ -1,7 +1,7 @@
-CAPIO's reference caption engines require licensed copies of `georgiab.ttf`,
-`impact.ttf`, and `arialbd.ttf` for cross-platform distribution. Put files
-with application redistribution rights here before building a release image.
-Do not commit Windows-supplied font files to the repository.
+CAPIO's reference caption engines use redistributable fonts from `assets/fonts`:
+`SourceSerif4-Bold.ttf`, `Anton-Regular.ttf`, and `Poppins-Bold.ttf`.
+They are distributed under SIL Open Font License 1.1; keep the matching OFL
+notice files in `assets/fonts`.
 
 For local development, set `CAPIO_REFERENCE_FONT_DIR` to a directory containing
 those three fonts. On Windows it defaults to the installed Windows Fonts folder.

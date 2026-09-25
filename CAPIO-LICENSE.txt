@@ -1,0 +1,12 @@
+CAPIO is proprietary software by Agentiv.
+
+Copyright (c) 2026 Agentiv. All rights reserved.
+
+This repository and the CAPIO Docker image may not be copied, modified,
+redistributed, sublicensed, or resold without written permission from Agentiv.
+A customer license grants use of the distributed application according to the
+applicable purchase or subscription terms; it does not transfer ownership of
+the source code or Docker image.
+
+Third-party components remain under their respective licenses listed in
+THIRD_PARTY_NOTICES.txt.
