@@ -31,3 +31,12 @@ def test_spoken_timing_and_scatter_accent():
     assert engine.frame(.1).getchannel("A").getbbox() is None
     assert engine.frame(1.1).getchannel("A").getbbox() is not None
     assert any(item["color"] == (0x33, 0xFF, 0xAA) for item in engine.groups[0]["items"])
+
+
+def test_soft_focus_short_phrase_remains_readable():
+    words = [{"i": i, "w": text, "s": i * .4, "e": (i + 1) * .4}
+             for i, text in enumerate("kalau kamu harus berani mulai sekarang".split())]
+    engine = CaptionEngine(words, {"start": 0., "end": 3.}, "pembicara_samping",
+                           {"caption_motion": "soft_focus"}, {"speaker_side": "kiri"})
+    sizes = [item["size"] for group in engine.groups for item in group["items"]]
+    assert min(sizes) >= 30

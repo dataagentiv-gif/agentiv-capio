@@ -130,7 +130,7 @@ class CaptionEngine:
                         (94 if hero else 73))
                 if motion == "editorial_focus" and hero:
                     text = text.upper()
-                pad = 115 if motion == "soft_focus" else 30
+                pad = 75 if motion == "soft_focus" else 30
                 size = self._fit(text, size, width, 1.16, pad)
                 items.append({"text": text, "size": size, "hero": hero,
                               "enter": max(group["start"], part[0]["s"] - clip_start),
