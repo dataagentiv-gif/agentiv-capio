@@ -15,6 +15,11 @@
   CAPIO, dan komputer harus tetap menyala. Pastikan komputer tidak masuk mode sleep.
 </div>
 
+<section class="process-tools" aria-label="Filter proses">
+  <div class="process-stats"><button type="button" data-stat="total"><b id="stat-total">0</b><span>total</span></button><button type="button" data-stat="running"><b id="stat-running">0</b><span>berjalan</span></button><button type="button" data-stat="done"><b id="stat-done">0</b><span>selesai</span></button><button type="button" data-stat="failed"><b id="stat-failed">0</b><span>gagal</span></button></div>
+  <div class="process-filters"><label for="process-search">Cari job</label><input id="process-search" type="search" placeholder="URL, job ID, atau style"><label for="process-template">Tampilan</label><select id="process-template"><option value="all">Semua</option><option value="custom">Custom</option><option value="template">Template library</option></select><label for="process-sort">Urutkan</label><select id="process-sort"><option value="newest">Terbaru</option><option value="oldest">Terlama</option><option value="running">Sedang berjalan</option><option value="failed">Gagal dulu</option></select></div>
+</section>
+
 <div id="p-berjalan"></div>
 <div id="p-riwayat" hidden></div>
 {% endblock %}
@@ -39,13 +44,15 @@ function kepala(j, ekor = '') {
       <a class="job-url" href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>
       <span class="job-meta">${esc(waktu(j.created_at))}${ekor}</span>
       ${idJob(j.id)}
+      <button type="button" class="btn-hapus" data-collapse="${esc(j.id)}" aria-expanded="true">Ringkas</button>
       ${isRunning(j) ? '' : tombolHapus('Hapus', `job:${j.id}`)}
     </div>`;
 }
 
 function jobJalan(j) {
-  return `<div class="job">
+  return `<div class="job ${localStorage.getItem(`capio-job-collapsed-${j.id}`)==='true'?'job-collapsed':''}">
     ${kepala(j, ` · minta ${j.target_clips} klip`)}
+    ${ringkasanGaya(j)}
     <div class="job-body">${stepper(j.status, j.progress)}</div>
   </div>`;
 }
@@ -81,8 +88,9 @@ function jobRiwayat(j) {
   const hasil = j.status !== 'done' ? ''
     : n ? `${n} klip · <a href="/results">lihat hasil</a>`
     : 'Klipnya sudah dibersihkan — riwayatnya saja yang tersisa.';
-  return `<div class="job">
+  return `<div class="job ${localStorage.getItem(`capio-job-collapsed-${j.id}`)==='true'?'job-collapsed':''}">
     ${kepala(j, ` · ${esc(NAMA_LAYOUT[j.layout] || j.layout || 'Penuh')}`)}
+    ${ringkasanGaya(j)}
     ${hasil ? `<div class="job-body"><p class="sub">${hasil}</p></div>` : ''}
     ${masalahHtml(j)}
   </div>`;
@@ -101,6 +109,16 @@ function pilihTab() {
 }
 
 let urutanTick = 0;
+const processState = {search: localStorage.getItem('capio-process-search') || '', template: localStorage.getItem('capio-process-template') || 'all', sort: localStorage.getItem('capio-process-sort') || 'newest', stat: 'all'};
+for (const [id, key] of [['process-search','search'],['process-template','template'],['process-sort','sort']]) { const el=document.getElementById(id); if(el){el.value=processState[key]; el.addEventListener('input',()=>{processState[key]=el.value;localStorage.setItem(`capio-process-${key}`,el.value);tick();}); } }
+function filterJobs(all) {
+  const q=processState.search.toLowerCase(); let rows=all.filter(j=>!q || JSON.stringify([j.id,j.url,j.template_id,j.layout,j.adjustments,j.gaya]).toLowerCase().includes(q));
+  if(processState.stat==='running') rows=rows.filter(isRunning); else if(processState.stat==='done') rows=rows.filter(j=>j.status==='done'); else if(processState.stat==='failed') rows=rows.filter(j=>j.status==='failed');
+  if(processState.template==='custom') rows=rows.filter(j=>(j.template_id||j.layout)==='custom'); else if(processState.template==='template') rows=rows.filter(j=>(j.template_id||j.layout)!=='custom');
+  rows.sort((a,b)=>{const ta=Date.parse(a.created_at||0),tb=Date.parse(b.created_at||0);if(processState.sort==='oldest')return ta-tb;if(processState.sort==='running')return Number(isRunning(b))-Number(isRunning(a))||tb-ta;if(processState.sort==='failed')return Number(b.status==='failed')-Number(a.status==='failed')||tb-ta;return tb-ta;}); return rows;
+}
+document.querySelectorAll('[data-stat]').forEach(b=>b.addEventListener('click',()=>{ const stat=b.dataset.stat; processState.stat=processState.stat===stat?'all':stat; document.querySelectorAll('[data-stat]').forEach(x=>x.classList.toggle('on',x===b&&processState.stat!=='all')); if(stat==='running') location.hash='berjalan'; else if(stat==='done'||stat==='failed') location.hash='riwayat'; tick(); }));
+document.querySelectorAll('[data-tab]').forEach(a=>a.addEventListener('click',()=>{processState.stat='all';document.querySelectorAll('[data-stat]').forEach(x=>x.classList.remove('on'));}));
 async function tick() {
   const urutan = ++urutanTick;
   try {
@@ -108,21 +126,21 @@ async function tick() {
     // Poll otomatis dan refresh setelah klik retry bisa tumpang tindih. Respons
     // lama tidak boleh menggambar status lama di atas hasil request terbaru.
     if (urutan !== urutanTick) return true;
-    const jalan = semua.filter(isRunning);
-    const selesai = semua.filter(j => !isRunning(j));
+    const jalan = semua.filter(isRunning), selesai = semua.filter(j => !isRunning(j)), tampil = filterJobs(semua);
+    document.getElementById('stat-total').textContent=semua.length; document.getElementById('stat-running').textContent=jalan.length; document.getElementById('stat-done').textContent=semua.filter(j=>j.status==='done').length; document.getElementById('stat-failed').textContent=semua.filter(j=>j.status==='failed').length;
 
-    document.getElementById('p-berjalan').innerHTML = jalan.length
-      ? jalan.map(jobJalan).join('')
+    document.getElementById('p-berjalan').innerHTML = tampil.filter(isRunning).length
+      ? tampil.filter(isRunning).map(jobJalan).join('')
       : empty('Tidak ada video yang sedang diproses',
               'Tempel link YouTube di <a href="/">halaman depan</a>, atau lihat <a href="#riwayat">riwayat</a>.');
 
-    document.getElementById('p-riwayat').innerHTML = selesai.length
-      ? selesai.map(jobRiwayat).join('')
+    document.getElementById('p-riwayat').innerHTML = tampil.filter(j=>!isRunning(j)).length
+      ? tampil.filter(j=>!isRunning(j)).map(jobRiwayat).join('')
       : empty('Belum ada riwayat', 'Video yang sudah selesai atau gagal akan muncul di sini.');
 
     document.getElementById('n-jalan').textContent = jalan.length || '';
     document.getElementById('n-riwayat').textContent = selesai.length || '';
-    document.getElementById('peringatan-jalan').hidden = jalan.length === 0;
+    document.getElementById('peringatan-jalan').hidden = jalan.length === 0 || location.hash.slice(1) === 'riwayat';
     pilihTab();
     return jalan.length > 0;
   } catch (e) {
@@ -137,6 +155,8 @@ async function tick() {
 // Delegasi di body: isinya digambar ulang tiap polling, jadi handler yang
 // dipasang ke tombol satu per satu akan hilang di render berikutnya.
 document.body.addEventListener('click', async (e) => {
+  const collapse = e.target.closest('[data-collapse]');
+  if (collapse) { const job=collapse.closest('.job'); const collapsed=job.classList.toggle('job-collapsed'); collapse.setAttribute('aria-expanded', String(!collapsed)); collapse.textContent=collapsed?'Buka':'Ringkas'; localStorage.setItem(`capio-job-collapsed-${collapse.dataset.collapse}`, String(collapsed)); return; }
   const b = e.target.closest('[data-aksi]');
   if (!b) return;
   const [aksi, id] = b.dataset.aksi.split(':');

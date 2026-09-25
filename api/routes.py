@@ -5,9 +5,11 @@ Route di sini tidak pernah menjalankan pipeline secara sinkron: terima request
 """
 import asyncio
 import base64
+import io
 import re
 import secrets
 import subprocess
+import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -475,6 +477,31 @@ def play_clip(job_id: str, clip_id: str, range: str | None = Header(default=None
     )
 
 
+@app.get("/jobs/{job_id}/clips.zip")
+def download_clips(job_id: str):
+    """Unduh semua klip job sebagai satu arsip lokal."""
+    if not _UUID.match(job_id):
+        raise HTTPException(404, "Job tidak ditemukan")
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Job tidak ditemukan")
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
+        count = 0
+        for clip in job.get("clips", []):
+            clip_id = clip.get("id", "")
+            if not _CLIP.match(clip_id):
+                continue
+            path = storage.clip_path(job_id, clip_id)
+            if path.is_file():
+                z.write(path, f"{clip_id}.mp4")
+                count += 1
+    if not count:
+        raise HTTPException(404, "Belum ada klip untuk diunduh")
+    archive.seek(0)
+    return StreamingResponse(archive, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="capio-{job_id[:8]}.zip"'})
+
+
 # --- REST API ---
 
 def _pastikan_boleh_memproses() -> None:
@@ -530,7 +557,7 @@ def retry_job(job_id: str):
     if lama["status"] != "failed":
         raise HTTPException(409, "Hanya job gagal yang dapat diproses ulang")
     from pipeline.templates import TEMPLATES
-    if lama.get("layout") not in TEMPLATES:
+    if lama.get("layout") not in TEMPLATES and lama.get("layout") != "custom":
         raise HTTPException(409, "Job lama tidak dapat diulang; submit ulang dengan template baru")
 
     _pastikan_boleh_memproses()

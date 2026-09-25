@@ -46,6 +46,7 @@ function badge(s) {
 // Nama yang tidak dikenal jatuh ke nilai aslinya, jadi layout baru tidak
 // menghasilkan sel kosong.
 const NAMA_LAYOUT = {
+  custom: 'Custom',
   mentahan: 'Mentahan',
   full_screen: 'Full Screen',
   pembicara_samping: 'Pembicara di samping',
@@ -57,6 +58,33 @@ const NAMA_LAYOUT = {
   duo: 'Podcast 2 Orang',
   ori: 'Asli (mentahan)',
 };
+
+const LABEL_CUSTOM = {
+  output_ratio: {'9:16': '9:16', '1:1': '1:1', '16:9': '16:9'},
+  video_mode: {full: 'video penuh', panel: 'panel tengah'},
+  fit_mode: {crop: 'crop', contain: 'utuh'},
+  background: {black: 'latar hitam', solid: 'latar warna', blur: 'latar blur'},
+  caption_font: {'Archivo Black': 'Archivo Black', Anton: 'Anton', Lora: 'Lora', Poppins: 'Poppins'},
+  caption_size: {small: 'kecil', medium: 'sedang', large: 'besar'},
+  caption_style: {text_color: 'warna teks', background: 'blok', background_scale: 'blok membesar'},
+  hook_block: {none: 'hook tanpa blok', white: 'hook kotak putih'},
+};
+
+function ringkasanGaya(j) {
+  const id = j.template_id || j.layout;
+  if (id !== 'custom') return `<div class="gaya-ringkas"><span class="gaya-chip utama">${esc(NAMA_LAYOUT[id] || id || 'Template')}</span></div>`;
+  const a = j.adjustments || j.gaya || {};
+  const p = [LABEL_CUSTOM.output_ratio[a.output_ratio] || a.output_ratio,
+    LABEL_CUSTOM.video_mode[a.video_mode] || a.video_mode,
+    LABEL_CUSTOM.fit_mode[a.fit_mode] || a.fit_mode,
+    LABEL_CUSTOM.background[a.background] || a.background];
+  if (a.video_mode === 'panel') p.push(`${a.panel_ratio || ''} ${a.panel_size || ''} panel`);
+  if (a.caption) p.push(`caption ${LABEL_CUSTOM.caption_font[a.caption_font] || a.caption_font || ''} · ${LABEL_CUSTOM.caption_size[a.caption_size] || a.caption_size || ''} · ${LABEL_CUSTOM.caption_style[a.caption_style] || a.caption_style || ''}`);
+  else p.push('caption mati');
+  if (a.hook) p.push(LABEL_CUSTOM.hook_block[a.hook_block] || 'hook aktif');
+  else p.push('hook mati');
+  return `<div class="gaya-ringkas"><span class="gaya-chip utama">Custom</span>${p.filter(Boolean).map(v => `<span class="gaya-chip">${esc(v)}</span>`).join('')}</div>`;
+}
 
 function waktu(iso) {
   if (!iso) return '';
@@ -284,6 +312,7 @@ function idJob(id) {
   // Banner update dipasang di poller yang sama, bukan poller kedua — dua-
   // duanya cuma butuh /api/status yang sudah difetch di sini.
   const banner = document.querySelector('#update-banner');
+  const wrap = document.querySelector('#update-wrap');
   const versiEl = document.getElementById('update-versi');
   if (!titik) return;
 
@@ -294,8 +323,16 @@ function idJob(id) {
       titik.title = s.jalan ? `${s.jalan} video sedang diproses` : '';
       const lis = s.lisensi || {};
       if (banner) {
-        banner.hidden = !lis.update_tersedia;
-        if (lis.update_tersedia && versiEl) versiEl.textContent = ` (${lis.versi_terbaru})`;
+        const versi = lis.versi_terbaru || '';
+        const ditunda = localStorage.getItem('capio-update-dismissed') === versi;
+        const tampil = !!lis.update_tersedia && !ditunda;
+        if (wrap) wrap.hidden = !tampil;
+        banner.hidden = !tampil;
+        if (tampil && versiEl) versiEl.textContent = ` (${versi})`;
+        const ringkas = document.getElementById('update-ringkas');
+        if (ringkas) ringkas.textContent = lis.release_notes || 'Detail perubahan belum tersedia.';
+        const detail = document.getElementById('update-detail');
+        if (detail) { detail.disabled = !lis.changelog_url; detail.onclick = () => lis.changelog_url && window.open(lis.changelog_url, '_blank', 'noopener'); }
       }
     } catch {
       // API tidak terjangkau bukan berarti tidak ada job berjalan atau tidak
@@ -306,6 +343,40 @@ function idJob(id) {
 
   cek();
   setInterval(cek, 15000);
+})();
+
+document.getElementById('update-nanti')?.addEventListener('click', () => {
+  const v = document.getElementById('update-versi')?.textContent?.replace(/^\s*\(/, '').replace(/\)\s*$/, '');
+  if (v) localStorage.setItem('capio-update-dismissed', v);
+  const wrap = document.getElementById('update-wrap'); if (wrap) wrap.hidden = true;
+});
+document.getElementById('update-salin')?.addEventListener('click', async (e) => {
+  const b = e.currentTarget; const command = 'docker compose pull\ndocker compose up -d';
+  try { await navigator.clipboard.writeText(command); b.textContent = 'Perintah tersalin'; }
+  catch { b.textContent = command; }
+  setTimeout(() => { b.textContent = 'Salin perintah update'; }, 1600);
+});
+
+(function feedback() {
+  const menu = document.getElementById('bantuan-menu'), pilihan = document.getElementById('bantuan-pilihan');
+  const dialog = document.getElementById('feedback-dialog'), buka = document.getElementById('buka-feedback');
+  if (!menu || !pilihan || !dialog || !buka) return;
+  menu.addEventListener('click', () => { const open = pilihan.hidden; pilihan.hidden = !open; menu.setAttribute('aria-expanded', String(open)); });
+  buka.addEventListener('click', () => { pilihan.hidden = true; menu.setAttribute('aria-expanded', 'false'); dialog.showModal(); });
+  document.getElementById('feedback-batal')?.addEventListener('click', () => dialog.close());
+  document.getElementById('feedback-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const val = id => document.getElementById(id)?.value || '';
+    const checked = id => document.getElementById(id)?.checked;
+    const lines = [`Jenis: ${val('feedback-kind')}`, `Rating: ${val('feedback-rating')}/5`, '', val('feedback-message'), '', `Versi CAPIO: ${document.querySelector('.versi-terpasang')?.textContent || '-'}`, `Halaman: ${location.pathname}`];
+    if (val('feedback-job')) lines.push(`Job/template: ${val('feedback-job')}`);
+    if (checked('feedback-style')) lines.push('Sertakan konfigurasi style dari job/template yang disebut pengguna.');
+    if (checked('feedback-url')) lines.push(`URL sumber: ${document.querySelector('#url')?.value || location.href}`);
+    if (val('feedback-contact')) lines.push(`Email balasan: ${val('feedback-contact')}`);
+    const subject = encodeURIComponent(`[CAPIO] ${val('feedback-kind')} — rating ${val('feedback-rating')}/5`);
+    window.location.href = `mailto:dataagentiv@gmail.com?subject=${subject}&body=${encodeURIComponent(lines.join('\n'))}`;
+    const status = document.getElementById('feedback-status'); if (status) status.hidden = false;
+  });
 })();
 
 // Menyalin id dipasang sekali di sini, bukan per halaman: dua halaman memakai
