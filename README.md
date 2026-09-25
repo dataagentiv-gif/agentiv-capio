@@ -33,6 +33,21 @@ untuk pemakaian ringan.
 
 ## Cara pakai
 
+### Tampilan output
+
+Pada halaman Submit, pilih salah satu jalur berikut:
+
+- **Template** untuk tampilan siap pakai dengan adjustment yang dibatasi oleh
+  karakter template (`mentahan`, `full_screen`, `pembicara_samping`,
+  `blur_atas_bawah`, dan `kotak_tengah`).
+- **Custom** untuk mengatur rasio output, komposisi video, latar, caption, dan
+  hook dalam satu konfigurasi yang berlaku untuk seluruh klip job.
+
+Setiap job menyimpan snapshot konfigurasi saat dikirim, sehingga perubahan
+default di versi berikutnya tidak mengubah hasil job lama. Caption panjang,
+source tanpa wajah, dan rasio landscape/square memakai fallback aman agar
+render tetap valid.
+
 ### Dengan Docker (disarankan)
 
 Cuma butuh **Docker**. Tidak perlu Python, ffmpeg, maupun database.

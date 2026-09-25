@@ -63,9 +63,13 @@ def test_adjustment_tidak_relevan_ditolak(client, cleanup):
     assert r.status_code == 422
 
 
-def test_custom_ditolak(client, cleanup):
-    r = client.post("/jobs", json={"url": URL, "template_id": "custom"})
-    assert r.status_code == 422
+def test_custom_disimpan_dengan_default(client, cleanup):
+    r = client.post("/jobs", json={"url": URL, "target_clips": 1,
+                                    "template_id": "custom", "adjustments": {}})
+    assert r.status_code == 201, r.text
+    job = client.get(f"/jobs/{r.json()['job_id']}").json()
+    assert job["template_id"] == "custom"
+    assert job["adjustments"] == resolve("custom", {})
 
 
 def test_retry_lama_ditolak(client, cleanup):

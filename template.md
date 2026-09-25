@@ -227,6 +227,14 @@ terbaca. Semua nilai berlaku untuk seluruh klip dalam satu job.
   template yang mendukungnya.
 - Preview Custom memakai cuplikan sintetis; posisi caption disimpan relatif terhadap kanvas final.
 - Filter visual kompleks di luar latar blur tidak tersedia.
+- Pada rasio `1:1` dan `16:9`, posisi serta ukuran caption diskalakan dari
+  layout referensi vertikal agar tidak jatuh di luar kanvas.
+- Hook dan caption panjang dibungkus atau diperkecil oleh renderer; transkrip
+  kosong tetap menghasilkan video tanpa caption, bukan job gagal.
+- Deteksi wajah yang gagal memakai crop titik tengah. Keputusan sisi pembicara
+  dibuat sekali per klip agar tidak berpindah-pindah di tengah video.
+- Nilai adjustment disalin ke job saat submit. Perubahan default katalog tidak
+  mengubah job yang sudah antre atau selesai.
 
 Contoh hasil custom: panel video 70% tinggi di tengah dengan radius 40 px,
 latar blur, serta caption bawah bergaya blok kuning.
