@@ -5,6 +5,7 @@ import subprocess
 import pytest
 
 from pipeline.motion import build
+from pipeline.reference_caption import CaptionEngine, MOTIONS, render_overlay
 from pipeline.stages.render import _render_templates
 from pipeline.templates import MOTIONS, TEMPLATES, resolve
 from tests.fixtures.make_fixture import build as source_fixture
@@ -33,8 +34,12 @@ def test_template_video_audio_dan_dimensi(tmp_path, template_id, adjustments):
     crop = {"x": 656, "w": 608, "fx": 0.35, "fy": 0.4, "speaker_side": "kiri"}
     captions = {}
     if template_id != "mentahan":
-        path = tmp_path / "c1.ass"
-        path.write_text(build(words, seg, template_id, options, crop, {3}), encoding="utf-8")
+        if options.get("caption_motion") in MOTIONS:
+            path = render_overlay(CaptionEngine(words, seg, template_id, options, crop, {3}),
+                                  tmp_path / "c1.mov", Deadline(300))
+        else:
+            path = tmp_path / "c1.ass"
+            path.write_text(build(words, seg, template_id, options, crop, {3}), encoding="utf-8")
         captions["c1"] = path
     ctx = {"template_id": template_id, "adjustments": options, "source": source,
            "meta": {"width": 1920, "height": 1080}, "workdir": tmp_path,

@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from pipeline.motion import build
+from pipeline.reference_caption import CaptionEngine, MOTIONS, render_overlay
 from pipeline.stages.render import _render_templates
 from pipeline.templates import resolve
 from utils.ffmpeg_helpers import Deadline
@@ -37,8 +38,13 @@ def render(template_id: str, adjustments: dict) -> bytes:
         crop = {"x": 0, "w": 608, "fx": 0.32, "fy": 0.38, "speaker_side": "kiri"}
         captions = {}
         if template_id != "mentahan":
-            (workdir / "p.ass").write_text(build(words, seg, template_id, options, crop, {2, 5, 9}), encoding="utf-8")
-            captions["p"] = workdir / "p.ass"
+            if options.get("caption_motion") in MOTIONS:
+                captions["p"] = render_overlay(
+                    CaptionEngine(words, seg, template_id, options, crop, {2, 5, 9}),
+                    workdir / "p.mov", Deadline(180))
+            else:
+                (workdir / "p.ass").write_text(build(words, seg, template_id, options, crop, {2, 5, 9}), encoding="utf-8")
+                captions["p"] = workdir / "p.ass"
         ctx = {"template_id": template_id, "adjustments": options, "source": source,
                "workdir": workdir, "meta": {"width": 1920, "height": 1080},
                "segments_final": [seg], "crops": {"p": crop}, "captions": captions,

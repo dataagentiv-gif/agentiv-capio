@@ -335,6 +335,7 @@ def knob_dari_settings() -> dict:
 def run(ctx: dict) -> dict:
     if "template_id" in ctx:
         from pipeline import emphasis, motion
+        from pipeline.reference_caption import CaptionEngine, MOTIONS, render_overlay
         paths = {}
         if ctx["template_id"] == "mentahan":
             return {"captions": paths}
@@ -343,6 +344,12 @@ def run(ctx: dict) -> dict:
             selected = set()
             if ctx["adjustments"].get("caption_motion") in {"editorial_focus", "scatter_emphasis"}:
                 selected = emphasis.choose(words, seg["start"], seg["end"])
+            if ctx["adjustments"].get("caption_motion") in MOTIONS:
+                path = ctx["workdir"] / f"{seg['id']}.mov"
+                engine = CaptionEngine(words, seg, ctx["template_id"],
+                                       ctx["adjustments"], ctx["crops"][seg["id"]], selected)
+                paths[seg["id"]] = render_overlay(engine, path, ctx["deadline"])
+                continue
             path = ctx["workdir"] / f"{seg['id']}.ass"
             path.write_text(motion.build(words, seg, ctx["template_id"],
                                          ctx["adjustments"], ctx["crops"][seg["id"]], selected), encoding="utf-8")

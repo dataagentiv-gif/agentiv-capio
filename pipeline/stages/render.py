@@ -217,7 +217,9 @@ def _render_templates(ctx: dict) -> dict:
     (workdir / "clips").mkdir(exist_ok=True)
     rendered = {}
     for seg in ctx["segments_final"]:
-        ass = f"{seg['id']}.ass" if seg["id"] in ctx["captions"] else None
+        caption = ctx["captions"].get(seg["id"])
+        overlay = caption is not None and caption.suffix == ".mov"
+        ass = f"{seg['id']}.ass" if caption is not None and not overlay else None
         graph, complex_graph = filters(ctx["template_id"], ctx["crops"][seg["id"]],
                                        int(ctx["meta"]["width"]), int(ctx["meta"]["height"]),
                                        ass, workdir, ctx["deadline"])
@@ -225,7 +227,15 @@ def _render_templates(ctx: dict) -> dict:
         args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-nostats", "-v", "error",
                 "-ss", f"{seg['start']:.3f}", "-i", str(ctx["source"]),
                 "-t", f"{seg['end'] - seg['start']:.3f}"]
-        if complex_graph:
+        if overlay:
+            args += ["-i", str(caption)]
+            if complex_graph:
+                base = graph.removesuffix("[outv]") + "[base]"
+            else:
+                base = f"[0:v]{graph}[base]"
+            args += ["-filter_complex", base + ";[base][1:v]overlay=0:0:shortest=1:format=auto[outv]",
+                     "-map", "[outv]", "-map", "0:a?", "-r", "30"]
+        elif complex_graph:
             args += ["-filter_complex", graph, "-map", "[outv]", "-map", "0:a?"]
         elif graph:
             args += ["-vf", graph]
