@@ -9,6 +9,7 @@ import io
 import re
 import secrets
 import subprocess
+import shutil
 from sqlalchemy.exc import IntegrityError
 import zipfile
 from contextlib import asynccontextmanager
@@ -364,6 +365,15 @@ def _kurang_konfigurasi() -> str | None:
 def config_status():
     """Ringkasan singkat untuk strip status di halaman Submit."""
     gemini_ok = bool(keypool.keys("gemini"))
+    try:
+        usage = shutil.disk_usage(settings.WORK_DIR)
+        used_pct = round((usage.used / usage.total) * 100, 1) if usage.total else 0
+        storage_status = "critical" if used_pct >= 90 else "warning" if used_pct >= 75 else "ok"
+        storage_info = {"provider": "local", "ok": True, "used_bytes": usage.used,
+                        "free_bytes": usage.free, "total_bytes": usage.total,
+                        "used_percent": used_pct, "status": storage_status}
+    except OSError:
+        storage_info = {"provider": "local", "ok": False, "status": "unknown"}
     return {
         # Transkrip dan LLM ditampilkan terpisah karena secara konsep memang
         # dua tahap pipeline berbeda (Stage 2 vs Stage 3/8) — kebetulan saja
@@ -381,7 +391,7 @@ def config_status():
         # Penyimpanan lokal tidak pernah "belum dikonfigurasi" — foldernya
         # dibuat sendiri. Tetap dilaporkan supaya strip status di halaman
         # Submit menampilkan ketiga bagian pipeline secara utuh.
-        "storage": {"provider": "local", "ok": True},
+        "storage": storage_info,
         "lisensi": lisensi.status(),
         "wa": lisensi.tautan_wa(),
         "ready": gemini_ok and lisensi.boleh_submit()[0],
@@ -401,6 +411,7 @@ def config_status():
         "default_clips": settings.TARGET_CLIPS_DEFAULT,
         "min_sec": settings.MIN_CLIP_SEC,
         "max_sec": settings.MAX_CLIP_SEC,
+        "max_upload_mb": settings.MAX_UPLOAD_MB,
     }
 
 
@@ -461,6 +472,8 @@ def play_clip(job_id: str, clip_id: str, range: str | None = Header(default=None
 
     try:
         potongan, panjang, content_range = storage.open_clip(job_id, clip_id, range)
+    except HTTPException:
+        raise
     except Exception as e:  # noqa: BLE001
         log.warning("gagal ambil klip %s/%s: %s", job_id, clip_id, e)
         raise HTTPException(404, "Klip tidak ada di storage") from e
@@ -615,7 +628,12 @@ async def unggah_berkas(berkas: UploadFile):
         with tujuan.open("wb") as keluar:
             while potong := await berkas.read(4 * 1024 * 1024):
                 besar += len(potong)
+                if besar > settings.MAX_UPLOAD_MB * 1024 * 1024:
+                    unggah.bersihkan(ident)
+                    raise HTTPException(413, f"Berkas terlalu besar. Batas upload {settings.MAX_UPLOAD_MB} MB.")
                 keluar.write(potong)
+    except HTTPException:
+        raise
     except Exception as e:  # noqa: BLE001
         # Berkas separuh jalan tidak boleh ditinggal: ia tidak akan pernah jadi
         # job, dan ukurannya justru paling besar saat gagal di tengah.

@@ -134,6 +134,10 @@ FIELDS = [
        lanjutan=True,
        help="Job yang belum selesai setelah selama ini dihentikan dan ditandai "
             "gagal. 1800 cukup untuk video satu jam."),
+    _f("MAX_UPLOAD_MB", "Batas ukuran upload (MB)", "Klip", kind="number",
+       lanjutan=True,
+       help="Berkas yang lebih besar langsung ditolak agar tidak memenuhi disk. "
+            "Bawaan 2048 MB."),
     _f("SILENCE_NOISE_DB", "Ambang hening (dB)", "Klip", kind="number", lanjutan=True,
        help="-30 untuk podcast bersih. Kalau source ada musik latar, NAIKKAN "
             "ke -20 — jangan diturunkan. Musik menaikkan lantai kebisingan, "

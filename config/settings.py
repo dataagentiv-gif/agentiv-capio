@@ -164,6 +164,7 @@ class Settings(BaseSettings):
     MIN_CLIP_SEC: float = 30.0
     MAX_CLIP_SEC: float = 90.0
     TARGET_CLIPS_DEFAULT: int = 8
+    MAX_UPLOAD_MB: int = 2048
 
     # --- Konkurensi worker ---
     #
