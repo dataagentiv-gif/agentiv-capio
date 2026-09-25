@@ -45,8 +45,11 @@ def test_warna_kondisional():
         resolve("kotak_tengah", {"scatter_accent_color": "#FF0000"})
 
 
-def test_custom_dan_legacy_tidak_diterima():
-    for template_id in ("custom", "penuh", "ori"):
+def test_custom_valid_dan_legacy_tidak_diterima():
+    assert resolve("custom", {})["output_ratio"] == "9:16"
+    with pytest.raises(ValueError):
+        resolve("custom", {"caption_words": 8})
+    for template_id in ("penuh", "ori"):
         with pytest.raises(ValueError):
             resolve(template_id, {})
 

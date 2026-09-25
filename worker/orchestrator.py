@@ -122,7 +122,7 @@ def run(job_id: str) -> None:
 
     try:
         from pipeline.templates import TEMPLATES, resolve
-        if ctx["template_id"] not in TEMPLATES:
+        if ctx["template_id"] not in TEMPLATES and ctx["template_id"] != "custom":
             raise ValueError("Job lama tidak memakai library template; submit ulang")
         ctx["adjustments"] = resolve(ctx["template_id"], ctx["adjustments"])
         for i, (status, stage) in enumerate(STAGES):

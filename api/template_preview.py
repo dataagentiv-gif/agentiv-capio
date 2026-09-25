@@ -35,9 +35,16 @@ def render(template_id: str, adjustments: dict) -> bytes:
         ]
         seg = {"id": "p", "start": 0.0, "end": 6.0,
                "hook": "Ini contoh caption bergerak", "hook_title": "Contoh topik utama"}
-        crop = {"x": 0, "w": 608, "fx": 0.32, "fy": 0.38, "speaker_side": "kiri"}
+        crop = {"x": 0, "w": 608, "fx": 0.32, "fy": 0.38, "speaker_side": "kiri",
+                "custom_options": options}
         captions = {}
-        if template_id != "mentahan":
+        if template_id == "custom":
+            from pipeline.custom import caption_ass, output_size
+            if options["caption"]:
+                w, h = output_size(options)
+                (workdir / "p.ass").write_text(caption_ass(words, seg, options, w, h), encoding="utf-8")
+                captions["p"] = workdir / "p.ass"
+        elif template_id != "mentahan":
             if options.get("caption_motion") in MOTIONS:
                 captions["p"] = render_overlay(
                     CaptionEngine(words, seg, template_id, options, crop, {2, 5, 9}),

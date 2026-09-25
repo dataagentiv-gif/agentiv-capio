@@ -305,9 +305,11 @@ def _template_crops(ctx: dict) -> dict:
     src_w, src_h = int(ctx["meta"]["width"]), int(ctx["meta"]["height"])
     win_w = max(2, min(src_w, round(src_h * 9 / 16)) & ~1)
     result = {}
+    custom = ctx.get("template_id") == "custom"
+    options = ctx.get("adjustments", {})
     for seg in ctx["segments_final"]:
         face = None
-        if ctx["template_id"] != "mentahan":
+        if ctx["template_id"] != "mentahan" and (not custom or options.get("focus_mode") == "face"):
             try:
                 face = _face_center(_sample(ctx["source"], seg["start"],
                                             seg["end"] - seg["start"], ctx["deadline"]))
@@ -321,4 +323,6 @@ def _template_crops(ctx: dict) -> dict:
         side = "kanan" if fx is not None and fx > 0.55 else "kiri"
         result[seg["id"]] = {"x": x, "w": win_w, "fx": fx, "fy": fy,
                               "speaker_side": side}
+        if custom:
+            result[seg["id"]]["custom_options"] = options
     return {"crops": result}

@@ -28,9 +28,53 @@ MOTIONS = {key: set(value["motion_options"]) for key, value in TEMPLATES.items()
            if "motion_options" in value}
 HEX = re.compile(r"#?[0-9a-fA-F]{6}\Z")
 
+CUSTOM_DEFAULTS = {
+    "output_ratio": "9:16", "video_mode": "full", "panel_ratio": "16:9",
+    "panel_size": "medium", "panel_radius": "rounded", "fit_mode": "crop",
+    "focus_mode": "face", "background": "black", "background_color": "101820",
+    "caption": True, "caption_position": 0.78, "caption_font": "Poppins",
+    "caption_size": "medium", "caption_words": 3, "caption_upper": False,
+    "caption_style": "text_color", "active_text_color": "FFE500",
+    "active_background_color": "FFE500", "hook": False, "hook_block": "none",
+}
+CUSTOM_ENUMS = {
+    "output_ratio": {"9:16", "1:1", "16:9"}, "video_mode": {"full", "panel"},
+    "panel_ratio": {"9:16", "1:1", "16:9"}, "panel_size": {"small", "medium", "large"},
+    "panel_radius": {"square", "rounded"}, "fit_mode": {"crop", "contain"},
+    "focus_mode": {"face", "center"}, "background": {"black", "solid", "blur"},
+    "caption_font": {"Poppins", "Archivo Black", "Anton", "Lora"},
+    "caption_size": {"small", "medium", "large"}, "caption_style": STYLES,
+    "hook_block": {"none", "white"},
+}
+
 
 def resolve(template_id: str, adjustments: dict | None) -> dict:
     """Tolak seluruh konfigurasi yang tidak bermakna, termasuk warna dormant."""
+    if template_id == "custom":
+        if not isinstance(adjustments, dict):
+            raise ValueError("adjustments harus berupa objek")
+        result = {**CUSTOM_DEFAULTS, **adjustments}
+        extra = set(result) - set(CUSTOM_DEFAULTS)
+        if extra:
+            raise ValueError(f"Adjustment tidak berlaku untuk Custom: {', '.join(sorted(extra))}")
+        for key, allowed in CUSTOM_ENUMS.items():
+            if result[key] not in allowed:
+                raise ValueError(f"{key} tidak dikenal untuk Custom")
+        if not isinstance(result["caption"], bool) or not isinstance(result["hook"], bool):
+            raise ValueError("caption dan hook harus boolean")
+        if not isinstance(result["caption_upper"], bool):
+            raise ValueError("caption_upper harus boolean")
+        if result["caption_words"] not in {1, 2, 3, 4}:
+            raise ValueError("caption_words harus 1 sampai 4")
+        try:
+            result["caption_position"] = max(0.08, min(0.92, float(result["caption_position"])))
+        except (TypeError, ValueError):
+            raise ValueError("caption_position harus angka 0.08 sampai 0.92") from None
+        for key in ("background_color", "active_text_color", "active_background_color"):
+            if not isinstance(result[key], str) or not HEX.fullmatch(result[key]):
+                raise ValueError(f"{key} harus warna #RRGGBB")
+            result[key] = result[key].lstrip("#").upper()
+        return result
     if template_id not in TEMPLATES:
         raise ValueError("Template tidak dikenal atau Custom belum tersedia")
     if not isinstance(adjustments, dict):

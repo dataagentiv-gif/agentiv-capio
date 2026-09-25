@@ -206,26 +206,26 @@ mengubah `single_word_float` maupun `soft_phrase`.
 
 Mode `custom` bukan template dengan tampilan baku. Ia memberi kontrol atas
 komposisi dasar untuk satu video, dengan batas aman agar crop dan caption tetap
-terbaca. Semua nilai berlaku per video.
+terbaca. Semua nilai berlaku untuk seluruh klip dalam satu job.
 
 ### Parameter yang dapat diatur
 
 | Kelompok | Parameter |
 |---|---|
-| Video | ukuran panel video, posisi vertikal, zoom crop, fokus crop (`wajah` atau `tengah`), radius sudut |
+| Video | rasio output `9:16`, `1:1`, `16:9`; video penuh atau panel; rasio/ukuran panel; crop atau video utuh; fokus wajah atau tengah; radius sudut |
 | Latar | hitam, warna polos, atau blur dari source video |
-| Caption | tampil/sembunyi, posisi caption, font, ukuran, jumlah kata per grup, huruf besar semua |
+| Caption | tampil/sembunyi, posisi vertikal, Poppins/Archivo Black/Anton/Lora, ukuran, 1–4 kata per grup, huruf besar semua |
 | Gaya kata aktif | `text_color`, `background`, `background_scale`, warna huruf aktif, warna blok aktif |
 | Keterbacaan | outline, shadow, kekuatan shadow |
-| Hook | tampil/sembunyi, teks hook dari metadata, posisi atas, gaya `normal` atau `bold_caps` |
+| Hook | tampil/sembunyi, teks hook otomatis dari metadata, posisi atas, tanpa blok atau kotak putih–teks hitam |
 
 ### Batasan versi awal
 
-- Posisi setiap kata tidak dapat diatur satu per satu.
+- Posisi setiap kata tidak dapat diatur satu per satu; posisi grup caption digeser sebagai satu zona dan berlaku untuk semua klip.
 - Motion editorial `soft_focus`, `kinetic_words`, `editorial_focus`,
   `single_word_float`, `soft_phrase`, dan `scatter_emphasis` tetap dimiliki
   template yang mendukungnya.
-- Perpindahan sisi caption mengikuti subjek tidak tersedia di mode custom.
+- Preview Custom memakai cuplikan sintetis; posisi caption disimpan relatif terhadap kanvas final.
 - Filter visual kompleks di luar latar blur tidak tersedia.
 
 Contoh hasil custom: panel video 70% tinggi di tengah dengan radius 40 px,

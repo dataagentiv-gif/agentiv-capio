@@ -341,6 +341,14 @@ def run(ctx: dict) -> dict:
             return {"captions": paths}
         for seg in ctx["segments_final"]:
             words = [w for w in ctx["words"] if w["e"] > seg["start"] and w["s"] < seg["end"]]
+            if ctx["template_id"] == "custom":
+                from pipeline.custom import caption_ass, output_size
+                if ctx["adjustments"].get("caption"):
+                    w, h = output_size(ctx["adjustments"])
+                    path = ctx["workdir"] / f"{seg['id']}.ass"
+                    path.write_text(caption_ass(words, seg, ctx["adjustments"], w, h), encoding="utf-8")
+                    paths[seg["id"]] = path
+                continue
             selected = set()
             if ctx["adjustments"].get("caption_motion") in {"editorial_focus", "scatter_emphasis"}:
                 selected = emphasis.choose(words, seg["start"], seg["end"])
