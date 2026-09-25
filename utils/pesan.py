@@ -178,6 +178,12 @@ ATURAN: list[tuple[tuple[str, ...], object]] = [
         "atau video bisu tidak bisa diproses. Pakai video yang ada orang "
         "bicaranya.",
     )),
+    (("tidak ada segmen lolos validasi",), (
+        "Tidak ada momen valid untuk parameter klip ini",
+        "Gemini menemukan kandidat, tetapi semuanya tidak memenuhi batas durasi "
+        "klip 30–90 detik. Coba gunakan source yang lebih panjang atau longgarkan "
+        "rentang durasi di halaman Setting → Klip.",
+    )),
     (("tidak ada segmen lolos",), (
         "Tidak ada bagian yang cocok dijadikan klip",
         "Isi videonya tidak punya momen yang berdiri sendiri dengan durasi "
