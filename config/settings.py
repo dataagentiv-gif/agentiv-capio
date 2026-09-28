@@ -49,10 +49,7 @@ class Settings(BaseSettings):
     # setiap percobaan. Dengan satu model, itu job yang gagal. Dengan beberapa,
     # percobaan berikutnya memakai model lain dan job tetap selesai.
     GEMINI_MODELS: str = ""
-    GEMINI_INPUT_PRICE_PER_MILLION: float = 0.0
-    GEMINI_OUTPUT_PRICE_PER_MILLION: float = 0.0
-    CLIP_SERVICE_PRICE: float = 0.0
-    USAGE_CURRENCY: str = "USD"
+    # Tarif global lama di .env diabaikan: estimasi kini memakai harga per model.
 
     # --- Tampilan klip (Stage 5 & 7) ---
     #

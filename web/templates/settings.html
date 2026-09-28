@@ -130,24 +130,58 @@ function isiPanel(g) {
 }
 
 function pemakaianGeminiHtml() {
-  return `<div class="field usage-lifetime" id="usage-lifetime">
-    <div class="field-kepala"><label>Pemakaian Gemini seumur hidup</label></div>
-    <p class="sub" id="usage-lifetime-total">Memuat…</p>
-    <p class="sub">Total token dari seluruh pemanggilan Gemini yang tercatat di mesin ini.</p>
-  </div>`;
+  return `<h3 class="bagian">Penggunaan Gemini</h3>
+    <div class="field-kepala"><label for="usage-period">Periode</label></div>
+    <select id="usage-period" aria-label="Periode penggunaan Gemini">
+      <option value="all">Semua waktu</option><option value="day">Hari ini</option>
+      <option value="7d">7 hari</option><option value="30d">30 hari</option>
+    </select>
+    <div class="usage-stats" aria-live="polite">
+      <div><span>Panggilan Gemini</span><strong id="usage-requests">Memuat…</strong></div>
+      <div><span>Total token digunakan</span><strong id="usage-lifetime-total">Memuat…</strong></div>
+      <div><span>Setara biaya API berbayar</span><strong id="usage-lifetime-cost">Memuat…</strong></div>
+    </div>
+    <p class="sub" id="usage-note">Estimasi tarif Standard paid tier, bukan tagihan aktual. Free tier bisa Rp0.</p>
+    <div class="usage-table-wrap"><table class="usage-models">
+      <thead><tr><th scope="col">Model</th><th scope="col">Panggilan</th>
+        <th scope="col">Input</th><th scope="col">Output</th><th scope="col">Total token</th>
+        <th scope="col">Setara biaya</th></tr></thead>
+      <tbody id="usage-model-rows"><tr><td colspan="6">Memuat…</td></tr></tbody>
+    </table></div>`;
 }
 
 async function muatPemakaianGemini() {
   const el = document.getElementById('usage-lifetime-total');
+  const biaya = document.getElementById('usage-lifetime-cost');
   if (!el) return;
+  const jumlah = n => Number(n || 0).toLocaleString('id-ID');
+  const dolar = n => `~US$${Number(n || 0).toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 6})}`;
   try {
-    const r = await fetch('/api/usage/summary?period=all');
+    const periode = document.getElementById('usage-period').value;
+    const r = await fetch(`/api/usage/summary?period=${periode}`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     const tanda = d.estimated_tokens ? ' (sebagian estimasi)' : '';
-    el.textContent = `${(d.total_tokens || 0).toLocaleString('id-ID')} token${tanda}`;
+    el.textContent = `${jumlah(d.total_tokens)} token${tanda}`;
+    document.getElementById('usage-requests').textContent = jumlah(d.requests);
+    biaya.textContent = d.total_tokens && d.unpriced_tokens === d.total_tokens
+      ? 'Belum bisa dihitung' : dolar(d.equivalent_cost_usd);
+    document.getElementById('usage-model-rows').innerHTML = (d.models || []).length
+      ? d.models.map(m => `<tr><th scope="row">${esc(m.model)}${m.price_status === 'alias_assumption' ? '<small>alias · tarif perkiraan</small>' : ''}</th>
+          <td>${jumlah(m.requests)}</td><td>${jumlah(m.input_tokens)}</td><td>${jumlah(m.output_tokens)}</td>
+          <td>${jumlah(m.total_tokens)}</td><td>${m.price_status === 'unavailable' || m.unpriced_tokens === m.total_tokens ? '—' : dolar(m.equivalent_cost_usd)}</td></tr>`).join('')
+      : '<tr><td colspan="6">Belum ada pemakaian pada periode ini.</td></tr>';
+    const parsial = d.unpriced_tokens ? ` ${jumlah(d.unpriced_tokens)} token lama/tidak dikenal belum bisa dinilai.` : '';
+    const tarif = d.pricing || {};
+    document.getElementById('usage-note').innerHTML =
+      `Setara tarif Standard paid tier per model, diperiksa ${esc(tarif.as_of || '—')}.
+       Bukan tagihan aktual; free tier bisa Rp0 dan diskon cache tidak dihitung.${esc(parsial)}
+       <a href="${esc(tarif.source || 'https://ai.google.dev/gemini-api/docs/pricing')}" target="_blank" rel="noopener">Lihat tarif resmi</a>.`;
   } catch {
     el.textContent = 'Data pemakaian belum tersedia.';
+    biaya.textContent = 'Data estimasi belum tersedia.';
+    document.getElementById('usage-requests').textContent = '—';
+    document.getElementById('usage-model-rows').innerHTML = '<tr><td colspan="6">Gagal memuat rincian model.</td></tr>';
   }
 }
 
@@ -369,6 +403,7 @@ function render() {
   document.querySelectorAll('[data-test]').forEach(b => b.onclick = () => tes(b));
   segarkanLisensi();
   muatPemakaianGemini();
+  document.getElementById('usage-period')?.addEventListener('change', muatPemakaianGemini);
   // Preview ikut berubah saat knob diputar, tanpa perlu disimpan dulu —
   // mencoba lima warna kalau harus menyimpan dulu berarti lima kali menulis .env.
   document.querySelectorAll('#p-klip [data-key]').forEach(el => {

@@ -241,8 +241,7 @@ def usage_summary(period: str = "7d"):
     if period not in {"day", "7d", "30d", "all"}:
         raise HTTPException(400, "period harus day, 7d, 30d, atau all")
     rows = usage.rows(period)
-    p = usage.prices()
-    inp = sum(r.input_tokens for r in rows); out = sum(r.output_tokens for r in rows)
+    pemakaian = usage.model_breakdown(rows)
     from datetime import datetime, timedelta, timezone
     since = None if period == "all" else datetime.now(timezone.utc) - timedelta(days={"day":1,"7d":7,"30d":30}[period])
     def _job_in_period(j):
@@ -252,12 +251,9 @@ def usage_summary(period: str = "7d"):
         return stamp >= since
     done = [j for j in jobs.list_all(10000) if j.get("status") == "done" and _job_in_period(j)]
     clips = sum(len(j.get("clips") or []) for j in done)
-    cost = inp / 1_000_000 * p["input_per_million"] + out / 1_000_000 * p["output_per_million"]
-    savings = clips * p["service_per_clip"] - cost
     return {"period": period, "clips": clips, "videos": len(done), "avg_clips_per_video": round(clips / len(done), 2) if done else 0,
-            "input_tokens": inp, "output_tokens": out, "total_tokens": inp + out,
-            "estimated_tokens": any(r.estimated for r in rows), "estimated_cost": round(cost, 6),
-            "service_value": round(clips * p["service_per_clip"], 6), "savings": round(savings, 6), "prices": p}
+            **pemakaian, "estimated_cost": pemakaian["equivalent_cost_usd"],
+            "pricing": usage.prices()}
 
 
 @app.post("/api/settings")

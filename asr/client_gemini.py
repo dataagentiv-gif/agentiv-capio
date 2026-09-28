@@ -225,17 +225,28 @@ def _minta(key: str, path: Path) -> list[dict]:
             ditunggu += jeda
         _wajib_ok(r, "mentranskrip audio")
         payload = r.json()
-        meta = payload.get("usage", payload.get("usage_metadata", {})) or {}
-        inp = meta.get("promptTokenCount", meta.get("prompt_tokens", 0)) or 0
-        out = meta.get("candidatesTokenCount", meta.get("completion_tokens", 0)) or 0
-        estimated = not bool(meta)
-        if estimated:
-            inp = max(1, path.stat().st_size // 4)
-        telemetry.record(MODEL, inp, out, meta.get("totalTokenCount", meta.get("total_tokens", inp + out)), estimated, True)
+        inp, out, total, estimated = _usage_counts(
+            payload.get("usage") or payload.get("usage_metadata") or {}, path.stat().st_size
+        )
+        telemetry.record(MODEL, inp, out, total, estimated, True)
         return _annotations(payload, 0.0)
     finally:
         if name:
             _hapus(key, name)
+
+
+def _usage_counts(meta: dict, audio_bytes: int) -> tuple[int, int, int, bool]:
+    """Interactions API memakai total_*; GenerateContent memakai *TokenCount."""
+    inp = int(meta.get("total_input_tokens", meta.get("promptTokenCount", meta.get("prompt_tokens", 0))) or 0)
+    out = int(meta.get("total_output_tokens", meta.get("candidatesTokenCount", meta.get("completion_tokens", 0))) or 0)
+    inp += int(meta.get("total_tool_use_tokens", 0) or 0)
+    out += int(meta.get("total_thought_tokens", meta.get("thoughtsTokenCount", 0)) or 0)
+    total = int(meta.get("total_tokens", meta.get("totalTokenCount", inp + out)) or 0)
+    has_split = any(k in meta for k in ("total_input_tokens", "promptTokenCount", "prompt_tokens")) and (inp + out > 0 or total == 0)
+    if not meta:
+        inp = max(1, audio_bytes // 4)
+        total = inp
+    return inp, out, total, not has_split
 
 
 def _minta_cadangan(key: str, path: Path) -> list[dict]:
