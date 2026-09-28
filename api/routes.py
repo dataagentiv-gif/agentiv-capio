@@ -648,6 +648,10 @@ def cancel_job(job_id: str):
         raise HTTPException(404, "Job tidak ditemukan")
     if result == "active":
         raise HTTPException(409, "Job sudah selesai, gagal, atau dibatalkan")
+    if result == "cancelled":
+        job = jobs.get(job_id)
+        if job and (ident := unggah.sumber(job["url"])):
+            unggah.bersihkan(ident)
     log.info("pembatalan diminta untuk job %s", job_id)
     return {"job_id": job_id, "status": result}
 

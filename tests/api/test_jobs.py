@@ -201,6 +201,25 @@ def test_job_antre_bisa_dibatalkan(client):
     assert response.json()["status"] == "cancelled"
 
 
+def test_batal_job_antre_membersihkan_upload(client, tmp_path, monkeypatch):
+    from config.settings import settings
+    import unggah
+
+    monkeypatch.setattr(settings, "WORK_DIR", tmp_path)
+    ident = "5f2a9c1e-8b47-4d3a-9f61-2c7e0a1b8d43"
+    source = unggah.berkas(ident)
+    source.write_bytes(b"video")
+    unggah.catat_nama(ident, "uji.mp4")
+    job_id = client.post("/jobs", json={
+        "url": f"unggah:{ident}", "target_clips": 2,
+        "template_id": "full_screen",
+    }).json()["job_id"]
+
+    assert client.post(f"/jobs/{job_id}/cancel").status_code == 200
+    assert not source.exists()
+    assert not source.with_suffix(".json").exists()
+
+
 def test_proses_ulang_upload_mempertahankan_source(client, tmp_path, monkeypatch):
     from db import jobs as db_jobs
 
