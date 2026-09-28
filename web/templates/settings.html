@@ -129,6 +129,28 @@ function isiPanel(g) {
   return html;
 }
 
+function pemakaianGeminiHtml() {
+  return `<div class="field usage-lifetime" id="usage-lifetime">
+    <div class="field-kepala"><label>Pemakaian Gemini seumur hidup</label></div>
+    <p class="sub" id="usage-lifetime-total">Memuat…</p>
+    <p class="sub">Total token dari seluruh pemanggilan Gemini yang tercatat di mesin ini.</p>
+  </div>`;
+}
+
+async function muatPemakaianGemini() {
+  const el = document.getElementById('usage-lifetime-total');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/usage/summary?period=all');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    const tanda = d.estimated_tokens ? ' (sebagian estimasi)' : '';
+    el.textContent = `${(d.total_tokens || 0).toLocaleString('id-ID')} token${tanda}`;
+  } catch {
+    el.textContent = 'Data pemakaian belum tersedia.';
+  }
+}
+
 // Alamat database dan antrean: ditampilkan, tapi sengaja tidak bisa diubah.
 function readonlyHtml() {
   return `
@@ -325,6 +347,7 @@ function render() {
          <button type="button" class="btn sm" data-save="1">Simpan</button>${tes}
        </div>`;
     const isi = isiPanel(g) +
+      (g.name === 'API Key' ? pemakaianGeminiHtml() : '') +
       (g.name === 'Lisensi' ? '<div id="lisensi-status"></div>' : '') +
       (g.name === 'Infra' ? aksi + readonlyHtml() : '');
     return panelHtml(g.name, isi, g.name === 'Infra' ? '' : aksi);
@@ -345,6 +368,7 @@ function render() {
   });
   document.querySelectorAll('[data-test]').forEach(b => b.onclick = () => tes(b));
   segarkanLisensi();
+  muatPemakaianGemini();
   // Preview ikut berubah saat knob diputar, tanpa perlu disimpan dulu —
   // mencoba lima warna kalau harus menyimpan dulu berarti lima kali menulis .env.
   document.querySelectorAll('#p-klip [data-key]').forEach(el => {
