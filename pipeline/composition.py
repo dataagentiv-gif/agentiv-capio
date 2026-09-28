@@ -14,6 +14,14 @@ def _panel(src_w, src_h, out_w, out_h, crop, face_x=0.5):
         return (f"scale={out_w}:{out_h}:force_original_aspect_ratio=decrease,"
                 f"pad={out_w}:{out_h}:(ow-iw)/2:(oh-ih)/2:black,setsar=1")
     cw = max(2, min(src_w, int(src_h * target)) & ~1)
+    shots = crop.get("shots") or []
+    if shots:
+        positions = [max(0, min(src_w - cw, int(s["center"] * src_w - cw * face_x))) & ~1
+                     for s in shots]
+        expr = str(positions[-1])
+        for i in range(len(shots) - 2, -1, -1):
+            expr = f"if(lt(t\\,{shots[i + 1]['at']:.3f})\\,{positions[i]}\\,{expr})"
+        return f"crop={cw}:{src_h}:'{expr}':0,scale={out_w}:{out_h},setsar=1"
     fx = crop.get("fx")
     cx = max(0, min(src_w - cw, int((0.5 if fx is None else fx) * src_w - cw * face_x))) & ~1
     return f"crop={cw}:{src_h}:{cx}:0,scale={out_w}:{out_h},setsar=1"

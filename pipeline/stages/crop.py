@@ -49,8 +49,8 @@ def _detector(jauh: bool = False):
     return vision.FaceDetector.create_from_options(opts), mp
 
 
-def _sample(source: Path, start: float, dur: float, deadline) -> list:
-    """Ambil SAMPLES frame RGB dari satu segmen.
+def _sample(source: Path, start: float, dur: float, deadline, count: int = SAMPLES) -> list:
+    """Ambil sejumlah frame RGB dari satu segmen.
 
     Lewat pipe rawvideo ffmpeg, bukan cv2.VideoCapture: ini satu kali decode
     berurutan, bukan 20 kali seek acak. Output yt-dlp sering VFR dan seek
@@ -64,8 +64,8 @@ def _sample(source: Path, start: float, dur: float, deadline) -> list:
         [
             "ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-v", "error",
             "-ss", f"{start:.3f}", "-i", str(source), "-t", f"{dur:.3f}",
-            "-vf", f"fps={SAMPLES / max(dur, 1.0):.4f},scale={DET_W}:{DET_H}",
-            "-frames:v", str(SAMPLES),
+            "-vf", f"fps={count / max(dur, 1.0):.4f},scale={DET_W}:{DET_H}",
+            "-frames:v", str(count),
             "-pix_fmt", "rgb24", "-f", "rawvideo", "-",
         ],
         deadline,
@@ -125,6 +125,7 @@ def _face_observations(frames: list, jauh: bool = False) -> list[list[dict]]:
                 "x": (b.origin_x + b.width / 2) / DET_W,
                 "y": (b.origin_y + b.height / 2) / DET_H,
                 "area": (b.width * b.height) / (DET_W * DET_H),
+                "width": b.width / DET_W,
             })
         hasil.append(baris)
     return hasil
@@ -187,6 +188,133 @@ def _pair_fits_duo(pair: list[dict], src_w: int, src_h: int) -> bool:
     tengah = (pair[0]["fx"] + pair[1]["fx"]) * src_w / 2
     crop_ideal = src_h * 0.78 * 9 / 8
     return min(tengah, src_w - tengah) >= crop_ideal * MIN_DUO_CROP_RATIO
+
+
+def _tracked_shots(observations: list[list[dict]], duration: float, src_w: int,
+                   src_h: int, template_id: str, words: list[dict],
+                   start: float) -> list[dict]:
+    """Titik cut crop relatif klip; wajah sesaat tidak boleh merebut fokus."""
+    if not observations:
+        return []
+    from pipeline.templates import TEMPLATES
+
+    panel_h = TEMPLATES[template_id]["visual"]["panel_height"]
+    crop_w = min(src_w, src_h * 1080 / panel_h)
+    tracks: list[list[tuple[int, dict]]] = []
+    visible: list[list[tuple[int, dict]]] = []
+    for i, faces in enumerate(observations):
+        used = set()
+        frame = []
+        for face in sorted((f for f in faces if f["area"] >= MIN_PAIR_AREA),
+                           key=lambda f: f["area"], reverse=True):
+            candidates = []
+            for ti, track in enumerate(tracks):
+                if ti in used or i - track[-1][0] > 6:
+                    continue
+                last = track[-1][1]
+                distance = abs(face["x"] - last["x"]) + abs(face["y"] - last["y"]) * 0.5
+                if distance < 0.20:
+                    candidates.append((distance, ti))
+            ti = min(candidates)[1] if candidates else len(tracks)
+            if ti == len(tracks):
+                tracks.append([])
+            tracks[ti].append((i, face))
+            used.add(ti)
+            frame.append((ti, face))
+        visible.append(frame)
+    if not tracks:
+        return []
+
+    # Pilih orang yang sudah terlihat di awal dan paling konsisten, bukan
+    # median lintas dua orang yang bisa jatuh persis di ruang kosong.
+    early = {ti for frame in visible[:3] for ti, _ in frame}
+    pool = early or set(range(len(tracks)))
+    primary = max(pool, key=lambda ti: (len(tracks[ti]),
+                                       sum(face["area"] for _, face in tracks[ti])))
+    primary_faces = [face for _, face in tracks[primary]]
+    leftmost = min(f["x"] - f.get("width", 0.08) / 2 for f in primary_faces)
+    rightmost = max(f["x"] + f.get("width", 0.08) / 2 for f in primary_faces)
+    # Satu bingkai yang memuat seluruh gerak alami lebih baik daripada cut
+    # bolak-balik hanya karena pembicara sedikit menggeser kepalanya.
+    steady_center = ((leftmost + rightmost) / 2
+                     if (rightmost - leftmost) * src_w <= crop_w
+                     else statistics.median(f["x"] for f in primary_faces[:3]))
+    pair_center = None
+    pair_ids = set()
+    if template_id == "blur_atas_bawah":
+        stable = sorted(range(len(tracks)), key=lambda ti: len(tracks[ti]), reverse=True)[:2]
+        if len(stable) == 2 and all(len(tracks[ti]) >= len(observations) * 0.6 for ti in stable):
+            pair_faces = [f for ti in stable for _, f in tracks[ti]]
+            left = min(f["x"] - f.get("width", 0.08) / 2 for f in pair_faces)
+            right = max(f["x"] + f.get("width", 0.08) / 2 for f in pair_faces)
+            if (right - left) * src_w <= crop_w:
+                pair_center = (left + right) / 2
+                pair_ids = set(stable)
+    shots: list[dict] = []
+    active = primary
+    center = None
+    missed = 0
+    interval = duration / len(observations)
+
+    def safe(face: dict, at: float) -> bool:
+        left = max(0.0, min(src_w - crop_w, at * src_w - crop_w / 2))
+        half = face.get("width", 0.08) * src_w / 2
+        px = face["x"] * src_w
+        return left + half <= px <= left + crop_w - half
+
+    def pause_near(at: float) -> float:
+        gaps = []
+        for a, b in zip(words, words[1:]):
+            gap = b["s"] - a["e"]
+            mid = (a["e"] + b["s"]) / 2 - start
+            if gap >= 0.16 and 0 < mid < duration and abs(mid - at) <= 1.0:
+                gaps.append((abs(mid - at), mid))
+        return min(gaps)[1] if gaps else at
+
+    for i, frame in enumerate(visible):
+        found = dict(frame)
+        face = found.get(active)
+        if face is None:
+            missed += 1
+            if missed < 2:
+                continue
+            alternatives = [(ti, f) for ti, f in frame
+                            if any(j == i - 1 for j, _ in tracks[ti])]
+            if not alternatives:
+                continue
+            active, face = max(alternatives, key=lambda pair: pair[1]["area"])
+        else:
+            missed = 0
+
+        # Panel Blur dapat menampung dua pembicara tanpa mengubah layout.
+        focus = face["x"]
+        if center is None and active == primary:
+            focus = steady_center
+        pair_fits = False
+        if pair_center is not None:
+            focus = pair_center
+            pair_fits = True
+        elif template_id == "blur_atas_bawah" and len(frame) > 1:
+            left = min(f["x"] - f.get("width", 0.08) / 2 for _, f in frame)
+            right = max(f["x"] + f.get("width", 0.08) / 2 for _, f in frame)
+            if (right - left) * src_w + crop_w * 0.12 <= crop_w:
+                focus = (left + right) / 2
+                pair_fits = True
+        if center is not None:
+            checked = [(ti, f) for ti, f in frame if ti in pair_ids] if pair_ids else frame
+            keep = (all(safe(f, center) for _, f in checked) if pair_fits
+                    else safe(face, center))
+            if keep or abs(focus - center) * src_w < 8:
+                continue
+
+        at = 0.0 if not shots else max(0.0, (i - 0.5) * interval)
+        if shots:
+            at = pause_near(at)
+            if at - shots[-1]["at"] < 2.0:
+                continue
+        center = focus
+        shots.append({"at": round(at, 3), "center": round(center, 5)})
+    return shots
 
 
 def run(ctx: dict) -> dict:
@@ -309,7 +437,23 @@ def _template_crops(ctx: dict) -> dict:
     options = ctx.get("adjustments", {})
     for seg in ctx["segments_final"]:
         face = None
-        if ctx["template_id"] != "mentahan" and (not custom or options.get("focus_mode") == "face"):
+        shots = []
+        if ctx["template_id"] in ("full_screen", "blur_atas_bawah"):
+            try:
+                duration = seg["end"] - seg["start"]
+                frames = _sample(ctx["source"], seg["start"], duration,
+                                 ctx["deadline"], min(120, max(20, round(duration))))
+                observations = _face_observations(frames, jauh=True)
+                if sum(bool(f) for f in observations) < len(frames) * MIN_HIT_RATIO:
+                    observations = _face_observations(frames)
+                shots = _tracked_shots(observations, duration, src_w, src_h,
+                                       ctx["template_id"], ctx.get("words", []), seg["start"])
+                if shots:
+                    face = shots[0]["center"], None
+                log.info("crop %s: %d posisi, %d cut", seg["id"], len(shots), max(0, len(shots) - 1))
+            except Exception as exc:  # noqa: BLE001 - center crop tetap valid
+                log.warning("pelacakan wajah %s gagal: %s; memakai tengah", seg["id"], exc)
+        elif ctx["template_id"] != "mentahan" and (not custom or options.get("focus_mode") == "face"):
             try:
                 face = _face_center(_sample(ctx["source"], seg["start"],
                                             seg["end"] - seg["start"], ctx["deadline"]))
@@ -323,6 +467,8 @@ def _template_crops(ctx: dict) -> dict:
         side = "kanan" if fx is not None and fx > 0.55 else "kiri"
         result[seg["id"]] = {"x": x, "w": win_w, "fx": fx, "fy": fy,
                               "speaker_side": side}
+        if shots:
+            result[seg["id"]]["shots"] = shots
         if custom:
             result[seg["id"]]["custom_options"] = options
     return {"crops": result}
