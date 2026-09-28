@@ -167,6 +167,40 @@ def test_job_aktif_tidak_bisa_dihapus_dan_tetap_tercatat(client):
     assert client.get(f"/jobs/{job_id}").status_code == 404
 
 
+def test_job_aktif_bisa_dibatalkan_dan_statusnya_tidak_ditiban(client):
+    from db import jobs as db_jobs
+    from db.models import Status
+
+    job_id = client.post("/jobs", json={
+        "url": "https://youtu.be/abc", "target_clips": 2,
+        "template_id": "full_screen",
+    }).json()["job_id"]
+    db_jobs.update_status(job_id, Status.RENDERING, progress=70)
+
+    response = client.post(f"/jobs/{job_id}/cancel")
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelling"
+    assert client.get(f"/jobs/{job_id}").json()["status"] == "cancelling"
+    assert client.delete(f"/jobs/{job_id}").status_code == 409
+
+    db_jobs.finish(job_id, [{"id": "c1"}])
+    db_jobs.fail(job_id, "error balapan")
+    assert client.get(f"/jobs/{job_id}").json()["status"] == "cancelling"
+    db_jobs.mark_cancelled(job_id)
+    assert client.get(f"/jobs/{job_id}").json()["status"] == "cancelled"
+    assert client.post(f"/jobs/{job_id}/cancel").status_code == 409
+
+
+def test_job_antre_bisa_dibatalkan(client):
+    job_id = client.post("/jobs", json={
+        "url": "https://youtu.be/abc", "target_clips": 2,
+        "template_id": "full_screen",
+    }).json()["job_id"]
+    response = client.post(f"/jobs/{job_id}/cancel")
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+
+
 def test_proses_ulang_upload_mempertahankan_source(client, tmp_path, monkeypatch):
     from db import jobs as db_jobs
 

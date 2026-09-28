@@ -31,8 +31,10 @@ const NAMA_STATUS = {
   rendering: 'Membuat video',
   metadata: 'Menulis judul',
   uploading: 'Menyimpan',
+  cancelling: 'Membatalkan',
   done: 'Selesai',
   failed: 'Gagal',
+  cancelled: 'Dibatalkan',
 };
 
 function badge(s) {

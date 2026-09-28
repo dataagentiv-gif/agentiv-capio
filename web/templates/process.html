@@ -52,6 +52,7 @@ function kepala(j, ekor = '') {
       <span class="job-meta">${esc(waktu(j.created_at))}${ekor}</span>
       ${idJob(j.id)}
       <button type="button" class="btn-hapus" data-collapse="${esc(j.id)}" aria-expanded="true">Ringkas</button>
+      ${j.status === 'cancelling' ? '<button type="button" class="btn ghost" disabled>Membatalkan…</button>' : isRunning(j) ? `<button type="button" class="btn ghost" data-aksi="cancel:${esc(j.id)}">Batalkan</button>` : ''}
       ${isRunning(j) ? '' : tombolHapus('Hapus', `job:${j.id}`)}
     </div>`;
 }
@@ -100,7 +101,7 @@ function jobRiwayat(j) {
   return `<div class="job ${localStorage.getItem(`capio-job-collapsed-${j.id}`)==='true'?'job-collapsed':''}">
     ${kepala(j, ` · ${esc(NAMA_LAYOUT[j.layout] || j.layout || 'Penuh')}`)}
     ${ringkasanGaya(j)}
-    ${hasil ? `<div class="job-body"><p class="sub">${hasil}</p></div>` : ''}
+    ${hasil ? `<div class="job-body"><p class="sub">${hasil}</p></div>` : j.status === 'cancelled' ? '<div class="job-body"><p class="sub">Job dibatalkan.</p></div>' : ''}
     ${masalahHtml(j)}
   </div>`;
 }
@@ -169,6 +170,16 @@ document.body.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-aksi]');
   if (!b) return;
   const [aksi, id] = b.dataset.aksi.split(':');
+  if (aksi === 'cancel') {
+    if (!confirm('Batalkan job ini? Prosesnya akan dihentikan dan perlu dikirim ulang jika ingin melanjutkan.')) return;
+    b.disabled = true;
+    try {
+      const r = await fetch(`/jobs/${id}/cancel`, {method: 'POST'});
+      if (!r.ok) { const d = await r.json().catch(() => null); alert(d?.detail || 'Job gagal dibatalkan.'); }
+      await tick();
+    } catch { alert('CAPIO tidak merespons. Pastikan container masih menyala.'); }
+    return;
+  }
   if (aksi === 'retry') {
     b.disabled = true;
     b.classList.add('sibuk');

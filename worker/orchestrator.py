@@ -21,7 +21,7 @@ from pipeline.stages import (
     transcribe,
 )
 import storage
-from utils.ffmpeg_helpers import Deadline, rmtree_retry
+from utils.ffmpeg_helpers import Deadline, JobCancelled, rmtree_retry
 from utils.logging import get
 
 log = get(__name__)
@@ -54,6 +54,7 @@ def _build_clips(ctx: dict, job_id: str) -> list[dict]:
     """Susun kontrak final untuk kolom `clips` JSONB (PRD Bagian 4)."""
     clips = []
     for seg in ctx["segments_final"]:
+        ctx["deadline"].check("upload")
         meta = ctx["metadata"][seg["id"]]
         url = storage.save_clip(job_id, seg["id"], ctx["rendered"][seg["id"]])
         clips.append(
@@ -74,6 +75,12 @@ def _build_clips(ctx: dict, job_id: str) -> list[dict]:
     return clips
 
 
+def _finish_cancelled(job_id: str, workdir: Path) -> None:
+    storage.delete_job(job_id)
+    rmtree_retry(workdir)
+    jobs.mark_cancelled(job_id)
+
+
 def run(job_id: str) -> None:
     """Entry point yang di-enqueue ke RQ. Payload cuma job_id — semua state lain
     dibaca dan ditulis lewat Postgres.
@@ -87,6 +94,8 @@ def run(job_id: str) -> None:
     job = jobs.get(job_id)
     if job is None:
         raise KeyError(f"job {job_id} tidak ada di database")
+    if job["status"] == Status.CANCELLED:
+        return
 
     # Workdir sengaja pendek (8 karakter pertama UUID): path Windows mentok di
     # MAX_PATH 260 dan artefak per job punya nama yang cukup panjang sendiri.
@@ -104,7 +113,10 @@ def run(job_id: str) -> None:
         "template_id": job.get("layout"),
         "adjustments": job.get("gaya") or {},
         "workdir": workdir,
-        "deadline": Deadline(settings.JOB_TIMEOUT_SEC),
+        "deadline": Deadline(
+            settings.JOB_TIMEOUT_SEC,
+            check_cancel=lambda: jobs.is_cancelled(job_id),
+        ),
     }
     log.info("mulai job %s -> %s", job_id, workdir)
 
@@ -130,6 +142,7 @@ def run(job_id: str) -> None:
             ctx["deadline"].check(status)
             jobs.update_status(job_id, status, progress=int(i / TOTAL_STEPS * 100),
                                 worker_id=_worker_id)
+            ctx["deadline"].check(status)
             log.info("stage %s", status)
             t0 = time.monotonic()
             with usage_stage(job_id, status):
@@ -138,9 +151,11 @@ def run(job_id: str) -> None:
 
         jobs.update_status(job_id, Status.UPLOADING, progress=int(8 / TOTAL_STEPS * 100),
                             worker_id=_worker_id)
+        ctx["deadline"].check("upload")
         t0 = time.monotonic()
         clips = _build_clips(ctx, str(job_id))
         lama[Status.UPLOADING] = time.monotonic() - t0
+        ctx["deadline"].check("upload")
         jobs.finish(job_id, clips)
         log.info("job %s selesai: %d klip (%s)", job_id, len(clips), _rincian(lama))
 
@@ -148,7 +163,15 @@ def run(job_id: str) -> None:
         # ditinggal utuh supaya artefak antar-stage bisa diperiksa.
         rmtree_retry(workdir)
 
+    except JobCancelled:
+        log.info("job %s dibatalkan pengguna", job_id)
+        _finish_cancelled(str(job_id), workdir)
+
     except TimeoutError as e:
+        if jobs.is_cancelled(job_id):
+            log.info("job %s dibatalkan pengguna", job_id)
+            _finish_cancelled(str(job_id), workdir)
+            return
         # Kegagalan deadline butuh perlakuan sendiri: yang perlu diketahui
         # bukan traceback-nya — stack-nya selalu sama — melainkan stage mana
         # yang menghabiskan anggaran, karena itu yang menentukan apakah
@@ -165,6 +188,10 @@ def run(job_id: str) -> None:
         raise
 
     except Exception as e:  # noqa: BLE001
+        if jobs.is_cancelled(job_id):
+            log.info("job %s dibatalkan pengguna", job_id)
+            _finish_cancelled(str(job_id), workdir)
+            return
         log.error("job %s gagal: %s", job_id, e)
         jobs.fail(job_id, f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}")
         raise

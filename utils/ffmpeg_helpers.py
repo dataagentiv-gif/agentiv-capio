@@ -24,8 +24,9 @@ class Deadline:
     ke tiap subprocess sebagai timeout=.
     """
 
-    def __init__(self, total_sec: float):
+    def __init__(self, total_sec: float, check_cancel=None):
         self.end = time.monotonic() + total_sec
+        self.check_cancel = check_cancel
 
     def remaining(self, cap: float = 600.0) -> float:
         left = self.end - time.monotonic()
@@ -34,8 +35,14 @@ class Deadline:
         return min(cap, left)
 
     def check(self, stage: str) -> None:
+        if self.check_cancel and self.check_cancel():
+            raise JobCancelled("Job dibatalkan oleh pengguna")
         if time.monotonic() >= self.end:
             raise TimeoutError(f"deadline job terlampaui sebelum stage '{stage}'")
+
+
+class JobCancelled(Exception):
+    pass
 
 
 def run(
@@ -54,27 +61,47 @@ def run(
     `binary=True` untuk output rawvideo — stdout tidak boleh di-decode teks.
     """
     log.debug("run: %s", " ".join(args[:6]))
-    proc = subprocess.run(
+    proc = subprocess.Popen(
         args,
         cwd=str(cwd) if cwd else None,
         # ffmpeg yang mewarisi stdin console di Windows bisa memakan input dan
         # sesekali menggantung. Dua sabuk pengaman sekaligus.
         stdin=subprocess.DEVNULL,
-        capture_output=True,
-        encoding=None if binary else "utf-8",
-        errors=None if binary else "replace",
-        timeout=deadline.remaining(cap),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    if binary and check and proc.returncode != 0:
+    started = time.monotonic()
+    try:
+        while True:
+            deadline.check(args[0])
+            remaining = min(cap, deadline.end - time.monotonic())
+            if remaining <= 0 or time.monotonic() - started >= cap:
+                raise subprocess.TimeoutExpired(args, cap)
+            try:
+                stdout, stderr = proc.communicate(timeout=min(1.0, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                continue
+    except BaseException:
+        proc.kill()
+        proc.communicate()
+        raise
+    if binary:
+        stdout_value, stderr_value = stdout, stderr
+    else:
+        stdout_value = stdout.decode("utf-8", "replace")
+        stderr_value = stderr.decode("utf-8", "replace")
+    result = subprocess.CompletedProcess(args, proc.returncode, stdout_value, stderr_value)
+    if binary and check and result.returncode != 0:
         raise RuntimeError(
-            f"{args[0]} keluar dengan kode {proc.returncode}:\n"
-            f"{proc.stderr.decode('utf-8', 'replace')[-3000:]}"
+            f"{args[0]} keluar dengan kode {result.returncode}:\n"
+            f"{result.stderr.decode('utf-8', 'replace')[-3000:]}"
         )
-    if check and proc.returncode != 0:
+    if check and result.returncode != 0:
         raise RuntimeError(
-            f"{args[0]} keluar dengan kode {proc.returncode}:\n{proc.stderr[-3000:]}"
+            f"{args[0]} keluar dengan kode {result.returncode}:\n{result.stderr[-3000:]}"
         )
-    return proc
+    return result
 
 
 def ffmpeg(args: list[str], deadline: Deadline, **kw) -> subprocess.CompletedProcess:

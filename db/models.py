@@ -32,15 +32,17 @@ class Status:
     RENDERING = "rendering"
     METADATA = "metadata"
     UPLOADING = "uploading"
+    CANCELLING = "cancelling"
     DONE = "done"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
     #: Status yang berarti "ada worker yang sedang mengerjakannya sekarang".
     #: QUEUED sengaja TIDAK termasuk — job itu belum disentuh siapa pun dan
     #: masih sah dikerjakan setelah worker menyala lagi.
     BERJALAN = (
         DOWNLOADING, TRANSCRIBING, SEGMENTING, REFINING,
-        CAPTIONING, CROPPING, RENDERING, METADATA, UPLOADING,
+        CAPTIONING, CROPPING, RENDERING, METADATA, UPLOADING, CANCELLING,
     )
 
 

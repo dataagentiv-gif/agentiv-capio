@@ -107,17 +107,74 @@ def update_status(job_id, status: str, progress: int | None = None,
         fields["progress"] = progress
     if worker_id is not None:
         fields["worker_id"] = worker_id
-    _update(job_id, **fields)
+    with session_scope() as s:
+        s.execute(
+            update(Job).where(
+                Job.id == uuid.UUID(str(job_id)),
+                Job.status.not_in((Status.CANCELLING, Status.CANCELLED)),
+            ).values(**fields)
+        )
 
 
 def finish(job_id, clips: list[dict]) -> None:
-    _update(job_id, status=Status.DONE, progress=100, clips=clips, error=None)
+    with session_scope() as s:
+        s.execute(
+            update(Job).where(
+                Job.id == uuid.UUID(str(job_id)),
+                Job.status.not_in((Status.CANCELLING, Status.CANCELLED)),
+            ).values(status=Status.DONE, progress=100, clips=clips, error=None)
+        )
 
 
 def fail(job_id, error: str) -> None:
     # Pesan error dipotong: traceback ffmpeg/yt-dlp bisa puluhan KB dan yang
     # berguna di UI selalu ada di bagian akhir (baris error sebenarnya).
-    _update(job_id, status=Status.FAILED, error=error[-2000:])
+    with session_scope() as s:
+        s.execute(
+            update(Job).where(
+                Job.id == uuid.UUID(str(job_id)),
+                Job.status.not_in((Status.CANCELLING, Status.CANCELLED)),
+            ).values(status=Status.FAILED, error=error[-2000:])
+        )
+
+
+def is_cancelled(job_id: str | uuid.UUID) -> bool:
+    try:
+        key = uuid.UUID(str(job_id))
+    except ValueError:
+        return False
+    with session_scope() as s:
+        return s.scalar(select(Job.status).where(Job.id == key)) in (
+            Status.CANCELLING, Status.CANCELLED,
+        )
+
+
+def cancel(job_id: str | uuid.UUID) -> str:
+    """Request cancellation; running jobs stay protected until cleanup finishes."""
+    try:
+        key = uuid.UUID(str(job_id))
+    except ValueError:
+        return "missing"
+    with session_scope() as s:
+        job = s.get(Job, key, with_for_update=True)
+        if job is None:
+            return "missing"
+        if job.status == Status.QUEUED:
+            job.status, job.error = Status.CANCELLED, None
+            return "cancelled"
+        if job.status in Status.BERJALAN:
+            job.status, job.error = Status.CANCELLING, None
+            return "cancelling"
+        return "active"
+
+
+def mark_cancelled(job_id: str | uuid.UUID) -> None:
+    with session_scope() as s:
+        s.execute(
+            update(Job)
+            .where(Job.id == uuid.UUID(str(job_id)), Job.status == Status.CANCELLING)
+            .values(status=Status.CANCELLED, error=None)
+        )
 
 
 def retry(job_id: str | uuid.UUID) -> dict | None:
@@ -179,6 +236,11 @@ def bereskan_gantung(worker_id: str = "slot-0") -> int:
         ).all()
         for job in rows:
             tahap = job.status
+            if tahap == Status.CANCELLING:
+                job.status = Status.CANCELLED
+                job.error = None
+                log.warning("job %s dibatalkan saat worker %s berhenti", job.id, worker_id)
+                continue
             log.warning("job %s (worker %s) tertinggal di status '%s' — ditandai gagal",
                         job.id, worker_id, tahap)
             job.status = Status.FAILED

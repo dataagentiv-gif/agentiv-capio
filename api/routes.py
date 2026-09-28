@@ -639,6 +639,19 @@ def retry_job(job_id: str):
     return JobCreated(job_id=job["id"], status=job["status"])
 
 
+@app.post("/jobs/{job_id}/cancel")
+def cancel_job(job_id: str):
+    if not _UUID.match(job_id):
+        raise HTTPException(404, "Job tidak ditemukan")
+    result = jobs.cancel(job_id)
+    if result == "missing":
+        raise HTTPException(404, "Job tidak ditemukan")
+    if result == "active":
+        raise HTTPException(409, "Job sudah selesai, gagal, atau dibatalkan")
+    log.info("pembatalan diminta untuk job %s", job_id)
+    return {"job_id": job_id, "status": result}
+
+
 @app.post("/api/unggah", status_code=201)
 async def unggah_berkas(berkas: UploadFile):
     """Terima satu berkas video, kembalikan penandanya untuk dipakai submit.
