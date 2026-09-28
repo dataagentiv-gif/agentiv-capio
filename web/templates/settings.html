@@ -221,7 +221,7 @@ function lisensiHtml(s, wa) {
       ${baris.map(b => `<p>${b}</p>`).join('')}
       <div class="aksi-lisensi">
         <button type="button" class="btn sm ghost" id="cek-lisensi">Verifikasi ulang</button>
-        <a class="btn sm ghost" href="https://app.agentiv.my.id/cek" target="_blank" rel="noopener">Cek key di portal</a>
+        <a class="btn sm ghost" href="https://app.agentiv.my.id/produk/capio/lisensi" target="_blank" rel="noopener">Cek / perpanjang lisensi</a>
         ${s.aktif ? '' : `<a class="btn sm ghost" href="${esc(wa || '#')}" target="_blank" rel="noopener">Chat WA</a>`}
       </div>
     </div>`;
