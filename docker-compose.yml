@@ -5,15 +5,9 @@
 # yt-dlp perlu cookies.
 
 x-app: &app
-  # Client menarik image jadi dari Docker Hub, bukan membangun dari source —
-  # mereka tidak pernah memegang kode ini. Update-nya `docker compose pull`
-  # lalu `up -d`, tanpa build ulang apa pun.
-  #
-  # `latest` dipilih daripada tag versi tetap: update jadi satu perintah tanpa
-  # client perlu tahu nomor rilisnya. Konsekuensinya satu image rusak yang
-  # ter-push ke `latest` kena ke semua client sekaligus — makanya tiap rilis
-  # tetap dipush dengan tag versi juga (mis. `1.2.0`), supaya ada versi
-  # terakhir yang terbukti baik untuk dijadikan pegangan kalau itu terjadi.
+  # Memakai image jadi dari Docker Hub, tanpa build dari source. Update cukup
+  # `docker compose pull` lalu `up -d`. Tiap rilis juga punya tag versi
+  # (mis. `1.8.0`) bila ingin mengunci ke versi tertentu.
   image: agentiv/capio:latest
   env_file: .env
   environment:
@@ -37,11 +31,8 @@ x-app: &app
     # di dalam containernya sendiri — unggahannya tersimpan dengan benar, job
     # dibuat dengan benar, lalu gagal dengan "berkas sudah tidak ada".
     - work:/work
-    # install_id dan token lisensi. NAMED VOLUME, bukan bind mount, dan itu
-    # disengaja: bind mount membuat install_id gampang ditemukan lalu disalin ke
-    # mesin lain — persis yang membuat batas perangkat tidak menahan apa pun.
-    # Named volume juga bertahan melewati `up -d` dengan tag image baru, yang
-    # merupakan jalur update normal; hanya `down -v` yang menghapusnya.
+    # Data Agent (video sumber, transkrip, preview per sesi). Named volume supaya
+    # bertahan melewati update image; hanya `down -v` yang menghapusnya.
     - capiodata:/app/data
   depends_on:
     postgres: {condition: service_healthy}

@@ -1,42 +1,117 @@
 # CAPIO
 
-Ubah video panjang jadi beberapa klip pendek 9:16 siap posting — lengkap dengan
-caption karaoke yang terbakar di video, judul, caption, dan hashtag.
+Ubah video panjang jadi beberapa klip pendek 9:16 siap posting (TikTok, Reels,
+Shorts), lengkap dengan caption karaoke yang terbakar di video, judul, caption,
+dan hashtag.
 
-Sumbernya boleh **link YouTube** atau **berkas video sendiri** yang diunggah
-lewat halaman Submit (MP4, MOV, MKV, WEBM, dan wadah lain yang bisa dibaca
-ffmpeg). Berkas yang diunggah melewati yt-dlp sepenuhnya, jadi ia tidak
-tersentuh bot-detection YouTube maupun urusan cookies.
+Gratis dan open source (MIT). Semua pemrosesan berat berjalan di komputer
+sendiri; klip jadi mendarat sebagai file mp4 biasa di folder `clips/`. AI-nya
+cuma satu: **Gemini**, pakai API key milikmu sendiri (tersedia tier gratis).
 
-Semua pemrosesan berat berjalan di mesin sendiri. Klip jadi mendarat sebagai
-file mp4 biasa di folder `clips/`, bukan di storage cloud mana pun.
+---
 
-CAPIO memakai **satu layanan AI: Gemini**, untuk transkrip, pemilihan momen,
-dan metadata. Satu key dapat menjalankan semuanya dan tersedia tingkat gratis
-untuk pemakaian ringan.
+## Fitur
+
+- **Sumber fleksibel:** link YouTube atau unggah video sendiri (MP4, MOV, MKV,
+  WEBM, dan format lain yang dibaca ffmpeg).
+- **Pilih momen otomatis:** Gemini mentranskrip video, memilih momen yang
+  utuh secara gagasan, lalu menulis judul, caption, dan hashtag per klip.
+- **Caption karaoke:** kata yang sedang diucapkan disorot; font, ukuran, warna,
+  jumlah kata per tampilan, dan gaya sorotan bisa diatur per video, dengan
+  preview yang dirender persis seperti hasil akhir.
+- **Template siap pakai + Custom:** `mentahan`, `full_screen`,
+  `pembicara_samping`, `blur_atas_bawah`, `kotak_tengah`, atau atur sendiri
+  rasio, komposisi, latar, caption, dan hook.
+- **Crop mengikuti wajah:** pembicara tetap di tengah frame vertikal.
+- **Agent · Beta:** cari momen lewat chat ("cariin momen soal …"), tinjau
+  kandidat beserta konteksnya, pertahankan yang cocok, lalu render.
+- **Antrean job:** proses beberapa video, batalkan, atau coba ulang job gagal
+  tanpa mengunduh ulang; bisa multi-worker.
+- **Rotasi API key:** isi beberapa key Gemini sekaligus; dipakai bergiliran dan
+  pindah otomatis saat kuota satu key habis.
+- **Pemakaian & biaya:** token Gemini per model dan estimasi biayanya tercatat
+  di halaman Setting.
+- **Bersih otomatis (opsional):** hapus job dan hasil lama setelah sekian hari.
 
 ---
 
 ## Daftar isi
 
-- [Cara pakai](#cara-pakai)
+- [Mulai cepat](#mulai-cepat)
 - [Halaman](#halaman)
+- [Agent · Beta](#agent--beta)
 - [Cara kerjanya](#cara-kerjanya)
 - [Konfigurasi](#konfigurasi)
 - [Kalibrasi](#kalibrasi)
 - [Keamanan](#keamanan)
 - [Arsitektur](#arsitektur)
-- [Mode Agentiv-host](#mode-agentiv-host)
 - [Pengembangan](#pengembangan)
 - [Batasan yang diketahui](#batasan-yang-diketahui)
+- [Lisensi](#lisensi)
 
 ---
 
-## Cara pakai
+## Mulai cepat
 
-> Panduan publik instalasi, update, dan multi-worker tersedia di portal Agentiv.
-> Tutorial penggunaan harian dan cara memilih style dibahas di video channel
-> pribadi Agentiv, agar dokumentasi bisnis tetap ringkas.
+**Yang dibutuhkan:**
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac)
+  atau Docker Engine (Linux). Tidak perlu Python, ffmpeg, maupun database.
+- API key Gemini, gratis dari [Google AI Studio](https://aistudio.google.com/apikey).
+- Komputer minimal 4 core/8 thread, RAM 8 GB, SSD kosong 20 GB. Unduhan
+  pertama image sekitar 5 GB.
+
+**1. Siapkan folder dan dua file konfigurasi.**
+
+Windows (PowerShell):
+
+```powershell
+mkdir capio; cd capio
+curl.exe -LO https://raw.githubusercontent.com/dataagentiv-gif/agentiv-capio/main/docker-compose.yml
+curl.exe -L -o .env https://raw.githubusercontent.com/dataagentiv-gif/agentiv-capio/main/.env.example
+```
+
+Mac/Linux:
+
+```bash
+mkdir capio && cd capio
+curl -LO https://raw.githubusercontent.com/dataagentiv-gif/agentiv-capio/main/docker-compose.yml
+curl -L -o .env https://raw.githubusercontent.com/dataagentiv-gif/agentiv-capio/main/.env.example
+```
+
+Atau clone repo ini lalu salin `.env.example` menjadi `.env`. Hasilnya sama:
+`docker compose up -d` menarik image jadi dari Docker Hub, tidak membangun dari
+source.
+
+**2. Jalankan.**
+
+```bash
+docker compose up -d
+```
+
+**3. Isi API key.** Buka **http://localhost:8000** → **Setting** → tab
+**API Key**, tempel key Gemini, klik **Simpan**, lalu **Tes**. Setelah itu
+langsung bisa submit video di halaman utama, atau coba **Agent · Beta**.
+
+Perintah lain yang sering dipakai:
+
+```bash
+docker compose logs -f worker   # ikuti proses job
+docker compose down             # matikan; data tetap tersimpan
+docker compose pull             # ambil versi terbaru…
+docker compose up -d            # …lalu jalankan ulang
+```
+
+Catatan:
+
+- Selama job berjalan, browser boleh ditutup, tapi Docker dan komputer harus
+  tetap menyala (jangan sleep).
+- **Jangan memakai `docker compose down -v`.** Opsi `-v` menghapus database,
+  antrean, unggahan, dan data sesi Agent.
+- Port 8000 sudah terpakai? Ubah `HOST_PORT` di `.env`, lalu
+  `docker compose up -d` lagi.
+- Konfigurasi dari halaman Setting langsung berlaku tanpa restart (kecuali
+  jumlah worker, lihat [Kinerja](#kinerja)).
 
 ### Tampilan output
 
@@ -53,68 +128,6 @@ default di versi berikutnya tidak mengubah hasil job lama. Caption panjang,
 source tanpa wajah, dan rasio landscape/square memakai fallback aman agar
 render tetap valid.
 
-### Dengan Docker (disarankan)
-
-Cuma butuh **Docker**. Tidak perlu Python, ffmpeg, maupun database.
-
-Untuk pemakai rilis, unduh `capio.zip` dari tab **Cara pakai** di portal
-Agentiv, ekstrak, lalu jalankan dari folder hasil ekstraknya:
-
-```bash
-docker compose up -d
-```
-
-Perintah clone di bawah khusus pengembangan dari source repo:
-
-```bash
-git clone <repo-ini>
-cd video-clipper
-cp .env.example .env        # copy di Windows
-docker compose up -d
-```
-
-Buka **http://localhost:8000**, lalu ke halaman **Setting** untuk mengisi API
-key Gemini (petunjuknya ada di halaman itu). Klik **Simpan**,
-lalu **Tes** untuk memastikan key Gemini benar.
-Setelah itu langsung bisa submit video.
-
-```bash
-docker compose logs -f worker   # ikuti prosesnya
-docker compose down             # matikan; data tetap tersimpan
-```
-
-Saat job berjalan, browser boleh ditutup tetapi Docker, container CAPIO, dan
-komputer harus tetap menyala; komputer juga tidak boleh masuk mode sleep.
-Matikan CAPIO dengan `docker compose down` hanya setelah job selesai.
-
-Update rilis tanpa menghapus data:
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-CAPIO memeriksa versi terbaru saat API menyala dan setiap satu jam setelahnya.
-Jika ada rilis baru, petunjuk update muncul sebagai banner di semua halaman.
-
-**Jangan memakai `docker compose down -v`.** Opsi `-v` menghapus volume
-Postgres, Redis, source upload. Perintah update di
-atas mempertahankan semuanya.
-
-Kalau port 8000 sudah dipakai proses lain, ubah `HOST_PORT` di `.env` lalu
-`docker compose up -d`. Port di dalam container tetap 8000 — yang berubah hanya
-sisi host.
-
-Ubah **kode** perlu `docker compose up -d --build`. Tanpa `--build`, compose
-memakai image lama dan perubahan tidak terpakai — tanpa error, cuma perilaku
-yang tidak berubah. Ubah **konfigurasi** lewat halaman Setting tidak perlu
-rebuild: worker membaca ulang `.env` di awal tiap job.
-
-`docker-compose.yml` yang dikirim ke client tidak punya `build:` sama sekali
-(mereka menarik image jadi dari Docker Hub). `docker-compose.override.yml` di
-repo ini yang mengembalikannya untuk pengembangan lokal — dibaca Compose
-otomatis, tidak perlu flag tambahan, dan tidak ikut ke paket client.
-
 ### Tanpa Docker
 
 Butuh **Python 3.12** dan **ffmpeg** di PATH.
@@ -123,7 +136,7 @@ Butuh **Python 3.12** dan **ffmpeg** di PATH.
 python -m venv venv
 venv/Scripts/python -m pip install -r requirements.txt   # bin/python di Linux
 docker compose up -d postgres redis
-cp .env.example .env
+cp .env.example .env    # Windows: copy .env.example .env
 ```
 
 Lalu di dua terminal terpisah:
@@ -147,6 +160,7 @@ venv/Scripts/python main.py worker
 | **Submit** `/` | Link YouTube atau unggah video, jumlah klip, lalu pilih Template atau Custom. Penyesuaian dan preview mengikuti pilihan tersebut; konfigurasi disimpan bersama job. |
 | **Proses** `/process` | Tab Berjalan dan Riwayat, progres tiap tahap, statistik klip, pencarian/filter, ringkasan konfigurasi, pembatalan job berjalan, dan penjelasan job gagal. Job gagal dapat dicoba ulang jika aman. |
 | **Hasil** `/results` | Klip selesai dengan preview, judul, caption, hashtag, dan ringkasan konfigurasi; bisa diputar, diunduh per klip atau sekaligus per job, dan dihapus. |
+| **Agent · Beta** `/agent` | Cari momen lewat chat untuk satu video; lihat [Agent · Beta](#agent--beta). |
 | **Setting** `/settings` | Tab API Key, Klip, Kinerja, dan Infra. API Key juga menampilkan pemakaian Gemini per model dan estimasi setara tarif API Standard berbayar. |
 
 Klip juga bisa diambil langsung dari folder `clips/<job-id>/` lewat file
@@ -156,11 +170,38 @@ Tombol **Hapus** membuang berkasnya dari disk, bukan sekadar barisnya dari
 layar. Menghapus job juga membersihkan folder kerjanya, yang menyimpan video
 sumber mentah dan biasanya jadi penyebab utama disk penuh.
 
-Dua hal muncul di **semua halaman**, bukan cuma satu: nomor versi yang
-terpasang (`vX.Y.Z`, kecil di sebelah logo Agentiv di nav — buat
-troubleshooting, bukan branding) dan banner "versi baru tersedia" kalau
-Agentiv sudah mengumumkan rilis lebih baru dari yang sedang berjalan.
-Keduanya cuma informasi; tidak ada yang diblokir kalau belum update.
+Nomor versi yang terpasang (`vX.Y.Z`) tampil kecil di navigasi, berguna saat
+melaporkan masalah. Bandingkan dengan rilis terbaru di Docker Hub
+(`agentiv/capio`) atau tab Releases/commit repo ini.
+
+---
+
+## Agent · Beta
+
+Mode chat untuk satu video, dibuka dari tombol **Agent · Beta** di halaman
+Submit atau langsung di `/agent`.
+
+1. **Siapkan video:** tempel link YouTube atau unggah berkas. CAPIO mengunduh,
+   mentranskrip, membuat preview, dan menyusun **peta topik** (ringkasan isi
+   video per bagian) sekali saja.
+2. **Arahkan lewat chat:** misalnya *"cariin 2 momen soal kenapa gaji naik tapi
+   tetap ga kaya, 30–60 detik"*. Agent mencari di transkrip, membaca konteks
+   sebelum dan sesudahnya, lalu mengusulkan kandidat yang awal dan akhirnya
+   jatuh di batas kalimat.
+3. **Tinjau:** putar kandidat beserta konteksnya, lalu **Pertahankan**,
+   **Tolak**, atau minta revisi lewat chat. Agent mengingat arahanmu di
+   putaran berikutnya.
+4. **Render:** pilih sampai 20 kandidat yang dipertahankan, lalu render dengan
+   template atau Custom seperti biasa. Hasilnya muncul di halaman Hasil.
+
+Satu putaran biasanya selesai dalam 1–2 menit. Gangguan sementara dari Gemini
+(sibuk, kuota habis) ditangani dengan pindah ke key/model lain; kalau tetap
+gagal, pesan dan tombol **Coba ulang** muncul di bawah percakapan, tanpa
+kehilangan kandidat sebelumnya. Data sesi tersimpan di volume `capiodata`;
+hapus sesi lewat menu **•••** untuk membebaskan disk.
+
+Status **Beta**: kualitas pilihan momen sudah baik, tapi alurnya masih bisa
+berubah. Detail teknis ada di [`docs/AGENT_EXPERIMENT.md`](docs/AGENT_EXPERIMENT.md).
 
 ---
 
@@ -234,7 +275,7 @@ dua video lain nol. Kalimat Inggris juga diterjemahkan alih-alih ditranskrip:
 *"Tools like Google Analytics"* keluar sebagai *"Tua seperti analitik"*.
 ElevenLabs sempat jadi default (akurat, tanpa blokir IP) sampai tambalan di
 atas terbukti: free tier-nya tembok bulanan (~15 video/bulan) jauh lebih
-sempit dari batas laju harian Gemini, dan target market CAPIO sensitif harga.
+sempit dari batas laju harian Gemini, dan kebanyakan pemakai CAPIO mengandalkan tier gratis.
 `ASR_PROVIDER`, `LLM_PROVIDER`, `ELEVENLABS_*`, dan `OPENROUTER_*` yang masih
 tertulis di `.env` lama diabaikan tanpa error — tidak ada yang perlu
 disunting setelah update.
@@ -246,7 +287,7 @@ CAPIO menyediakan lima template (`mentahan`, `full_screen`,
 Adjustment hanya muncul pada mode yang mendukungnya dan konfigurasi lengkap
 disimpan sebagai snapshot per job. `mentahan` mempertahankan source tanpa
 caption; Custom mengatur rasio, komposisi video, latar, caption, dan hook.
-Spesifikasi visual dan adjustment ada di [`template.md`](template.md), katalog
+Spesifikasi visual dan adjustment ada di [`docs/template.md`](docs/template.md), katalog
 kode di `pipeline/templates.py`.
 
 Full Screen dan Blur atas-bawah melacak wajah dari beberapa sampel sepanjang
@@ -407,20 +448,16 @@ file; lapisan pemilih untuk satu implementasi hanyalah indirection.
 > dijalankan — `import queue` dari dependency mana pun akan nyasar ke folder
 > project dan memecahkan pipeline diam-diam.
 
-## Mode Agentiv-host
-
-Branch `codex/agentiv-host` disiapkan untuk mengembangkan layanan CAPIO yang
-di-host dan dikelola Agentiv setelah ada pesanan Agentiv-host. Perubahan khusus
-hosting—seperti pengaturan worker dan template modular—dikerjakan di branch ini;
-`main` tetap menjadi jalur rilis CAPIO Self-host.
-
-Sebelum ada pesanan, branch ini hanya menandai ruang kerja dan belum mengubah
-kode atau perilaku produk. Fitur dan perbaikan pada core CAPIO bersama tetap
-perlu diselaraskan dengan `main` saat pengembangan Agentiv-host dimulai.
-
----
-
 ## Pengembangan
+
+Membangun image dari source di repo ini (bukan menarik dari Docker Hub):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
+
+Tanpa `--build`, compose memakai image lama dan perubahan kode tidak terpakai.
+Dokumen desain dan catatan teknis lain ada di folder [`docs/`](docs/).
 
 ```bash
 venv/Scripts/python -m pytest          # semua kecuali integration
@@ -491,4 +528,4 @@ diperkirakan.
 
 ## Lisensi
 
-CAPIO sekarang dibagikan gratis — tidak perlu license key. Lisensi MIT — lihat `CAPIO-LICENSE.txt`.
+MIT, lihat [`CAPIO-LICENSE.txt`](CAPIO-LICENSE.txt): bebas dipakai, diubah, dan dibagikan ulang, termasuk untuk komersial, selama teks lisensinya ikut disertakan. Font pihak ketiga mengikuti lisensinya masing-masing di [`THIRD_PARTY_NOTICES.txt`](THIRD_PARTY_NOTICES.txt).

@@ -1,0 +1,12 @@
+# Khusus PENGEMBANGAN: membangun image dari source di repo ini.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#
+# Pemakai biasa tidak perlu file ini; `docker compose up -d` saja menarik
+# image jadi dari Docker Hub. Hasil build di-tag dengan nama image yang sama
+# (agentiv/capio:latest), jadi api dan worker tetap memakai satu image.
+services:
+  api:
+    build: .
+  worker:
+    build: .
