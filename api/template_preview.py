@@ -8,14 +8,14 @@ from pathlib import Path
 from pipeline.motion import build
 from pipeline.reference_caption import CaptionEngine, MOTIONS, render_overlay
 from pipeline.stages.render import _render_templates
-from pipeline.templates import resolve
+from pipeline.templates import canonical
 from utils.ffmpeg_helpers import Deadline
 
 _CACHE: dict[str, bytes] = {}
 
 
 def render(template_id: str, adjustments: dict) -> bytes:
-    options = resolve(template_id, adjustments)
+    template_id, options = canonical(template_id, adjustments)
     key = hashlib.sha1(json.dumps([template_id, options], sort_keys=True).encode()).hexdigest()
     if key in _CACHE:
         return _CACHE[key]

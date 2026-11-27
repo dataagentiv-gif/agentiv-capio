@@ -79,6 +79,8 @@ async def lifespan(app: FastAPI):
     # environment beku dari saat container lahir, bukan file yang sekarang.
     env_store.reload()
     models.init()
+    from pipeline.templates import load_presets
+    load_presets(settings.TEMPLATE_PACK_DIR)
     # Peringatan ini ada karena kesalahan yang paling mungkin terjadi bukan
     # serangan canggih, melainkan seseorang mengubah API_HOST agar bisa dibuka
     # dari HP-nya, lalu lupa bahwa /settings memajang status seluruh kredensial.
@@ -283,9 +285,13 @@ def test_provider(provider: str):
 @app.get("/api/templates")
 @app.get("/api/layouts")
 def daftar_layout():
-    from pipeline.templates import TEMPLATES
+    from pipeline.templates import PRESETS, TEMPLATES
 
-    return {"default": "full_screen", "templates": [
+    # Preset paket tampil di depan: kalau ada, itu tampilan yang memang dipesan.
+    presets = [{"id": key, "title": p["title"], "description": p["description"], "preset": True,
+                "visual": {"canvas": "1080x1920", "caption_color": p["adjustments"]["caption_color"],
+                           "caption_italic": p["adjustments"]["caption_italic"]}, "defaults": {}} for key, p in PRESETS.items()]
+    return {"default": next(iter(PRESETS), "full_screen"), "templates": presets + [
         {"id": key, **value} for key, value in TEMPLATES.items()
     ]}
 

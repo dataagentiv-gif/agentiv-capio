@@ -302,6 +302,23 @@ tidak terdeteksi, renderer memakai titik tengah source. Motion caption khusus
 Pembicara di samping dan Kotak tengah dirender sebagai overlay transparan,
 sementara caption lain memakai subtitle `.ass`.
 
+### Paket template
+
+Template khusus (mis. gaya caption brand) tidak perlu mengubah kode CAPIO. Taruh
+file `*.json` di folder `templates_extra/` (bisa diganti lewat `TEMPLATE_PACK_DIR`):
+
+```json
+{"id": "nama_template", "title": "Nama Template", "description": "Satu kalimat.",
+ "adjustments": {"caption_color": "F8B818", "active_text_color": "F8B818",
+                 "caption_italic": true, "caption_px": 87, "hook": true, "hook_block": "frame"}}
+```
+
+`adjustments` memakai kunci Custom (lihat `CUSTOM_DEFAULTS` di `pipeline/templates.py`),
+divalidasi saat API start; file yang tidak valid dilewati dengan pesan di log. Template
+paket tampil paling depan di halaman Submit dan dirender lewat jalur Custom dengan
+nilai yang dikunci. Untuk distribusi, buat repo terpisah berisi `templates/` dan
+Dockerfile `FROM agentiv/capio:<versi>` yang menyalinnya ke `/app/templates_extra/`.
+
 ### Pemakaian Gemini
 
 Settings menampilkan panggilan dan token Gemini per model. Catatan lokal

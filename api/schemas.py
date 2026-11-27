@@ -13,9 +13,9 @@ class JobCreate(BaseModel):
 
     @model_validator(mode="after")
     def _template_valid(self):
-        from pipeline.templates import resolve
+        from pipeline.templates import canonical
 
-        self.adjustments = resolve(self.template_id, self.adjustments)
+        self.template_id, self.adjustments = canonical(self.template_id, self.adjustments)
         return self
 
     @field_validator("url")

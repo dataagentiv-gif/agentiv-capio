@@ -201,9 +201,9 @@ def source(ident: uuid.UUID):
 @router.post("/api/agent/sessions/{ident}/render", status_code=201)
 def render(ident: uuid.UUID, payload: Render):
     gate()
-    from pipeline.templates import resolve
+    from pipeline.templates import canonical
     try:
-        adjustments = resolve(payload.template_id, payload.adjustments)
+        template_id, adjustments = canonical(payload.template_id, payload.adjustments)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     with sessions.locked(ident) as (db, row):
@@ -233,7 +233,7 @@ def render(ident: uuid.UUID, payload: Render):
                 "hook_title": c["title"], "reason": c["reason"], "score": 0})
         snapshot = {"session_id": str(ident), "version": payload.version, "brief": row.data.get("editorial", {}).get("understanding") or row.brief,
                     "editorial": row.data.get("editorial", {}), "segments": segments, "candidate_ids": payload.candidate_ids}
-        job = Job(url=row.url, target_clips=len(segments), layout=payload.template_id, gaya=adjustments,
+        job = Job(url=row.url, target_clips=len(segments), layout=template_id, gaya=adjustments,
                   status=Status.QUEUED, agent_snapshot=snapshot,
                   client_request_id=f"agent:{ident}:{payload.request_id}")
         db.add(job)

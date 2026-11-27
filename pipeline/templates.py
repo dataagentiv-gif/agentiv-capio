@@ -36,6 +36,11 @@ CUSTOM_DEFAULTS = {
     "caption_size": "medium", "caption_words": 3, "caption_upper": False,
     "caption_style": "text_color", "active_text_color": "FFE500",
     "active_background_color": "FFE500", "hook": False, "hook_block": "none",
+    # Knob gaya lanjutan. Bawaannya sama dengan perilaku lama, jadi job lama
+    # tidak berubah; dipakai terutama oleh paket template (lihat load_presets).
+    "caption_color": "FFFFFF", "caption_italic": False, "caption_outline": 6,
+    "caption_shadow": 2, "caption_px": 0, "hook_position": 0.06, "hook_seconds": 0,
+    "hook_frame_color": "800010",
 }
 CUSTOM_ENUMS = {
     "output_ratio": {"9:16", "1:1", "16:9"}, "video_mode": {"full", "panel"},
@@ -44,8 +49,11 @@ CUSTOM_ENUMS = {
     "focus_mode": {"face", "center"}, "background": {"black", "solid", "blur"},
     "caption_font": {"Poppins", "Archivo Black", "Anton", "Lora"},
     "caption_size": {"small", "medium", "large"}, "caption_style": STYLES,
-    "hook_block": {"none", "white"},
+    "hook_block": {"none", "white", "frame"},
 }
+# (kunci, minimum, maksimum); caption_px 0 berarti ikut caption_size.
+CUSTOM_RANGES = (("caption_outline", 0, 12), ("caption_shadow", 0, 8), ("caption_px", 0, 200),
+                 ("hook_position", 0.04, 0.92), ("hook_seconds", 0, 15))
 
 
 def resolve(template_id: str, adjustments: dict | None) -> dict:
@@ -62,15 +70,23 @@ def resolve(template_id: str, adjustments: dict | None) -> dict:
                 raise ValueError(f"{key} tidak dikenal untuk Custom")
         if not isinstance(result["caption"], bool) or not isinstance(result["hook"], bool):
             raise ValueError("caption dan hook harus boolean")
-        if not isinstance(result["caption_upper"], bool):
-            raise ValueError("caption_upper harus boolean")
+        for key in ("caption_upper", "caption_italic"):
+            if not isinstance(result[key], bool):
+                raise ValueError(f"{key} harus boolean")
+        for key, low, high in CUSTOM_RANGES:
+            value = result[key]
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not low <= value <= high:
+                raise ValueError(f"{key} harus angka {low} sampai {high}")
+        if 0 < result["caption_px"] < 24:
+            raise ValueError("caption_px harus 0 atau minimal 24")
         if result["caption_words"] not in {1, 2, 3, 4}:
             raise ValueError("caption_words harus 1 sampai 4")
         try:
             result["caption_position"] = max(0.08, min(0.92, float(result["caption_position"])))
         except (TypeError, ValueError):
             raise ValueError("caption_position harus angka 0.08 sampai 0.92") from None
-        for key in ("background_color", "active_text_color", "active_background_color"):
+        for key in ("background_color", "active_text_color", "active_background_color",
+                    "caption_color", "hook_frame_color"):
             if not isinstance(result[key], str) or not HEX.fullmatch(result[key]):
                 raise ValueError(f"{key} harus warna #RRGGBB")
             result[key] = result[key].lstrip("#").upper()
@@ -107,3 +123,49 @@ def resolve(template_id: str, adjustments: dict | None) -> dict:
                 raise ValueError(f"{key} harus warna #RRGGBB")
             result[key] = value.lstrip("#").upper()
     return result
+
+
+# --- Paket template ---
+#
+# Template milik satu pihak (mis. gaya caption brand client) tidak ditulis ke
+# kode: ia preset Custom bernama yang dibaca dari *.json di TEMPLATE_PACK_DIR,
+# sehingga jalur render tetap satu dan repo publik tidak memuat apa pun milik
+# client. Bentuk file: {"id", "title", "description", "adjustments": {...Custom}}.
+PRESETS: dict[str, dict] = {}
+_ID = re.compile(r"[a-z0-9][a-z0-9_]{1,39}\Z")
+
+
+def load_presets(folder) -> dict[str, dict]:
+    """Muat ulang PRESETS dari folder. File rusak dilewati dengan pesan di log,
+    bukan menggagalkan start: satu preset keliru tidak boleh mematikan CAPIO."""
+    import json
+    from pathlib import Path
+    from utils.logging import get
+    log = get(__name__)
+    PRESETS.clear()
+    folder = Path(folder)
+    if not folder.is_dir():
+        return PRESETS
+    for path in sorted(folder.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            ident = data["id"]
+            if not isinstance(ident, str) or not _ID.fullmatch(ident) or ident in TEMPLATES or ident == "custom":
+                raise ValueError(f"id preset tidak sah: {ident!r}")
+            preset = {"title": str(data["title"])[:60], "description": str(data.get("description", ""))[:200],
+                      "adjustments": resolve("custom", dict(data["adjustments"]))}
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            log.warning("paket template %s dilewati: %s", path.name, exc)
+            continue
+        PRESETS[ident] = preset
+        log.info("paket template dimuat: %s (%s)", ident, path.name)
+    return PRESETS
+
+
+def canonical(template_id: str, adjustments: dict | None) -> tuple[str, dict]:
+    """(template_id, adjustments) yang dipakai pipeline. Preset diterjemahkan ke
+    Custom dengan nilainya sendiri; adjustment kiriman pengguna diabaikan karena
+    tampilan preset memang dikunci."""
+    if template_id in PRESETS:
+        return "custom", dict(PRESETS[template_id]["adjustments"])
+    return template_id, resolve(template_id, adjustments)

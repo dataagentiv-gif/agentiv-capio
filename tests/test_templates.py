@@ -187,3 +187,64 @@ def test_retry_job_lama_ditolak(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         routes.retry_job("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
     assert exc.value.status_code == 409
+
+
+# --- Knob gaya Custom & paket template ---
+
+KAISAR = {"caption_color": "F8B818", "active_text_color": "F8B818", "caption_italic": True,
+          "caption_px": 70, "caption_outline": 5, "caption_shadow": 3, "caption_position": 0.6,
+          "hook": True, "hook_block": "frame", "hook_position": 0.675, "hook_seconds": 5}
+
+
+def test_knob_custom_baru_tidak_mengubah_bawaan_lama():
+    from pipeline.custom import caption_ass
+    words = [{"i": 0, "w": "halo", "s": 0.0, "e": 0.5}]
+    ass = caption_ass(words, {"start": 0, "end": 2}, resolve("custom", {}), 1080, 1920)
+    assert "Style: Cap,Poppins,96,&H00FFFFFF,&H000000FF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,6,2," in ass
+
+
+@pytest.mark.parametrize("bad", [{"caption_outline": 40}, {"caption_px": 10}, {"caption_italic": "ya"},
+                                 {"hook_block": "neon"}, {"caption_color": "kuning"}, {"hook_seconds": -1}])
+def test_knob_custom_baru_divalidasi(bad):
+    with pytest.raises(ValueError):
+        resolve("custom", bad)
+
+
+def test_gaya_kaisar_di_ass_dan_hook_berhenti_tepat_waktu():
+    from pipeline.custom import caption_ass
+    words = [{"i": i, "w": w, "s": i * .4, "e": i * .4 + .35} for i, w in enumerate("karena begini".split())]
+    ass = caption_ass(words, {"start": 0, "end": 8, "hook_title": "Kepercayaan Diri Tidak Datang"},
+                      resolve("custom", KAISAR), 1080, 1920)
+    style = next(l for l in ass.splitlines() if l.startswith("Style: Cap"))
+    assert style.startswith("Style: Cap,Poppins,70,&H0018B8F8,") and ",-1,-1,0,0,100,100,0,0,1,5,3," in style
+    hook = [l for l in ass.splitlines() if r"\p1" in l or "Kepercayaan" in l]
+    assert len(hook) == 3 and all(",0:00:05.00," in l for l in hook)   # bukan "5.00" (= 5 jam)
+    assert r"\pos(140,1296)" in ass and r"\1c&H100080&" in ass
+
+
+def test_paket_template_dimuat_dan_diterjemahkan_ke_custom(tmp_path):
+    import json
+    from pipeline import templates
+    (tmp_path / "kaisar.json").write_text(json.dumps(
+        {"id": "kaisar_tv", "title": "Kaisar TV", "description": "Caption kuning miring", "adjustments": KAISAR}))
+    (tmp_path / "rusak.json").write_text("{bukan json")
+    (tmp_path / "bentrok.json").write_text(json.dumps({"id": "full_screen", "title": "x", "adjustments": {}}))
+    try:
+        assert list(templates.load_presets(tmp_path)) == ["kaisar_tv"]
+        job = JobCreate(url=URL, template_id="kaisar_tv", adjustments={"caption_color": "FFFFFF"})
+        assert job.template_id == "custom" and job.adjustments["caption_color"] == "F8B818"
+        assert templates.canonical("full_screen", {})[0] == "full_screen"
+    finally:
+        templates.PRESETS.clear()
+
+
+def test_hook_berbingkai_judul_panjang_tetap_dua_baris_dan_mengecil():
+    from pipeline.custom import caption_ass
+    words = [{"i": 0, "w": "x", "s": 0.0, "e": 0.5}]
+    opsi = resolve("custom", {"hook": True, "hook_block": "frame"})
+    def baris(judul):
+        ass = caption_ass(words, {"start": 0, "end": 8, "hook_title": judul}, opsi, 1080, 1920)
+        return [l for l in ass.splitlines() if l.startswith("Dialogue: 2")]
+    pendek, panjang = baris("Self Image"), baris("Bukan Keadaannya yang Sulit Dilepaskan Tapi Cara Kita Merespons")
+    assert len(pendek) == 1 and len(panjang) == 2
+    assert r"\fs76" in pendek[0] and r"\fs76" not in panjang[0]

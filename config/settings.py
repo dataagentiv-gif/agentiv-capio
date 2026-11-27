@@ -91,9 +91,12 @@ class Settings(BaseSettings):
     # update berarti slot perangkat baru diklaim tiap ganti versi, dan batas 1
     # atau 3 perangkat habis sendiri tanpa penggunanya berbuat apa-apa.
     DATA_DIR: Path = ROOT / "data"
+    # Paket template (*.json preset Custom bernama) yang dimuat saat API start.
+    # Repo paket client menyalin file-nya ke sini lewat Dockerfile-nya sendiri.
+    TEMPLATE_PACK_DIR: Path = ROOT / "templates_extra"
 
     # Ditampilkan sebagai versi kecil di nav (_layout.html).
-    VERSI: str = "1.9.1"
+    VERSI: str = "1.10.0"
 
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"
