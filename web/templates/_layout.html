@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="format-detection" content="telephone=no">
   <title>{% block title %}CAPIO{% endblock %}</title>
+  {# crypto.randomUUID hanya ada di konteks aman (localhost/HTTPS). Dibuka dari
+     HP lewat IP jaringan, halaman Submit dan Agent akan mati tanpa ini. #}
+  <script>if(!crypto.randomUUID)crypto.randomUUID=()=>([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));</script>
   {# Tanpa ini browser meminta /favicon.ico dan dapat 404 di setiap muat
      halaman — mengotori log dengan kesalahan yang bukan kesalahan. #}
   <link rel="icon" href="/static/favicon.svg?v={{ v }}" type="image/svg+xml">
@@ -106,22 +109,11 @@
       </svg>
       <span class="brand-name">CAPIO</span>
     </a>
-    {# Atribusi, bukan co-branding — yang dijual CAPIO, Agentiv yang membuatnya.
-       Karena itu sengaja jauh lebih kecil dari lambang CAPIO dan dipisah garis:
-       kalau ukurannya sepadan, keduanya terbaca sebagai satu produk gabungan.
-       PNG dan bukan SVG seperti lambang CAPIO: yang ini dipakai pada satu
-       ukuran kecil saja, tidak pernah jadi favicon, dan wordmark "agentiv"
-       punya bentuk huruf khas yang men-trace-nya tidak sepadan hasilnya.
-       alt-nya "Agentiv" saja, bukan "by Agentiv" — "by"-nya sudah ada sebagai
-       teks di sebelahnya dan pembaca layar akan membacanya dua kali. #}
-    <a class="oleh" href="https://agentiv.my.id" target="_blank" rel="noopener">
+    {# Kredit pembuat, sengaja kecil dan dipisah garis dari lambang CAPIO. #}
+    <a class="oleh" href="https://github.com/dataagentiv-gif/agentiv-capio" target="_blank" rel="noopener">
       by <img src="/static/agentiv.png?v={{ v }}" alt="Agentiv" width="400" height="93">
     </a>
-    {# Nomor versi terpasang, kecil dan tidak mencolok — ini bukan branding,
-       cuma buat troubleshooting/support: biar client bisa langsung bandingin
-       ke versi yang disebut di banner "ada update" tanpa buka Setting dulu.
-       Ditaruh di semua halaman lewat _layout.html, sama seperti atribusi
-       Agentiv di sebelahnya. #}
+    {# Nomor versi terpasang, untuk melaporkan masalah. #}
     <span class="versi-terpasang" title="Versi CAPIO yang terpasang">v{{ versi }}</span>
     {# Dock gelap dengan lekukan di bawah item aktif. Bentuk docknya digambar
        satu path SVG oleh app.js; kalau JS mati, CSS memberi latar pil biasa
@@ -150,58 +142,23 @@
   </div>
 </header>
 
-{# Banner update tersedia, di semua halaman. Kosong/hidden sejak render —
-   app.js yang menyalakannya lewat /api/status, sama seperti titik penanda
-   job berjalan di dock. status() murni baca file lokal, jadi tidak ada
-   risiko halaman menunggu jaringan untuk ini. #}
-<div class="banner-update-wrap" id="update-wrap" hidden>
-  <section class="update-panel" id="update-banner" aria-label="Pembaruan CAPIO">
-    <div><strong>Versi baru CAPIO tersedia<span id="update-versi"></span></strong>
-      <p id="update-ringkas">Detail perubahan belum tersedia.</p></div>
-    <div class="update-actions">
-      <button type="button" class="btn sm ghost" id="update-detail">Lihat changelog</button>
-      <button type="button" class="btn sm ghost" id="update-salin">Salin perintah update</button>
-      <button type="button" class="btn sm ghost" id="update-nanti">Ingatkan nanti</button>
-    </div>
-    <details class="update-detail" id="update-instruksi"><summary>Cara update</summary>
-      <p>Jalankan perintah berikut di folder instalasi:</p><code>docker compose pull<br>docker compose up -d</code>
-      <p>Jangan gunakan <code>docker compose down -v</code> karena volume menyimpan data CAPIO.</p>
-    </details>
-  </section>
-</div>
-
 <main class="{% block main_class %}{% endblock %}">
   <div class="page-head">
-    <h1 class="display">{% block heading %}{% endblock %}</h1>
+    <h1 class="display">{% block heading %}{% endblock %}{% if help %} <button type="button" class="tanya" data-help="{{ help }}" aria-label="Cara pakai halaman ini" title="Cara pakai">?</button>{% endif %}</h1>
     <p class="lede">{% block lede %}{% endblock %}</p>
   </div>
   {% block content %}{% endblock %}
 </main>
 
 <div class="bantuan-wrap">
-  <button class="bantuan" id="bantuan-menu" type="button" aria-expanded="false" aria-controls="bantuan-pilihan" aria-label="Buka menu bantuan" title="Chat CS">
+  <button class="bantuan" id="bantuan-menu" type="button" aria-expanded="false" aria-controls="bantuan-pilihan" aria-label="Buka menu bantuan" title="Bantuan">
     <svg width="28" height="28" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-chat"/></svg>
   </button>
   <div class="bantuan-pilihan" id="bantuan-pilihan" hidden>
-    <a href="{{ wa() }}" target="_blank" rel="noopener">Chat CS</a>
-    <button type="button" id="buka-feedback">Kritik &amp; saran</button>
+    <a href="/panduan">Panduan</a>
+    <a href="https://github.com/dataagentiv-gif/agentiv-capio/issues" target="_blank" rel="noopener">Laporkan masalah</a>
   </div>
 </div>
-<dialog class="feedback-dialog" id="feedback-dialog" aria-labelledby="feedback-title">
-  <form method="dialog" id="feedback-form">
-    <button class="dialog-close" value="cancel" aria-label="Tutup">×</button>
-    <h2 id="feedback-title">Kritik &amp; saran</h2><p class="sub">Feedback akan dibuka sebagai draft email ke dataagentiv@gmail.com.</p>
-    <label for="feedback-kind">Jenis feedback</label><select id="feedback-kind"><option>Bug</option><option>Ide fitur</option><option>Kritik UX</option><option>Hasil render</option></select>
-    <label for="feedback-rating">Rating</label><select id="feedback-rating"><option value="5">5 — sangat baik</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1 — perlu banyak perbaikan</option></select>
-    <label for="feedback-message">Pesan</label><textarea id="feedback-message" required rows="5" placeholder="Apa yang terjadi atau apa yang ingin diperbaiki?"></textarea>
-    <label for="feedback-job">Job ID atau template (opsional)</label><input id="feedback-job" type="text" placeholder="contoh: 70c132cb atau Custom">
-    <label for="feedback-contact">Email untuk balasan (opsional)</label><input id="feedback-contact" type="email" placeholder="nama@email.com">
-    <label class="check"><input id="feedback-style" type="checkbox"> Sertakan konfigurasi style</label>
-    <label class="check"><input id="feedback-url" type="checkbox"> Sertakan URL sumber video</label>
-    <div class="dialog-actions"><button type="button" class="btn ghost" id="feedback-batal">Batal</button><button type="submit" class="btn">Buka draft email</button></div>
-    <p class="note ok" id="feedback-status" hidden>Draft feedback sudah disiapkan.</p>
-  </form>
-</dialog>
 
 <script src="/static/app.js?v={{ v }}"></script>
 {% block script %}{% endblock %}

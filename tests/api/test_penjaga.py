@@ -135,3 +135,13 @@ def test_adjustment_kosong_memakai_default_tersimpan(client):
     })
     from pipeline.templates import resolve
     assert client.get(f"/jobs/{r.json()['job_id']}").json()["adjustments"] == resolve("full_screen", {})
+
+
+def test_panduan_tampil_dan_semua_videonya_ada(client):
+    import json
+    from pathlib import Path
+    folder = Path(__file__).resolve().parents[2] / "web" / "static" / "panduan"
+    langkah = json.loads((folder / "panduan.json").read_text(encoding="utf-8"))
+    assert all((folder / p["video"]).is_file() for p in langkah)
+    r = client.get("/panduan")
+    assert r.status_code == 200 and r.text.count("<video") == len(langkah)

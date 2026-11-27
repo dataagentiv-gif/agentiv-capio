@@ -311,11 +311,6 @@ function idJob(id) {
 // seluruh isi job beserta klipnya.
 (function penandaJalan() {
   const titik = document.querySelector('.dock .titik');
-  // Banner update dipasang di poller yang sama, bukan poller kedua — dua-
-  // duanya cuma butuh /api/status yang sudah difetch di sini.
-  const banner = document.querySelector('#update-banner');
-  const wrap = document.querySelector('#update-wrap');
-  const versiEl = document.getElementById('update-versi');
   if (!titik) return;
 
   async function cek() {
@@ -323,23 +318,9 @@ function idJob(id) {
       const s = await (await fetch('/api/status')).json();
       titik.hidden = !s.jalan;
       titik.title = s.jalan ? `${s.jalan} video sedang diproses` : '';
-      const lis = s.lisensi || {};
-      if (banner) {
-        const versi = lis.versi_terbaru || '';
-        const ditunda = localStorage.getItem('capio-update-dismissed') === versi;
-        const tampil = !!lis.update_tersedia && !ditunda;
-        if (wrap) wrap.hidden = !tampil;
-        banner.hidden = !tampil;
-        if (tampil && versiEl) versiEl.textContent = ` (${versi})`;
-        const ringkas = document.getElementById('update-ringkas');
-        if (ringkas) ringkas.textContent = lis.release_notes || 'Detail perubahan belum tersedia.';
-        const detail = document.getElementById('update-detail');
-        if (detail) { detail.disabled = !lis.changelog_url; detail.onclick = () => lis.changelog_url && window.open(lis.changelog_url, '_blank', 'noopener'); }
-      }
     } catch {
-      // API tidak terjangkau bukan berarti tidak ada job berjalan atau tidak
-      // ada update. Titik dan banner dibiarkan apa adanya, bukan dimatikan —
-      // mematikannya adalah pernyataan yang tidak bisa dibuktikan.
+      // API tidak terjangkau bukan berarti tidak ada job berjalan; titik
+      // dibiarkan apa adanya, bukan dimatikan.
     }
   }
 
@@ -347,38 +328,10 @@ function idJob(id) {
   setInterval(cek, 15000);
 })();
 
-document.getElementById('update-nanti')?.addEventListener('click', () => {
-  const v = document.getElementById('update-versi')?.textContent?.replace(/^\s*\(/, '').replace(/\)\s*$/, '');
-  if (v) localStorage.setItem('capio-update-dismissed', v);
-  const wrap = document.getElementById('update-wrap'); if (wrap) wrap.hidden = true;
-});
-document.getElementById('update-salin')?.addEventListener('click', async (e) => {
-  const b = e.currentTarget; const command = 'docker compose pull\ndocker compose up -d';
-  try { await navigator.clipboard.writeText(command); b.textContent = 'Perintah tersalin'; }
-  catch { b.textContent = command; }
-  setTimeout(() => { b.textContent = 'Salin perintah update'; }, 1600);
-});
-
-(function feedback() {
+(function bantuan() {
   const menu = document.getElementById('bantuan-menu'), pilihan = document.getElementById('bantuan-pilihan');
-  const dialog = document.getElementById('feedback-dialog'), buka = document.getElementById('buka-feedback');
-  if (!menu || !pilihan || !dialog || !buka) return;
+  if (!menu || !pilihan) return;
   menu.addEventListener('click', () => { const open = pilihan.hidden; pilihan.hidden = !open; menu.setAttribute('aria-expanded', String(open)); });
-  buka.addEventListener('click', () => { pilihan.hidden = true; menu.setAttribute('aria-expanded', 'false'); dialog.showModal(); });
-  document.getElementById('feedback-batal')?.addEventListener('click', () => dialog.close());
-  document.getElementById('feedback-form')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const val = id => document.getElementById(id)?.value || '';
-    const checked = id => document.getElementById(id)?.checked;
-    const lines = [`Jenis: ${val('feedback-kind')}`, `Rating: ${val('feedback-rating')}/5`, '', val('feedback-message'), '', `Versi CAPIO: ${document.querySelector('.versi-terpasang')?.textContent || '-'}`, `Halaman: ${location.pathname}`];
-    if (val('feedback-job')) lines.push(`Job/template: ${val('feedback-job')}`);
-    if (checked('feedback-style')) lines.push('Sertakan konfigurasi style dari job/template yang disebut pengguna.');
-    if (checked('feedback-url')) lines.push(`URL sumber: ${document.querySelector('#url')?.value || location.href}`);
-    if (val('feedback-contact')) lines.push(`Email balasan: ${val('feedback-contact')}`);
-    const subject = encodeURIComponent(`[CAPIO] ${val('feedback-kind')} — rating ${val('feedback-rating')}/5`);
-    window.location.href = `mailto:dataagentiv@gmail.com?subject=${subject}&body=${encodeURIComponent(lines.join('\n'))}`;
-    const status = document.getElementById('feedback-status'); if (status) status.hidden = false;
-  });
 })();
 
 // Menyalin id dipasang sekali di sini, bukan per halaman: dua halaman memakai
@@ -400,3 +353,30 @@ document.addEventListener('click', async (e) => {
   }
   setTimeout(() => { b.textContent = semula; }, 1400);
 });
+
+
+// Tombol ? bertanda data-help membuka langkah panduan untuk halaman itu,
+// lengkap dengan video singkat. Sumbernya satu: static/panduan/panduan.json,
+// yang juga dipakai halaman /panduan.
+(function panduan() {
+  let data;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'panduan-dialog';
+  dialog.setAttribute('aria-label', 'Cara pakai');
+  dialog.addEventListener('click', e => { if (e.target === dialog || e.target.closest('[data-tutup]')) dialog.close(); });
+  dialog.addEventListener('close', () => dialog.querySelectorAll('video').forEach(v => v.pause()));
+  document.body.append(dialog);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-help]');
+    if (!b) return;
+    e.preventDefault();
+    try { data = data || await (await fetch('/static/panduan/panduan.json')).json(); } catch { location.href = '/panduan'; return; }
+    const langkah = data.filter(p => p.halaman === b.dataset.help);
+    dialog.innerHTML = `<button class="dialog-close" data-tutup aria-label="Tutup">×</button>
+      ${langkah.map(p => `<section><h2>${esc(p.judul)}</h2><p>${esc(p.teks)}</p>
+        <video src="/static/panduan/${esc(p.video)}" autoplay loop muted playsinline></video></section>`).join('')}
+      <p><a href="/panduan">Lihat semua panduan →</a></p>`;
+    dialog.showModal();
+  });
+})();

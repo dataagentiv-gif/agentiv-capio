@@ -1,0 +1,16 @@
+{% extends "_layout.html" %}
+{% set page = 'panduan' %}
+{% block title %}Panduan · CAPIO{% endblock %}
+{% block heading %}Panduan{% endblock %}
+{% block lede %}Dari API key sampai klip jadi. Tiap langkah punya video singkat; tombol <b>?</b> di tiap halaman membuka langkah yang relevan.{% endblock %}
+{% block content %}
+<div class="panduan-list">
+  {% for p in panduan %}
+  <section class="panel panduan-item" id="{{ p.id }}">
+    <h2>{{ p.judul }}</h2>
+    <p>{{ p.teks }}</p>
+    <video src="/static/panduan/{{ p.video }}?v={{ v }}" controls loop muted playsinline preload="metadata"></video>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

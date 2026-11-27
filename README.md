@@ -93,6 +93,10 @@ docker compose up -d
 **API Key**, tempel key Gemini, klik **Simpan**, lalu **Tes**. Setelah itu
 langsung bisa submit video di halaman utama, atau coba **Agent · Beta**.
 
+Bingung di satu halaman? Klik tombol **?** di samping judulnya untuk video
+singkat cara pakainya, atau buka **http://localhost:8000/panduan** untuk
+seluruh langkah dari awal.
+
 Perintah lain yang sering dipakai:
 
 ```bash
@@ -161,6 +165,7 @@ venv/Scripts/python main.py worker
 | **Submit** `/` | Link YouTube atau unggah video, jumlah klip, lalu pilih Template atau Custom. Penyesuaian dan preview mengikuti pilihan tersebut; konfigurasi disimpan bersama job. |
 | **Proses** `/process` | Tab Berjalan dan Riwayat, progres tiap tahap, statistik klip, pencarian/filter, ringkasan konfigurasi, pembatalan job berjalan, dan penjelasan job gagal. Job gagal dapat dicoba ulang jika aman. |
 | **Hasil** `/results` | Klip selesai dengan preview, judul, caption, hashtag, dan ringkasan konfigurasi; bisa diputar, diunduh per klip atau sekaligus per job, dan dihapus. |
+| **Panduan** `/panduan` | Delapan langkah bergambar dari isi API key sampai render klip Agent. Tombol **?** di tiap halaman membuka langkah yang relevan. |
 | **Agent · Beta** `/agent` | Cari momen lewat chat untuk satu video; lihat [Agent · Beta](#agent--beta). |
 | **Setting** `/settings` | Tab API Key, Klip, Kinerja, dan Infra. API Key juga menampilkan pemakaian Gemini per model dan estimasi setara tarif API Standard berbayar. |
 
@@ -458,6 +463,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
 Tanpa `--build`, compose memakai image lama dan perubahan kode tidak terpakai.
+
+Video panduan (`web/static/panduan/*.webm`) direkam ulang dengan
+`scripts/rekam_panduan.py` (Playwright + Google Chrome) terhadap instance demo
+yang bersih; petunjuk lengkap ada di docstring script tersebut.
 Dokumen desain dan catatan teknis lain ada di folder [`docs/`](docs/).
 
 ```bash

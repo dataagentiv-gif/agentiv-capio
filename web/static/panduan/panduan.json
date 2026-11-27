@@ -1,0 +1,58 @@
+[
+ {
+  "id": "api-key",
+  "halaman": "settings",
+  "judul": "1. Isi API key Gemini",
+  "teks": "Buka Setting → tab API Key, tempel key dari Google AI Studio di kolom \"Tempel API key baru\", klik Tambah, lalu Tes gemini. Boleh tambah beberapa key; dipakai bergiliran.",
+  "video": "api-key.webm"
+ },
+ {
+  "id": "submit",
+  "halaman": "submit",
+  "judul": "2. Proses video dari link YouTube",
+  "teks": "Tempel link YouTube (atau pilih Unggah berkas), tentukan jumlah klip, pilih template, lalu klik Proses video.",
+  "video": "submit.webm"
+ },
+ {
+  "id": "tampilan",
+  "halaman": "submit",
+  "judul": "3. Atur tampilan dan caption",
+  "teks": "Ganti template untuk melihat contohnya, atau pilih Custom. Ubah font, ukuran, dan warna caption; preview di kanan memperlihatkan hasil akhirnya.",
+  "video": "tampilan.webm"
+ },
+ {
+  "id": "proses",
+  "halaman": "process",
+  "judul": "4. Pantau proses",
+  "teks": "Halaman Proses menampilkan tahap yang sedang dikerjakan. Browser boleh ditutup, tapi Docker dan komputer harus tetap menyala.",
+  "video": "proses.webm"
+ },
+ {
+  "id": "hasil",
+  "halaman": "results",
+  "judul": "5. Putar dan unduh klip",
+  "teks": "Di halaman Hasil, putar klip, salin judul/caption/hashtag, lalu unduh per klip atau sekaligus satu job.",
+  "video": "hasil.webm"
+ },
+ {
+  "id": "agent-mulai",
+  "halaman": "agent",
+  "judul": "6. Agent · Beta: siapkan video",
+  "teks": "Buka Agent, tempel link YouTube, klik Siapkan video. CAPIO mentranskrip dan membuat peta topik sekali saja.",
+  "video": "agent-mulai.webm"
+ },
+ {
+  "id": "agent-chat",
+  "halaman": "agent",
+  "judul": "7. Agent · Beta: cari momen lewat chat",
+  "teks": "Tulis momen yang dicari, misalnya \"cariin 2 momen soal disiplin, 30–60 detik\". Agent mengusulkan kandidat yang awal dan akhirnya utuh.",
+  "video": "agent-chat.webm"
+ },
+ {
+  "id": "agent-render",
+  "halaman": "agent",
+  "judul": "8. Agent · Beta: tinjau dan render",
+  "teks": "Buka Tinjau klip, putar kandidat, klik Pertahankan pada yang cocok, lalu Render pilihan dengan template seperti biasa.",
+  "video": "agent-render.webm"
+ }
+]

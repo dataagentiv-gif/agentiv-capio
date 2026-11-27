@@ -6,6 +6,7 @@ Route di sini tidak pernah menjalankan pipeline secara sinkron: terima request
 import asyncio
 import base64
 import io
+import json
 import re
 import secrets
 import subprocess
@@ -62,7 +63,6 @@ def _cap_aset() -> str:
 
 
 templates.env.globals["v"] = _cap_aset()
-templates.env.globals["wa"] = lambda: f"https://wa.me/{settings.AGENTIV_WA}"
 # Nilai, bukan fungsi: VERSI tidak bisa diubah dari halaman Setting (tidak ada
 # di FIELDS env_store.py) dan cuma berubah lewat build image baru — sama
 # seperti `v`, aman dihitung sekali saat start.
@@ -174,6 +174,12 @@ def process_page(request: Request):
 @app.get("/results", response_class=HTMLResponse)
 def results_page(request: Request):
     return templates.TemplateResponse(request, "results.html", {})
+
+
+@app.get("/panduan", response_class=HTMLResponse)
+def panduan_page(request: Request):
+    data = json.loads((WEB / "static" / "panduan" / "panduan.json").read_text(encoding="utf-8"))
+    return templates.TemplateResponse(request, "panduan.html", {"panduan": data})
 
 
 @app.get("/settings", response_class=HTMLResponse)

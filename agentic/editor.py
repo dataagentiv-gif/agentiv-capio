@@ -403,10 +403,11 @@ Tidak menyetujui render. Maksimal 20 kandidat per balasan.
                 reply.overview = None
             if overview_only and (reply.candidates or reply.overview is None):
                 raise ValueError("Sesi baru memerlukan overview, tanpa kandidat sebelum arahan editorial.")
-            for recommendation in reply.recommendations:
-                a,b = recommendation.start_idx,recommendation.end_idx
-                if not 0 <= a <= b < len(words) or not (any(x <= a and b <= y for x,y in reads) or all(n in pages for n in range(a//500,b//500+1))):
-                    raise ValueError("Rekomendasi membutuhkan indeks valid dan bukti yang dibaca pada putaran ini.")
+            # Recommendations are optional hints: an unread one is dropped, never
+            # allowed to fail the whole turn and take valid candidates down with it.
+            reply.recommendations = [r for r in reply.recommendations
+                if 0 <= r.start_idx <= r.end_idx < len(words) and (any(x <= r.start_idx and r.end_idx <= y for x,y in reads)
+                    or all(n in pages for n in range(r.start_idx//500, r.end_idx//500+1)))]
             unique_recommendations=[]
             for recommendation in reply.recommendations:
                 a,b=recommendation.start_idx,recommendation.end_idx
@@ -419,6 +420,16 @@ Tidak menyetujui render. Maksimal 20 kandidat per balasan.
                 metadata_errors.append("Sertakan pemahaman editorial terkini bersama kandidat.")
             errors, accepted, recovered_recommendations = [], [], []
             for c in reply.candidates:
+                # Models quote the boundary words right but miscount the index by
+                # a word or two. Snap to where the exact quote sits (≤3 words away);
+                # duration, context and quote checks below still run on the result.
+                if 0 <= c.start_idx < c.end_idx < len(words):
+                    a0 = quote_boundary(c.opening_quote, words, c.start_idx, c.end_idx, True)
+                    b0 = quote_boundary(c.closing_quote, words, c.start_idx, c.end_idx, False)
+                    if a0 is not None and abs(a0 - c.start_idx) <= 3:
+                        c.start_idx = a0
+                    if b0 is not None and abs(b0 - c.end_idx) <= 3:
+                        c.end_idx = b0
                 before_errors = len(errors)
                 label = f"{c.title} [{c.start_idx}:{c.end_idx}]"
                 if alternatives and any(same_moment(c.start_idx,c.end_idx,r["start_idx"],r["end_idx"]) for r in previous_recommendations + data.get("candidates", [])):

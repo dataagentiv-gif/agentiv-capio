@@ -588,11 +588,11 @@ def test_invalid_candidates_retried_once_then_excluded(problem,tmp_path):
         if problem=='quote' and not any(isinstance(p,ToolReturnPart) for m in messages for p in m.parts):
             return ModelResponse(parts=[ToolCallPart('read_ranges',{'ranges':[{'start_idx':0,'end_idx':3}]})])
         c=candidate().model_dump()
-        if problem=='quote':c['closing_quote']='kata0 kata1 kata2'
+        if problem=='quote':c['closing_quote']='kata7 kata8 kata9'  # >3 kata dari end_idx: tidak digeser
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name,{'message':'Hasil','candidates':[c]})])
     reply,_,usage=asyncio.run(editor.turn(session,ctx,FunctionModel(answer)))
     assert reply.candidates==[] and len(ctx['candidate_rejections'])==2 and usage.requests <=3
-    if problem=='quote':assert 'end_idx=2' in str(ctx['candidate_rejections'])
+    if problem=='quote':assert 'end_idx=9' in str(ctx['candidate_rejections'])
 
 
 def test_valid_candidate_survives_other_invalid_candidate(tmp_path):
@@ -668,8 +668,9 @@ def test_recommendation_evidence_and_boundary_metadata(tmp_path):
     assert len(reply.recommendations)==1 and not reply.candidates
     def bad(messages,info):
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name,{'message':'Tanpa bukti','recommendations':[{'title':'Pelajaran','reason':'Belum dibaca','start_idx':0,'end_idx':3}]})])
-    from pydantic_ai.exceptions import UnexpectedModelBehavior
-    with pytest.raises(UnexpectedModelBehavior):asyncio.run(editor.turn(session,ctx,FunctionModel(bad)))
+    # Unread angles are dropped, not allowed to fail the turn.
+    reply,_,_=asyncio.run(editor.turn(session,ctx,FunctionModel(bad)))
+    assert reply.recommendations==[] and reply.message=='Tanpa bukti'
 
 
 def test_worker_duplicate_counts_and_recommendations_not_renderable(dbclient,monkeypatch):
@@ -785,3 +786,16 @@ def test_topic_map_quotes_come_from_the_server():
     first = result["topics"][0]
     assert first["end_idx"] == 499 and first["opening_quote"].startswith("kata3 ") and first["closing_quote"].endswith("kata499")
     assert result["partial"] and result["pages_seen"] == [0, 1] and result["summary"] == "Ringkas"
+
+
+def test_off_by_one_index_snaps_to_exact_quote(tmp_path):
+    session = {"brief": "", "data": {"pending": "Cari momen"}}
+    ctx = {"words": words(), "sentences": [], "deadline": Deadline(30), "workdir": tmp_path}
+    def answer(messages, info):
+        if not any(isinstance(p, ToolReturnPart) for m in messages for p in m.parts):
+            return ModelResponse(parts=[ToolCallPart("read_ranges", {"ranges": [{"start_idx": 0, "end_idx": 4}]})])
+        c = candidate().model_dump()          # quotes describe words 0..3
+        c.update(start_idx=1, end_idx=4)      # but the index is one word late
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"message": "Hasil", "candidates": [c]})])
+    reply, _, _ = asyncio.run(editor.turn(session, ctx, FunctionModel(answer)))
+    assert [(c.start_idx, c.end_idx) for c in reply.candidates] == [(0, 3)]
