@@ -108,8 +108,9 @@ Catatan:
   tetap menyala (jangan sleep).
 - **Jangan memakai `docker compose down -v`.** Opsi `-v` menghapus database,
   antrean, unggahan, dan data sesi Agent.
-- Port 8000 sudah terpakai? Ubah `HOST_PORT` di `.env`, lalu
-  `docker compose up -d` lagi.
+- Port bentrok ("port is already allocated")? Ubah di `.env`: `HOST_PORT`
+  untuk 8000, `POSTGRES_HOST_PORT` untuk 5432, `REDIS_HOST_PORT` untuk 6379,
+  lalu `docker compose up -d` lagi.
 - Konfigurasi dari halaman Setting langsung berlaku tanpa restart (kecuali
   jumlah worker, lihat [Kinerja](#kinerja)).
 
