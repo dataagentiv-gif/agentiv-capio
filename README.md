@@ -491,4 +491,4 @@ diperkirakan.
 
 ## Lisensi
 
-CAPIO sekarang dibagikan gratis — tidak perlu license key. Syarat pemakaian ada di `CAPIO-LICENSE.txt`.
+CAPIO sekarang dibagikan gratis — tidak perlu license key. Lisensi MIT — lihat `CAPIO-LICENSE.txt`.
