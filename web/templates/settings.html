@@ -29,7 +29,6 @@ const TES = { 'API Key': ['gemini-transcribe', 'gemini'] };
 // melihat labelnya.
 const INTRO = {
   'API Key': 'Satu key Gemini untuk transkrip (mengubah suara jadi teks) dan LLM (memilih momen, lalu menulis judul, caption, dan hashtag). Boleh diisi beberapa, dipakai bergiliran.',
-  'Lisensi': 'Tanpa license key CAPIO tetap jalan normal — hanya memproses video baru yang diblokir. Klip lama tetap bisa diputar, diunduh, dan dihapus.',
   'Klip': 'Batas durasi klip dan angka kalibrasi titik potong. Tampilan dipilih per video di halaman Submit.',
   'Kinerja': 'Berapa banyak video diproses bersamaan. Lebih banyak bisa lebih cepat, tapi lebih berat di CPU.',
   'Infra': 'Tempat berkas disimpan, pembersihan otomatis, dan alamat database/antrean.',
@@ -43,7 +42,7 @@ const CATATAN = {
 };
 
 const IKON = {
-  'API Key': 'i-llm', 'Lisensi': 'i-shield', 'Klip': 'i-results',
+  'API Key': 'i-llm', 'Klip': 'i-results',
   'Kinerja': 'i-process', 'Infra': 'i-server',
 };
 const ikon = n => `<svg class="ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><use href="#${IKON[n] || 'i-settings'}"/></svg>`;
@@ -195,54 +194,6 @@ function readonlyHtml() {
       `<div class="ro-row"><b>${esc(r.key)}</b><code>${esc(r.value)}</code></div>`).join('')}`;
 }
 
-// Dibaca dari token tersimpan, TANPA memanggil server. Yang ditampilkan
-// `license_expires_at`, bukan `exp`: exp dipotong maksimal 14 hari supaya jam
-// sistem yang dimundurkan tidak bisa dipakai selamanya, jadi menampilkannya
-// membuat client yang baru membayar 30 hari melihat "14 hari lagi" lalu
-// menghubungi Agentiv.
-function lisensiHtml(s, wa) {
-  const tgl = s.berlaku_sampai
-    ? new Date(s.berlaku_sampai).toLocaleDateString('id-ID',
-        { day: 'numeric', month: 'long', year: 'numeric' })
-    : '';
-  const kelas = s.aktif ? (s.sisa_hari !== null && s.sisa_hari <= 7 ? 'warn' : 'ok') : 'err';
-  const judul = s.aktif
-    ? (s.sisa_hari !== null && s.sisa_hari <= 7 ? 'Akan segera habis' : 'Aktif')
-    : (s.punya_key ? 'Belum aktif' : 'Belum ada license key');
-
-  const baris = [];
-  if (s.aktif) baris.push(`Berlaku sampai <b>${esc(tgl)}</b> — ${s.sisa_hari} hari lagi`);
-  if (s.pesan) baris.push(esc(s.pesan));
-  if (s.diperiksa) baris.push(`Terakhir diperiksa ${esc(waktu(new Date(s.diperiksa * 1000).toISOString()))}`);
-
-  return `
-    <div class="lisensi ${kelas}">
-      <strong>${esc(judul)}</strong>
-      ${baris.map(b => `<p>${b}</p>`).join('')}
-      <div class="aksi-lisensi">
-        <button type="button" class="btn sm ghost" id="cek-lisensi">Verifikasi ulang</button>
-        <a class="btn sm ghost" href="https://app.agentiv.my.id/produk/capio/lisensi" target="_blank" rel="noopener">Cek / perpanjang lisensi</a>
-        ${s.aktif ? '' : `<a class="btn sm ghost" href="${esc(wa || '#')}" target="_blank" rel="noopener">Chat WA</a>`}
-      </div>
-    </div>`;
-}
-
-async function segarkanLisensi(paksa = false) {
-  const el = document.getElementById('lisensi-status');
-  if (!el) return;
-  if (paksa) el.innerHTML = '<div class="lisensi"><strong>Memeriksa…</strong></div>';
-  try {
-    const d = paksa
-      ? await (await fetch('/api/lisensi/verifikasi', { method: 'POST' })).json()
-      : await (await fetch('/api/status')).json();
-    const s = paksa ? d.status : d.lisensi;
-    el.innerHTML = lisensiHtml(s, d.wa);
-    document.getElementById('cek-lisensi').onclick = () => segarkanLisensi(true);
-  } catch {
-    el.innerHTML = '<div class="lisensi err"><strong>CAPIO tidak merespons</strong></div>';
-  }
-}
-
 // Preview dirender di server lewat ffmpeg, bukan ditiru dengan CSS. Tiruan akan
 // memakai font BROWSER, sementara video memakai font di dalam container — dan
 // keduanya sudah terbukti bisa berbeda tanpa satu pun tanda. Preview yang
@@ -382,7 +333,6 @@ function render() {
        </div>`;
     const isi = isiPanel(g) +
       (g.name === 'API Key' ? pemakaianGeminiHtml() : '') +
-      (g.name === 'Lisensi' ? '<div id="lisensi-status"></div>' : '') +
       (g.name === 'Infra' ? aksi + readonlyHtml() : '');
     return panelHtml(g.name, isi, g.name === 'Infra' ? '' : aksi);
   });
@@ -401,7 +351,6 @@ function render() {
     if (b) simpan(b);
   });
   document.querySelectorAll('[data-test]').forEach(b => b.onclick = () => tes(b));
-  segarkanLisensi();
   muatPemakaianGemini();
   document.getElementById('usage-period')?.addEventListener('change', muatPemakaianGemini);
   // Preview ikut berubah saat knob diputar, tanpa perlu disimpan dulu —

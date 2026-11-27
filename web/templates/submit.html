@@ -1,13 +1,14 @@
 {% extends "_layout.html" %}
 {% set page = 'submit' %}
-{% block heading %}Ubah video panjang jadi klip siap posting.{% endblock %}
+{% block heading %}{% if agent_session %}Pilih tampilan untuk klip pilihanmu.{% else %}Ubah video panjang jadi klip siap posting.{% endif %}{% endblock %}
 {% block lede %}Masukkan video, lalu pilih satu tampilan dari library template CAPIO.{% endblock %}
 {% block content %}
+{% if agent_session %}<p><a href="/agent#{{ agent_session.id }}">← Kembali ke sesi</a> · {{ default_clips }} kandidat dipertahankan</p>{% else %}<p><a class="btn ghost" href="/agent">Agent · Eksperimen</a></p>{% endif %}
 <div id="status" class="status-strip"></div>
 <div class="submit-layout picked" id="submit-layout">
   <div class="submit-col"><div class="card">
     <form id="f">
-      <div class="field">
+      <div class="field" {% if agent_session %}hidden{% endif %}>
         <div class="tabs kecil" id="tab-sumber"><a href="#" data-sumber="link" class="on">Link YouTube</a><a href="#" data-sumber="berkas">Unggah berkas</a></div>
         <div id="s-link"><input type="text" id="url" placeholder="https://www.youtube.com/watch?v=..."></div>
         <div id="s-berkas" hidden>
@@ -15,11 +16,11 @@
           <div class="bar unggah" hidden id="bar-unggah"><i></i></div><p class="sub" id="ket-berkas"></p>
         </div>
       </div>
-      <div class="field"><label for="n">Jumlah klip</label><input type="number" id="n" value="{{ default_clips }}" min="1" max="20"><p class="sub" id="durasi"></p></div>
+      <div class="field" {% if agent_session %}hidden{% endif %}><label for="n">Jumlah klip</label><input type="number" id="n" value="{{ default_clips }}" min="1" max="20"><p class="sub" id="durasi"></p></div>
       <div class="field"><label>Mulai dengan</label><div class="chips" id="mode"><button type="button" class="chip on" data-mode="template">Template</button><button type="button" class="chip" data-mode="custom">Custom</button></div></div>
       <div id="template-panel"><div class="field"><label>Library template</label><div class="layouts" id="templates"></div><p class="sub" id="template-note"></p></div><div id="adjustments"></div></div>
       <div id="custom-panel" hidden><div class="field"><label>Rasio output</label><select data-option="output_ratio"><option value="9:16">Vertikal 9:16</option><option value="1:1">Persegi 1:1</option><option value="16:9">Landscape 16:9</option></select></div><div class="field"><label>Komposisi video</label><select data-option="video_mode"><option value="full">Penuh</option><option value="panel">Panel tengah</option></select></div><div id="custom-panel-options" hidden><div class="field"><label>Rasio panel</label><select data-option="panel_ratio"><option value="9:16">9:16</option><option value="1:1">1:1</option><option value="16:9">16:9</option></select></div><div class="field"><label>Ukuran panel</label><select data-option="panel_size"><option value="small">Kecil</option><option value="medium" selected>Sedang</option><option value="large">Besar</option></select></div><div class="field"><label>Sudut panel</label><select data-option="panel_radius"><option value="square">Siku</option><option value="rounded" selected>Tumpul</option></select></div></div><div class="field"><label>Isi bingkai</label><select data-option="fit_mode"><option value="crop">Crop memenuhi bingkai</option><option value="contain">Video utuh</option></select></div><div class="field"><label>Fokus crop</label><select data-option="focus_mode"><option value="face">Wajah otomatis</option><option value="center">Tengah</option></select></div><div class="field"><label>Latar</label><select data-option="background"><option value="black">Hitam</option><option value="solid">Warna polos</option><option value="blur">Blur video</option></select></div><div id="custom-bg-color" hidden><div class="field"><label>Warna latar</label><input data-option="background_color" type="color" value="#101820"></div></div><div class="field"><label>Caption</label><select data-option="caption"><option value="true" selected>Nyala</option><option value="false">Mati</option></select></div><div id="custom-caption-options"><div class="field"><label>Font</label><select data-option="caption_font"><option>Poppins</option><option>Archivo Black</option><option>Anton</option><option>Lora</option></select></div><div class="field"><label>Ukuran</label><select data-option="caption_size"><option value="small">Kecil</option><option value="medium" selected>Sedang</option><option value="large">Besar</option></select></div><div class="field"><label>Kata per grup</label><select data-option="caption_words"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></div><div class="field"><label>Gaya caption</label><select data-option="caption_style"><option value="text_color">Warna teks</option><option value="background">Blok</option><option value="background_scale">Blok + membesar</option></select></div><div class="field"><label>Warna aktif</label><input data-option="active_text_color" type="color" value="#FFE500"></div><div id="custom-block-color" hidden><div class="field"><label>Warna blok</label><input data-option="active_background_color" type="color" value="#FFE500"></div></div><div class="field"><label>Posisi caption</label><input data-option="caption_position" type="range" min="0.08" max="0.92" step="0.01" value="0.78"><small>Geser vertikal pada preview; posisi berlaku untuk semua klip.</small></div></div><div class="field"><label>Hook</label><select data-option="hook"><option value="false" selected>Mati</option><option value="true">Nyala</option></select></div><div id="custom-hook-options" hidden><div class="field"><label>Blok hook</label><select data-option="hook_block"><option value="none">Tanpa blok</option><option value="white">Kotak putih, teks hitam</option></select></div></div><p class="sub">Preview Custom memakai contoh sintetis; judul hook diambil otomatis per klip.</p></div>
-      <div class="actions"><button type="submit" class="btn" id="go" disabled>Proses video</button><a class="btn ghost" href="/settings">Ubah setelan</a></div>
+      <div class="actions"><button type="submit" class="btn" id="go" disabled>{% if agent_session %}Render pilihan{% else %}Proses video{% endif %}</button><a class="btn ghost" href="/settings">Ubah setelan</a></div>
     </form><div id="out"></div>
   </div><p class="hint">Pemrosesan berjalan di belakang layar. Pantau hasilnya di <a href="/process">Proses</a>.</p></div>
   <aside class="submit-preview" id="submit-preview"><div class="field pratinjau"><label>Pratinjau sintetis</label><div class="hp memuat" id="pv-hp"><video id="pv-v" autoplay loop muted playsinline aria-label="Pratinjau video sintetis"></video><div id="caption-guide" hidden style="position:absolute;left:12%;right:12%;height:16%;border:2px dashed #ffe500;border-radius:10px;pointer-events:auto;cursor:grab;color:#ffe500;text-align:center;padding-top:8px;box-sizing:border-box">Geser caption</div><div class="hp-spin"><span class="spin"></span></div><div class="preview-error" hidden>Preview gagal dibuat. <button type="button" id="preview-retry" class="btn sm ghost">Coba lagi</button></div></div><p class="sub">Contoh netral untuk memeriksa warna, crop, dan gerak caption. Video contoh CAPIO menyusul setelah hasil nyata disetujui.</p></div></aside>
@@ -27,6 +28,8 @@
 {% endblock %}
 {% block script %}
 <script>
+const agentSession = {{ agent_session|default(none)|tojson }};
+let renderRequestId = crypto.randomUUID(), renderPayload = null;
 const form = document.getElementById('f'), out = document.getElementById('out');
 const go = document.getElementById('go'), video = document.getElementById('pv-v');
 let library = [], picked = null, mode = 'template', sourceFile = null, uploading = false, ready = false, previewTimer;
@@ -36,11 +39,11 @@ const opts = () => Object.fromEntries([...document.querySelectorAll('#adjustment
 function reason() {
   if (mode === 'template' && !picked) return 'Pilih template dulu.';
   if (uploading) return 'Tunggu unggahan selesai.';
-  if (sourceMode() === 'berkas' && !sourceFile) return 'Pilih berkas video.';
-  if (sourceMode() === 'link' && !/^https:\/\/((www|m)\.youtube\.com\/|youtube\.com\/|youtu\.be\/)/.test(document.getElementById('url').value.trim())) return 'Masukkan link YouTube yang valid.';
+  if (!agentSession && sourceMode() === 'berkas' && !sourceFile) return 'Pilih berkas video.';
+  if (!agentSession && sourceMode() === 'link' && !/^https:\/\/((www|m)\.youtube\.com\/|youtube\.com\/|youtu\.be\/)/.test(document.getElementById('url').value.trim())) return 'Masukkan link YouTube yang valid.';
   const n = Number(document.getElementById('n').value);
   if (!Number.isInteger(n) || n < 1 || n > 20) return 'Jumlah klip harus 1–20.';
-  if (!ready) return 'CAPIO belum siap; periksa lisensi dan API key di Setting.';
+  if (!ready) return 'CAPIO belum siap; periksa API key di Setting.';
   return null;
 }
 function refreshButton() { const r = reason(); go.disabled = !!r; go.title = r || 'Proses video'; }
@@ -82,7 +85,21 @@ file.onchange=()=>{if(file.files[0])upload(file.files[0]);};
 drop.addEventListener('drop',e=>{if(e.dataTransfer.files[0])upload(e.dataTransfer.files[0]);});
 document.getElementById('url').oninput=refreshButton; document.getElementById('n').oninput=refreshButton;
 async function loadStatus(){try{const s=await(await fetch('/api/status')).json();ready=!!s.ready;const storageWarn=s.storage?.status==='critical'?' · Storage hampir penuh':s.storage?.status==='warning'?' · Storage mulai penuh':'';document.getElementById('status').innerHTML=ready?`<span class="stat ${storageWarn?'warn':'ok'}">CAPIO siap${storageWarn}</span>`:'<a class="stat warn" href="/settings">CAPIO belum siap — periksa Setting →</a>';document.getElementById('durasi').textContent=`Tiap klip ${s.min_sec}–${s.max_sec} detik · Upload maksimal ${s.max_upload_mb||2048} MB.`;}catch{document.getElementById('status').textContent='CAPIO tidak merespons.';}refreshButton();}
-form.onsubmit=async e=>{e.preventDefault();const why=reason();if(why){out.innerHTML=`<div class="note err">${esc(why)}</div>`;return;}go.disabled=true;go.textContent='Mengirim…';const requestId=crypto.randomUUID();try{const r=await fetch('/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:sourceMode()==='berkas'?sourceFile:document.getElementById('url').value.trim(),target_clips:Number(document.getElementById('n').value),template_id:mode==='custom'?'custom':picked,adjustments:opts(),client_request_id:requestId})});const d=await r.json();if(!r.ok)throw Error(Array.isArray(d.detail)?d.detail.map(x=>x.msg).join('; '):d.detail||'Gagal');out.innerHTML=`<div class="note ok">Video masuk antrean — <a href="/process#${esc(d.job_id)}">lihat prosesnya</a>.</div>`;document.getElementById('url').value='';sourceFile=null;file.value='';note.textContent='';}catch(err){out.innerHTML=`<div class="note err">${esc(err.message)}</div>`;}finally{go.textContent='Proses video';refreshButton();}};
+form.onsubmit=async e=>{
+  e.preventDefault();const why=reason();if(why){out.innerHTML=`<div class="note err">${esc(why)}</div>`;return;}
+  go.disabled=true;go.textContent='Mengirim…';
+  const style={template_id:mode==='custom'?'custom':picked,adjustments:opts()};
+  if(renderPayload!==JSON.stringify(style)){renderRequestId=crypto.randomUUID();renderPayload=JSON.stringify(style);}
+  const body=agentSession?{...style,candidate_ids:agentSession.candidate_ids,version:agentSession.version,request_id:renderRequestId}:{...style,url:sourceMode()==='berkas'?sourceFile:document.getElementById('url').value.trim(),target_clips:Number(document.getElementById('n').value),client_request_id:crypto.randomUUID()};
+  try{
+    const r=await fetch(agentSession?`/api/agent/sessions/${agentSession.id}/render`:'/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();if(!r.ok)throw Error(Array.isArray(d.detail)?d.detail.map(x=>x.msg).join('; '):d.detail||'Gagal');
+    if(agentSession){location.href=`/process#${d.job_id}`;return;}
+    out.innerHTML=`<div class="note ok">Video masuk antrean — <a href="/process#${esc(d.job_id)}">lihat prosesnya</a>.</div>`;
+    document.getElementById('url').value='';sourceFile=null;file.value='';note.textContent='';
+  }catch(err){out.innerHTML=`<div class="note err">${esc(err.message)}</div>`;}
+  finally{go.textContent=agentSession?'Render pilihan':'Proses video';refreshButton();}
+};
 loadTemplates();drawCustom();customLabels();loadStatus();
 </script>
 {% endblock %}

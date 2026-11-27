@@ -35,8 +35,9 @@ def _scene_cuts(source: Path, t: float, deadline) -> list[float]:
     proc = ff(
         [
             "ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-v", "info",
-            "-ss", f"{t0:.3f}", "-i", str(source),
-            "-t", f"{2 * SCENE_WINDOW:.3f}",
+            # Input duration must be bounded before select drops frames.
+            "-ss", f"{t0:.3f}", "-t", f"{2 * SCENE_WINDOW:.3f}",
+            "-i", str(source),
             "-vf", f"select='gt(scene,{SCENE_THRESHOLD})',metadata=print",
             "-an", "-f", "null", "-",
         ],
@@ -88,6 +89,13 @@ def run(ctx: dict) -> dict:
     duration = float(ctx["meta"]["duration"])
     drift = settings.SNAP_MAX_DRIFT
 
+    if ctx.get("approved_ranges"):
+        # Human approval fixes boundaries; widening could include an unapproved claim.
+        final = [{"id": f"c{n}", **s, "start": words[s["start_idx"]]["s"],
+                  "end": words[s["end_idx"]]["e"]} for n, s in enumerate(segments, 1)]
+        (workdir / "segments_final.json").write_text(json.dumps(final, ensure_ascii=False), encoding="utf-8")
+        return {"segments_final": final}
+
     # Stage deterministik, tidak di-retry. Kalau deteksi gagal, jatuh ke
     # timestamp asli — batas yang tidak di-snap masih menghasilkan klip yang
     # layak, sedangkan batas yang di-snap ke hening palsu justru lebih buruk.
@@ -127,6 +135,13 @@ def run(ctx: dict) -> dict:
 
         start = max(0.0, _snap(raw_start, sils, cuts_a, "start", drift) - LEAD_IN)
         end = min(duration, _snap(raw_end, sils, cuts_b, "end", drift) + TAIL)
+
+        # Batas harus di celah antar kata: jangan potong ucapan terpilih atau
+        # masukkan ucapan tetangga walaupun scene/jeda terlihat lebih menarik.
+        prev_end = words[s["start_idx"] - 1]["e"] if s["start_idx"] > 0 else 0.0
+        next_start = words[s["end_idx"] + 1]["s"] if s["end_idx"] + 1 < len(words) else duration
+        start = max(min(prev_end, raw_start), min(start, raw_start))
+        end = min(max(next_start, raw_end), max(end, raw_end))
 
         # Snap tidak boleh melanggar kontrak durasi. Hening panjang di dekat
         # batas bisa memendekkan klip di bawah minimum tanpa penjaga ini.

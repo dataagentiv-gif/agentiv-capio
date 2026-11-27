@@ -66,14 +66,6 @@ FIELDS = [
             "memakainya, jadi setelan yang disalin dari mesin lain bisa mati "
             "di sini saja."),
 
-    # --- Lisensi ---
-    _f("LICENSE_KEY", "License key", "Lisensi",
-       help="Ditempel dari email pembelian, bentuknya seperti "
-            "AGV-CAP-SG-K7M2QX4P. Begitu disimpan, key langsung diverifikasi ke "
-            "server dan hasilnya tampil di bawah. Tanpa key, CAPIO tetap jalan "
-            "normal — hanya memproses video baru yang diblokir; klip lama tetap "
-            "bisa dibuka dan diunduh."),
-
     # --- Klip: tampilan ---
     _f("CLIP_LAYOUT", "Layout klip", "Klip", kind="select", bagian="Tampilan",
        options=["penuh", "duo", "kotak", "samping", "ori"],

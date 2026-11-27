@@ -86,32 +86,15 @@ class Settings(BaseSettings):
     ACTIVE_WORD_PADDING_X: int = 18
     ACTIVE_WORD_PADDING_Y: int = 8
 
-    # --- Lisensi ---
-    #
-    # Key dimasukkan lewat halaman Setting, bukan dengan menyunting berkas ini.
-    # Kosong = aplikasi tetap hidup normal, hanya submit job yang diblokir —
-    # menolak start berarti halaman Setting tidak bisa dibuka dan key tidak
-    # akan pernah bisa dimasukkan sama sekali.
-    LICENSE_KEY: str = ""
-
     # Folder yang HARUS bertahan melewati update image. Bukan CLIPS_DIR (dikelola
     # pengguna) dan bukan WORK_DIR (disapu berkala): install_id yang hilang saat
     # update berarti slot perangkat baru diklaim tiap ganti versi, dan batas 1
     # atau 3 perangkat habis sendiri tanpa penggunanya berbuat apa-apa.
     DATA_DIR: Path = ROOT / "data"
 
-    # VERSI ikut terkirim ke server lisensi sebagai agent_version dan tersimpan
-    # di tabel activations — satu-satunya cara tahu versi berapa yang dipakai
-    # client saat mereka melaporkan masalah. Naikkan bersamaan dengan tag image.
-    # Juga yang ditampilkan sebagai versi kecil di nav (_layout.html) dan
-    # yang dibandingkan fitur notifikasi update (license._lebih_baru) — telat
-    # menaikkan ini berarti kedua tempat itu ikut berbohong.
-    VERSI: str = "1.6.0"
+    # Ditampilkan sebagai versi kecil di nav (_layout.html).
+    VERSI: str = "1.7.0"
     AGENTIV_WA: str = "6285843570782"
-
-    # Kosong = pakai alamat produksi yang tertulis di license/__init__.py.
-    # Diisi hanya untuk staging atau pengujian dari mesin sendiri.
-    LICENSE_SERVER: str = ""
 
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"

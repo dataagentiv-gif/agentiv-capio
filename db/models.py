@@ -80,6 +80,7 @@ class Job(Base):
     # sehat. Bukan untuk ditampilkan — tidak masuk as_dict().
     worker_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     client_request_id: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
+    agent_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -107,7 +108,25 @@ class Job(Base):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "worker_id": self.worker_id,
             "client_request_id": self.client_request_id,
+            "agent_snapshot": self.agent_snapshot,
         }
+
+
+class AgentSession(Base):
+    __tablename__ = "agent_sessions"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    url: Mapped[str] = mapped_column(Text)
+    brief: Mapped[str] = mapped_column(Text)
+    target_clips: Mapped[int] = mapped_column(Integer)
+    model: Mapped[str] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(24), default="queued")
+    worker_id: Mapped[str | None] = mapped_column(String(64))
+    operation_id: Mapped[str] = mapped_column(String(100))
+    create_request_id: Mapped[str] = mapped_column(String(100), unique=True)
+    error: Mapped[str | None] = mapped_column(Text)
+    data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class GeminiUsage(Base):
@@ -167,6 +186,7 @@ def init() -> None:
             "gaya JSONB",
             "worker_id VARCHAR(64)",
             "client_request_id VARCHAR(100)",
+            "agent_snapshot JSONB",
         ):
             c.execute(text(f"ALTER TABLE jobs ADD COLUMN IF NOT EXISTS {kolom}"))
         c.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_jobs_client_request_id ON jobs (client_request_id) WHERE client_request_id IS NOT NULL"))

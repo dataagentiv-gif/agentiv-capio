@@ -98,6 +98,8 @@ def _jalankan_slot(slot: int) -> None:
     # mode multi, slot yang baru menyala tidak ikut menggagalkan job slot lain
     # yang masih sehat.
     gantung = jobs.bereskan_gantung(WORKER_ID)
+    from db.agent_sessions import recover
+    recover(WORKER_ID)
     if gantung:
         log.warning("%d job yatim milik %s dari proses sebelumnya ditandai gagal",
                     gantung, WORKER_ID)

@@ -9,6 +9,7 @@ lebih panjang.
 import pytest
 
 from worker.orchestrator import _rincian
+from utils.ffmpeg_helpers import Deadline
 
 
 # --- format rincian ---
@@ -40,6 +41,7 @@ def test_hasil_menyimpan_template(monkeypatch):
     seg = {"id": "c1", "start": 0.0, "end": 8.0, "score": 90,
            "hook": "Hook", "reason": "Alasan"}
     ctx = {
+        "deadline": Deadline(30),
         "template_id": "pembicara_samping", "segments_final": [seg],
         "metadata": {"c1": meta}, "rendered": {"c1": "hasil.mp4"},
         "crops": {"c1": {"speaker_side": "kiri"}},
@@ -57,6 +59,7 @@ def test_hasil_mentahan(monkeypatch):
     seg = {"id": "c1", "start": 0.0, "end": 8.0, "score": 90,
            "hook": "Hook", "reason": "Alasan"}
     ctx = {
+        "deadline": Deadline(30),
         "template_id": "mentahan", "segments_final": [seg],
         "metadata": {"c1": {"title": "Judul", "caption": "Caption", "hashtags": []}},
         "rendered": {"c1": "hasil.mp4"},
@@ -81,7 +84,8 @@ def jalankan(monkeypatch, tmp_path):
     monkeypatch.setattr(orchestrator.env_store, "reload", lambda: None)
     monkeypatch.setattr(orchestrator.jobs, "get", lambda j: {
         "url": "https://youtu.be/x", "target_clips": 3,
-        "layout": "full_screen", "gaya": {}})
+        "layout": "full_screen", "gaya": {}, "status": Status.QUEUED})
+    monkeypatch.setattr(orchestrator.jobs, "is_cancelled", lambda _: False)
     monkeypatch.setattr(orchestrator.jobs, "update_status", lambda *a, **k: None)
     monkeypatch.setattr(orchestrator.jobs, "fail",
                         lambda jid, err: dicatat.update(error=err))
@@ -157,7 +161,8 @@ def test_kegagalan_biasa_tidak_ikut_dibungkus(monkeypatch, tmp_path):
     monkeypatch.setattr(orchestrator.env_store, "reload", lambda: None)
     monkeypatch.setattr(orchestrator.jobs, "get", lambda j: {
         "url": "https://youtu.be/x", "target_clips": 3,
-        "layout": "full_screen", "gaya": {}})
+        "layout": "full_screen", "gaya": {}, "status": Status.QUEUED})
+    monkeypatch.setattr(orchestrator.jobs, "is_cancelled", lambda _: False)
     monkeypatch.setattr(orchestrator.jobs, "update_status", lambda *a, **k: None)
     monkeypatch.setattr(orchestrator.jobs, "fail",
                         lambda jid, err: dicatat.update(error=err))

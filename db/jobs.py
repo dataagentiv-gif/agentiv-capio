@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import func, or_, select, update
 
-from db.models import Job, Status, session_scope
+from db.models import AgentSession, Job, Status, session_scope
 from utils.logging import get
 
 log = get(__name__)
@@ -189,6 +189,15 @@ def retry(job_id: str | uuid.UUID) -> dict | None:
     except ValueError:
         return None
     with session_scope() as s:
+        original = s.get(Job, key)
+        if original and original.agent_snapshot:
+            # Same lock order as approval/deletion: session first, then job.
+            session = s.get(AgentSession, uuid.UUID(original.agent_snapshot["session_id"]), with_for_update=True)
+            if session is None:
+                from fastapi import HTTPException
+                raise HTTPException(409, "Sumber Agent telah dihapus. Buat sesi baru.")
+            from db.agent_sessions import ensure_idle
+            ensure_idle(s, session)
         job = s.scalar(
             update(Job)
             .where(Job.id == key, Job.status == Status.FAILED)

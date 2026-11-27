@@ -174,3 +174,9 @@ def test_job_berhasil_tidak_punya_masalah():
 
     j = JobOut(id="x", url="u", target_clips=3, status="done", progress=100)
     assert j.masalah is None
+
+
+def test_penolakan_seleksi_tidak_menyarankan_melonggarkan_durasi():
+    result = pesan.terjemah("RuntimeError: Tidak ada segmen lolos validasi setelah seleksi dan satu koreksi. Batas 30-90s; alasan: too_long.")
+    assert "longgarkan" not in result["saran"].lower()
+    assert "koreksi" in result["saran"].lower()

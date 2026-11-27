@@ -180,9 +180,10 @@ ATURAN: list[tuple[tuple[str, ...], object]] = [
     )),
     (("tidak ada segmen lolos validasi",), (
         "Tidak ada momen valid untuk parameter klip ini",
-        "Gemini menemukan kandidat, tetapi semuanya tidak memenuhi batas durasi "
-        "klip 30–90 detik. Coba gunakan source yang lebih panjang atau longgarkan "
-        "rentang durasi di halaman Setting → Klip.",
+        "Belum ada kandidat yang memenuhi validasi seleksi. CAPIO memberi satu "
+        "kesempatan koreksi tanpa memaksakan jumlah klip. "
+        "Lihat Detail teknis untuk alasan penolakan seperti durasi, batas potongan, atau "
+        "tumpang tindih. Jumlah klip tidak dipaksakan.",
     )),
     (("tidak ada segmen lolos",), (
         "Tidak ada bagian yang cocok dijadikan klip",

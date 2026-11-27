@@ -54,10 +54,10 @@ def test_hasil_urut_berdasarkan_waktu():
     assert [s["start_idx"] for s in out] == sorted(s["start_idx"] for s in out)
 
 
-def test_index_di_luar_jangkauan_di_clamp_bukan_bikin_crash():
+def test_index_di_luar_jangkauan_ditolak_bukan_bikin_crash():
     """LLM sesekali mengarang index melebihi panjang transkrip."""
     out = _validate([seg(100, 99_999)], WORDS, target=8)
-    assert all(s["end_idx"] <= len(WORDS) - 1 for s in out)
+    assert out == []
 
 
 def test_field_rusak_dilewati_diam_diam():
@@ -77,9 +77,9 @@ def test_score_di_clamp_ke_0_100():
 def test_tanpa_kalimat_jatuh_ke_mode_per_kata():
     """Fallback kalau Whisper tidak mengembalikan level kalimat."""
     lines = _indexed_transcript(WORDS[:25], []).splitlines()
-    assert lines[0].startswith("[0] ")
-    assert lines[1].startswith("[10] ")
-    assert lines[2].startswith("[20] ")
+    assert lines[0].startswith("[0 @ ")
+    assert lines[1].startswith("[10 @ ")
+    assert lines[2].startswith("[20 @ ")
 
 
 # --- transkrip per kalimat: tanda baca + jeda ---
@@ -231,65 +231,33 @@ def test_tanpa_anchors_index_tidak_diubah():
 def test_mmss_format():
     from pipeline.stages.segment import _mmss
 
-    assert _mmss(0) == "00:00"
-    assert _mmss(65) == "01:05"
-    assert _mmss(936) == "15:36"
+    assert _mmss(0) == "00:00.0"
+    assert _mmss(65) == "01:05.0"
+    assert _mmss(936) == "15:36.0"
 
 
 def test_tiap_baris_mencantumkan_jam_mulai():
     lines = _indexed_transcript(SENT_WORDS, SENTENCES).splitlines()
-    assert lines[0].startswith("[0 @ 00:00]")
-    assert lines[1].startswith("[3 @ 00:03]")
+    assert lines[0].startswith("[0 @ 00:00.0-00:01.1 | end_idx=2]")
+    assert lines[1].startswith("[3 @ 00:03.0-00:04.9 | end_idx=7]")
 
 
-# --- melebarkan kandidat yang kependekan ---
-#
-# Terukur di uji beban 8 video: dari 20 kandidat yang dibuang, SEMUANYA
-# kependekan — nol yang kepanjangan, nol karena tumpang tindih. Membuangnya
-# salah keputusan: LLM sudah menemukan momennya, cuma kurang lebar
-# membingkainya. Satu video kehilangan 11 momen dan pulang dengan 1 klip.
-
-# 400 kata, 2 kata/detik. Batas kalimat tiap 20 kata (= 10 detik).
+# Kandidat pendek harus dikoreksi berdasarkan isi, bukan dilebarkan otomatis.
 ANCHORS = list(range(0, 400, 20))
 
 
-def test_segmen_kependekan_dilebarkan_bukan_dibuang():
-    """18 detik dulu dibuang; sekarang harus jadi klip yang layak."""
-    out = _validate([seg(100, 136)], WORDS, target=8, anchors=ANCHORS)
-    assert out, "kandidat kependekan masih dibuang"
-    d = WORDS[out[0]["end_idx"]]["e"] - WORDS[out[0]["start_idx"]]["s"]
-    assert 30 <= d <= 90
+def test_kandidat_pendek_tidak_ditambahi_ucapan():
+    rejected = []
+    assert _validate([seg(100, 136), seg(392, 398)], WORDS, 8, ANCHORS, rejected) == []
+    assert [r["reason"] for r in rejected] == ["too_short", "too_short"]
+    assert all(r["duration"] < 30 for r in rejected)
 
 
-def test_pelebaran_mempertahankan_awal():
-    """Tiga detik pertama adalah kail; memundurkan awal berarti menimpanya."""
-    out = _validate([seg(100, 120)], WORDS, target=8, anchors=ANCHORS)
-    assert out[0]["start_idx"] == 100
-    assert out[0]["end_idx"] > 120
-
-
-def test_awal_digeser_hanya_kalau_ujung_mentok():
-    """Momen di ujung video tidak punya ruang maju, jadi awalnya yang mundur."""
-    out = _validate([seg(392, 398)], WORDS, target=8, anchors=ANCHORS)
-    assert out, "segmen di akhir video tidak berhasil dilebarkan"
-    assert out[0]["start_idx"] < 392
-
-
-def test_pelebaran_tidak_melewati_batas_atas():
-    kandidat = [seg(0, 10), seg(200, 208)]
-    for s in _validate(kandidat, WORDS, target=8, anchors=ANCHORS):
-        d = WORDS[s["end_idx"]]["e"] - WORDS[s["start_idx"]]["s"]
-        assert d <= 90, f"hasil pelebaran {d:.1f}s melewati batas"
-
-
-def test_yang_kepanjangan_tetap_dibuang():
-    """Pelebaran cuma untuk yang kurang; yang kelewat panjang tidak disentuh."""
-    assert _validate([seg(0, 399)], WORDS, target=8, anchors=ANCHORS) == []
-
-
-def test_tanpa_anchors_perilaku_lama_dipertahankan():
-    """Tanpa daftar kalimat tidak ada acuan untuk melebarkan."""
-    assert _validate([seg(100, 136)], WORDS, target=8) == []
+def test_diagnostik_indeks_durasi_dan_overlap():
+    rejected = []
+    out = _validate([seg(-1, 100), seg(0, 399), seg(100, 220, 90), seg(110, 230, 80)], WORDS, 8, None, rejected)
+    assert len(out) == 1
+    assert {r["reason"] for r in rejected} == {"invalid_indices", "too_long", "overlap"}
 
 
 # --- sebaran skor ---
@@ -352,7 +320,8 @@ def test_balasan_kosong_dicoba_ulang(monkeypatch, tmp_path):
     })
 
     assert len(panggilan) == 2
-    assert "jangan kembalikan array kosong" in panggilan[1]
+    assert "KOREKSI SATU KALI" in panggilan[1]
+    assert "jangan memaksakan jumlah" in panggilan[1]
     assert len(out["segments_raw"]) == 1
 
 
@@ -378,21 +347,23 @@ def seg_hook(a, b, hook, score=90):
 
 def test_index_salah_dipindah_ke_posisi_hook():
     """Inti perbaikannya: isi menang atas aritmetika."""
-    kandidat = [seg_hook(0, 100, "k200 k201 k202 k203 k204")]
+    kandidat = [seg_hook(100, 300, "k200 k201 k202 k203 k204")]
     out = _validate(kandidat, KATA_UNIK, target=8, anchors=ANCH)
     assert out and out[0]["start_idx"] == 200, "klip tidak dipindah ke posisi hook"
 
 
-def test_durasi_dipertahankan_saat_dipindah():
-    """Ujung ikut bergeser bersama awalnya. Kalau tidak, memindahkan awal ke
-    depan akan memanjangkan klip — dan yang jadi kepanjangan langsung dibuang,
-    jadi perbaikan ini malah menghilangkan klip yang tadinya lolos.
-
-    Selisih satu kata dimaklumi: ujungnya masih ditarik ke akhir kalimat
-    setelah dipindah."""
-    out = _validate([seg_hook(0, 100, "k200 k201 k202 k203 k204")],
+def test_koreksi_hook_tidak_menggeser_kesimpulan():
+    out = _validate([seg_hook(180, 300, "k200 k201 k202 k203 k204")],
                     KATA_UNIK, target=8, anchors=ANCH)
-    assert abs((out[0]["end_idx"] - out[0]["start_idx"]) - 100) <= 1
+    assert out[0]["start_idx"] == 200
+    assert out[0]["end_idx"] == 299
+
+
+def test_hook_setelah_penutup_ditolak_untuk_koreksi_model():
+    rejected = []
+    assert _validate([seg_hook(0, 100, "k200 k201 k202 k203 k204")],
+                     KATA_UNIK, 8, ANCH, rejected) == []
+    assert rejected[0]["reason"] == "invalid_indices"
 
 
 def test_index_yang_sudah_cocok_tidak_diganggu():
@@ -420,3 +391,89 @@ def test_tanpa_anchors_tidak_ada_pemindahan():
     """Tanpa daftar kalimat tidak ada posisi sah untuk dituju."""
     out = _validate([seg_hook(0, 100, "k200 k201 k202 k203")], KATA_UNIK, target=8)
     assert out[0]["start_idx"] == 0
+
+
+def test_koreksi_kandidat_panjang_mempertahankan_valid(monkeypatch, tmp_path):
+    import json
+    from pipeline.stages import segment
+    calls = []
+    replies = iter([{"segments": [seg(0, 100, 60), seg(150, 399)]},
+                    {"segments": [seg(0, 120, 99), seg(150, 280, 70)]}])
+    def llm(prompt, schema):
+        calls.append(prompt)
+        return next(replies)
+    monkeypatch.setattr(segment, "call_llm", llm)
+    out = segment.run({"words": WORDS, "target_clips": 3, "workdir": tmp_path})
+    assert len(calls) == 2
+    assert [(s["start_idx"], s["end_idx"]) for s in out["segments_raw"]] == [(0, 100), (150, 280)]
+    report = json.loads((tmp_path / "segment_diagnostics.json").read_text())
+    assert report[0]["rejected"][0]["reason"] == "too_long"
+    assert report[1]["rejected"][0]["reason"] == "overlap"
+
+
+def test_dua_balasan_kosong_tetap_berhenti(monkeypatch, tmp_path):
+    import json
+    import pytest
+    from pipeline.stages import segment
+    calls = []
+    def llm(prompt, schema):
+        calls.append(prompt)
+        return {"segments": []}
+    monkeypatch.setattr(segment, "call_llm", llm)
+    with pytest.raises(RuntimeError, match="kandidat kosong"):
+        segment.run({"words": WORDS, "target_clips": 5, "workdir": tmp_path})
+    assert len(calls) == 2
+    assert len(json.loads((tmp_path / "segment_diagnostics.json").read_text())) == 2
+
+
+def test_target_tercapai_tidak_memanggil_koreksi(monkeypatch, tmp_path):
+    from pipeline.stages import segment
+    calls = []
+    def llm(prompt, schema):
+        calls.append(prompt)
+        return {"segments": [seg(0, 100)]}
+    monkeypatch.setattr(segment, "call_llm", llm)
+    assert len(segment.run({"words": WORDS, "target_clips": 1, "workdir": tmp_path})["segments_raw"]) == 1
+    assert len(calls) == 1
+
+
+def test_kegagalan_koreksi_tetap_menghasilkan_kandidat_awal(monkeypatch, tmp_path):
+    from pipeline.stages import segment
+    calls = []
+    def llm(prompt, schema):
+        calls.append(prompt)
+        if len(calls) == 2:
+            raise RuntimeError("Gemini quota exhausted")
+        return {"segments": [seg(0, 100)]}
+    monkeypatch.setattr(segment, "call_llm", llm)
+    assert len(segment.run({"words": WORDS, "target_clips": 5, "workdir": tmp_path})["segments_raw"]) == 1
+    assert len(calls) == 2
+
+
+def test_pembatalan_sebelum_koreksi_tidak_ditelan(monkeypatch, tmp_path):
+    import pytest
+    from pipeline.stages import segment
+    from utils.ffmpeg_helpers import JobCancelled
+    class Deadline:
+        def check(self, stage):
+            if calls:
+                raise JobCancelled("cancel")
+    calls = []
+    def llm(prompt, schema):
+        calls.append(prompt)
+        return {"segments": [seg(0, 100)]}
+    monkeypatch.setattr(segment, "call_llm", llm)
+    with pytest.raises(JobCancelled):
+        segment.run({"words": WORDS, "target_clips": 5, "workdir": tmp_path, "deadline": Deadline()})
+    assert len(calls) == 1
+    assert (tmp_path / "segment_diagnostics.json").exists()
+
+
+def test_diagnostik_job_bertahan_di_data_dir(monkeypatch, tmp_path):
+    import json
+    from pipeline.stages import segment
+    data = tmp_path / "data"
+    monkeypatch.setattr(segment.settings, "DATA_DIR", data)
+    monkeypatch.setattr(segment, "call_llm", lambda *args: {"segments": [seg(0, 100)]})
+    segment.run({"job_id": "test-job", "words": WORDS, "target_clips": 1, "workdir": tmp_path})
+    assert json.loads((data / "pipeline_diagnostics" / "test-job.json").read_text())[0]["accepted"]

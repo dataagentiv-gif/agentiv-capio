@@ -21,7 +21,7 @@
   <link rel="preload" href="/static/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/style.css?v={{ v }}">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 {# Sprite ikon. Sekali didefinisikan, dipakai lewat <use> — jadi tidak ada
    markup SVG yang disalin berulang di tiap halaman. Semua stroke memakai
    currentColor supaya ikut warna teks induknya. #}
@@ -178,12 +178,6 @@
   {% block content %}{% endblock %}
 </main>
 
-{# Tombol bantuan melayang, di semua halaman. Tautannya dari lisensi.tautan_wa()
-   dan BUKAN wa.me yang ditulis ulang di sini: fungsi itu menyisipkan license
-   key ke dalam pesannya, sehingga percakapan tidak selalu dimulai dengan
-   menanyakan key-nya. Dipanggil sebagai fungsi, bukan nilai yang dihitung
-   sekali saat start, karena key bisa diisi dari halaman Setting kapan saja
-   tanpa aplikasi di-restart — tautan yang dibekukan akan membawa key lama. #}
 <div class="bantuan-wrap">
   <button class="bantuan" id="bantuan-menu" type="button" aria-expanded="false" aria-controls="bantuan-pilihan" aria-label="Buka menu bantuan" title="Chat CS">
     <svg width="28" height="28" viewBox="0 0 16 16" aria-hidden="true"><use href="#i-chat"/></svg>

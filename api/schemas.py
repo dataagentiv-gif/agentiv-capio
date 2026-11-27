@@ -62,6 +62,7 @@ class Clip(BaseModel):
     hashtags: list[str]
     layout: str = "penuh"
     layout_fallback: bool = False
+    editor_approved: bool = False
 
 
 class JobOut(BaseModel):

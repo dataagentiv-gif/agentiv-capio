@@ -26,6 +26,7 @@ untuk pemakaian ringan.
 - [Kalibrasi](#kalibrasi)
 - [Keamanan](#keamanan)
 - [Arsitektur](#arsitektur)
+- [Mode Agentiv-host](#mode-agentiv-host)
 - [Pengembangan](#pengembangan)
 - [Batasan yang diketahui](#batasan-yang-diketahui)
 
@@ -73,8 +74,8 @@ docker compose up -d
 ```
 
 Buka **http://localhost:8000**, lalu ke halaman **Setting** untuk mengisi API
-key Gemini dan license key (petunjuknya ada di halaman itu). Klik **Simpan**,
-lalu **Tes** untuk memastikan key Gemini benar dan verifikasi lisensinya.
+key Gemini (petunjuknya ada di halaman itu). Klik **Simpan**,
+lalu **Tes** untuk memastikan key Gemini benar.
 Setelah itu langsung bisa submit video.
 
 ```bash
@@ -97,7 +98,7 @@ CAPIO memeriksa versi terbaru saat API menyala dan setiap satu jam setelahnya.
 Jika ada rilis baru, petunjuk update muncul sebagai banner di semua halaman.
 
 **Jangan memakai `docker compose down -v`.** Opsi `-v` menghapus volume
-Postgres, Redis, source upload, install ID, dan data lisensi. Perintah update di
+Postgres, Redis, source upload. Perintah update di
 atas mempertahankan semuanya.
 
 Kalau port 8000 sudah dipakai proses lain, ubah `HOST_PORT` di `.env` lalu
@@ -143,10 +144,10 @@ venv/Scripts/python main.py worker
 
 | Halaman | Isi |
 |---|---|
-| **Submit** `/` | Link YouTube atau unggah berkas sendiri, jumlah klip, pemilih layout dengan contoh videonya, dan knob gaya caption — semuanya per video. Begitu satu layout dipilih, halaman melebar dan panel pratinjau caption (dirender lewat jalur yang sama dengan produksi, bukan tiruan CSS) muncul di sebelah kanan. Strip di atas menunjukkan provider aktif, status lisensi, dan apakah konfigurasi sudah lengkap, jadi yang bolong ketahuan *sebelum* submit, bukan belasan menit kemudian. |
-| **Proses** `/process` | Job berjalan dengan penanda 9 tahap dan peringatan agar Docker/komputer tetap menyala. Job gagal menampilkan sebab, detail tahap terakhir, tombol **Proses ulang**, dan tombol hapus. Retry memakai source, jumlah klip, layout, serta gaya yang sama—upload lokal tidak perlu diunggah ulang. |
-| **Hasil** `/results` | Klip jadi, bisa diputar, diunduh, atau dihapus — satu per satu maupun sekaligus per job. |
-| **Setting** `/settings` | Semua konfigurasi dalam lima tab — API Key, Lisensi, Klip, Kinerja, Infra — dengan tombol tes Gemini dan verifikasi lisensi. Penjelasan tiap setelan tersembunyi di balik ikon `?`, dan setelan yang jarang disentuh (model, kalibrasi) dilipat di bagian *Lanjutan*. |
+| **Submit** `/` | Link YouTube atau unggah video, jumlah klip, lalu pilih Template atau Custom. Penyesuaian dan preview mengikuti pilihan tersebut; konfigurasi disimpan bersama job. |
+| **Proses** `/process` | Tab Berjalan dan Riwayat, progres tiap tahap, statistik klip, pencarian/filter, ringkasan konfigurasi, pembatalan job berjalan, dan penjelasan job gagal. Job gagal dapat dicoba ulang jika aman. |
+| **Hasil** `/results` | Klip selesai dengan preview, judul, caption, hashtag, dan ringkasan konfigurasi; bisa diputar, diunduh per klip atau sekaligus per job, dan dihapus. |
+| **Setting** `/settings` | Tab API Key, Klip, Kinerja, dan Infra. API Key juga menampilkan pemakaian Gemini per model dan estimasi setara tarif API Standard berbayar. |
 
 Klip juga bisa diambil langsung dari folder `clips/<job-id>/` lewat file
 manager — tidak perlu lewat aplikasi.
@@ -165,20 +166,21 @@ Keduanya cuma informasi; tidak ada yang diblokir kalau belum update.
 
 ## Cara kerjanya
 
-Pipeline sekuensial sembilan tahap. Urutannya tetap dan ditentukan di kode; LLM
-dipanggil untuk dua tugas sempit saja dan tidak pernah memutuskan alur.
+Pipeline sekuensial sembilan tahap termasuk unggah/unduh. Urutannya tetap dan
+ditentukan di kode; Gemini dipakai untuk transkrip, seleksi momen, dan metadata,
+tetapi tidak pernah memutuskan alur pipeline.
 
 | # | Tahap | Alat | Hasil |
 |---|---|---|---|
-| 1 | Unduh | yt-dlp + ffmpeg | `source.mp4`, `audio.ogg` (16kHz mono opus) |
-| 2 | Transkrip | Gemini Transcribe | kata + kalimat, bertimestamp |
-| 3 | Seleksi momen | LLM | kandidat klip + skor + alasan |
-| 4 | Geser batas | ffmpeg | batas dipindah ke jeda alami terdekat |
-| 5 | Caption | generator `.ass` | caption karaoke per kata |
-| 6 | Crop | MediaPipe | jendela 9:16 mengikuti posisi wajah |
-| 7 | Render | ffmpeg | mp4 1080×1920, caption terbakar |
-| 8 | Metadata | LLM | judul, caption, hashtag |
-| 9 | Simpan | — | file ke `clips/<job-id>/` |
+| 1 | Sumber | upload atau yt-dlp + ffmpeg | video sumber dan audio kerja |
+| 2 | Transkrip | Gemini Transcribe | kata bertimestamp |
+| 3 | Seleksi momen | Gemini LLM | kandidat klip, skor, alasan, dan hook |
+| 4 | Perapian batas | ffmpeg | batas disesuaikan ke jeda alami |
+| 5 | Crop | MediaPipe | posisi wajah dan perpindahan crop bila template memerlukannya |
+| 6 | Caption | generator `.ass` atau overlay motion | layer caption mengikuti timestamp kata |
+| 7 | Render | ffmpeg | komposisi video, caption, dan audio |
+| 8 | Metadata | Gemini LLM | judul, caption deskripsi, hashtag |
+| 9 | Simpan | storage lokal | file ke `clips/<job-id>/` dan status job |
 
 Tiga hal yang membuat titik potongnya masuk akal:
 
@@ -203,9 +205,10 @@ project, jadi bisa juga disunting manual kalau lebih suka.
 
 ### Gemini
 
-Satu key, dua tugas: transkrip (Stage 2) lewat `GEMINI_API_KEYS`, lalu seleksi
-momen dan metadata (Stage 3 & 8) lewat key yang sama. Bukan pilihan di antara
-beberapa provider — CAPIO cuma jalan dengan Gemini.
+CAPIO memakai Gemini untuk transkrip, seleksi momen, dan metadata. Beberapa
+API key boleh disimpan dan dipakai bergiliran. Model LLM memakai urutan bawaan
+hasil pengujian; `GEMINI_MODELS` dapat mengatur urutan model sendiri. Model
+transkripsi tetap terpisah dari model chat.
 
 Ini pilihan yang paling terasa hasilnya untuk transkrip, karena **caption
 terbakar permanen di video**. Transkrip yang meleset kelihatan oleh penonton
@@ -236,44 +239,32 @@ sempit dari batas laju harian Gemini, dan target market CAPIO sensitif harga.
 tertulis di `.env` lama diabaikan tanpa error — tidak ada yang perlu
 disunting setelah update.
 
-### Lisensi
+### Tampilan dan caption
 
-CAPIO butuh **license key** untuk memproses video baru — diisi lewat halaman
-**Setting**, bagian Lisensi. Kosong atau tidak aktif berarti aplikasi tetap
-jalan normal: klip yang sudah ada tetap bisa dibuka, diputar, dan diunduh,
-cuma submit job **baru** yang diblokir sampai key-nya terverifikasi.
+CAPIO menyediakan lima template (`mentahan`, `full_screen`,
+`pembicara_samping`, `blur_atas_bawah`, `kotak_tengah`) serta jalur Custom.
+Adjustment hanya muncul pada mode yang mendukungnya dan konfigurasi lengkap
+disimpan sebagai snapshot per job. `mentahan` mempertahankan source tanpa
+caption; Custom mengatur rasio, komposisi video, latar, caption, dan hook.
+Spesifikasi visual dan adjustment ada di [`template.md`](template.md), katalog
+kode di `pipeline/templates.py`.
 
-Gerbangnya satu fungsi (`license.boleh_submit()`), disengaja begitu —
-lihat komentar di `license/__init__.py` sebelum menyentuhnya. Verifikasi
-tidak pernah memblokir halaman Setting sendiri: kalau iya, key tidak akan
-pernah bisa dimasukkan sama sekali.
+Full Screen dan Blur atas-bawah melacak wajah dari beberapa sampel sepanjang
+klip. Crop dapat bergeser ketika wajah utama keluar dari area aman; saat wajah
+tidak terdeteksi, renderer memakai titik tengah source. Motion caption khusus
+Pembicara di samping dan Kotak tengah dirender sebagai overlay transparan,
+sementara caption lain memakai subtitle `.ass`.
 
-### Tampilan
+### Pemakaian Gemini
 
-Lima bentuk klip (`penuh`, `duo`, `kotak`, `samping`, `ori`) plus gaya caption
-(font, ukuran, jumlah kata per tampilan, huruf besar, gaya kata aktif) —
-dipilih **per video** di halaman Submit, bukan sekali untuk semua video.
-Nilai di halaman Setting cuma jadi nilai awal yang tampil pertama kali.
-Detail tiap layout ada di `pipeline/layout.py`.
-
-**Gaya kata aktif** ada tiga: *warna teks* (kata yang diucapkan cuma berubah
-warna), *blok* (blok bersudut tumpul di belakang kata itu), dan *blok +
-membesar* (blok, dan katanya membesar 1,08×). Warna blok, warna teks di dalam
-blok, radius sudut, dan padding bisa diatur. Karena libass tidak punya latar per
-kata yang bersudut tumpul, di dua gaya blok posisi tiap kata dihitung sendiri
-dari metrik font (`pipeline/metrik.py`) dan bloknya digambar sebagai vector
-drawing di titik tengah yang sama dengan katanya.
-
-Layout **Pembicara di samping** (`samping`) bisa menaruh pembicara di kiri atau
-kanan, dengan gradasi pada sisi sebaliknya. Kepekatan ujung (0–100%) dan luasnya
-(20–80% lebar) bisa digeser per
-video di halaman Submit.
-
-Layout **Podcast 2 Orang** (key kompatibilitas: `duo`) mengambil 20 sampel
-sepanjang klip. Jika tepat dua wajah terlihat stabil pada sedikitnya 90% sampel,
-posisi median keduanya dikunci: pembicara kiri di panel atas dan kanan di panel
-bawah sepanjang klip. Video multicam, close-up bergantian, atau tiga orang
-otomatis memakai `penuh`, dan halaman Hasil menampilkan peringatan fallback.
+Settings menampilkan panggilan dan token Gemini per model. Catatan lokal
+mencakup model, tahap, jumlah token, waktu, status, dan penanda estimasi; prompt,
+transkrip, respons mentah, serta API key tidak disimpan dalam tabel pemakaian.
+Nilai biaya di UI adalah pembanding terhadap tarif API Standard berbayar, bukan
+tagihan BYOK. Tarif per model mengikuti [harga resmi Gemini](https://ai.google.dev/gemini-api/docs/pricing)
+dan tanggal pemeriksaannya ditampilkan. Alias model
+`-latest` memakai asumsi harga yang ditandai; riwayat lama tanpa rincian input
+dan output tetap masuk total token, tetapi tidak diberi estimasi biaya.
 
 ### Auto clear
 
@@ -374,8 +365,8 @@ fungsi apa saja — eksekusi kode jarak jauh di mesin yang menjalankan worker.
 ```
 POST /jobs → row Postgres (queued) → job_id ke Redis (RQ)
            → worker: orchestrator.run(job_id)
-              unduh → transkrip → seleksi → batas
-                    → caption → crop → render → metadata
+              sumber → transkrip → seleksi → perapian batas
+                     → crop → caption → render → metadata
               → simpan ke clips/ → status done
 ```
 
@@ -385,7 +376,7 @@ config/               settings + baca-tulis .env
 api/                  REST + penyaji halaman
 web/                  template Jinja2 + aset
 worker/               orchestrator (satu-satunya pemanggil stage)
-pipeline/stages/      sembilan tahap, masing-masing satu file
+pipeline/stages/      stage pipeline (urutan dikelola orchestrator)
 asr/                  transkrip (gemini)
 llm/                  LLM (gemini)
 storage/              penyimpanan klip lokal
@@ -415,6 +406,17 @@ file; lapisan pemilih untuk satu implementasi hanyalah indirection.
 > stdlib Python, dan root project berada di `sys.path[0]` saat `main.py`
 > dijalankan — `import queue` dari dependency mana pun akan nyasar ke folder
 > project dan memecahkan pipeline diam-diam.
+
+## Mode Agentiv-host
+
+Branch `codex/agentiv-host` disiapkan untuk mengembangkan layanan CAPIO yang
+di-host dan dikelola Agentiv setelah ada pesanan Agentiv-host. Perubahan khusus
+hosting—seperti pengaturan worker dan template modular—dikerjakan di branch ini;
+`main` tetap menjadi jalur rilis CAPIO Self-host.
+
+Sebelum ada pesanan, branch ini hanya menandai ruang kerja dan belum mengubah
+kode atau perilaku produk. Fitur dan perbaikan pada core CAPIO bersama tetap
+perlu diselaraskan dengan `main` saat pengembangan Agentiv-host dimulai.
 
 ---
 
@@ -474,15 +476,10 @@ diperkirakan.
 
   Penyusutan jumlah kandidat belum diukur ulang sesudah perbaikan itu — bisa
   jadi ikut membaik, bisa jadi sebab yang berbeda.
-- **Source lebih sempit dari 9:16** (misalnya 9:20) akan ter-stretch vertikal.
-  Perbaikannya mode `fit` dengan latar blur; worker memperingatkannya di log.
-- **Satu crop per klip, bukan per shot.** Memadai untuk talking-head satu orang.
-  Pada video wawancara yang berpindah kamera antar pembicara, **wajah utama
-  berada di luar bingkai sekitar 18% waktu** — **diukur SEKALI, pada satu video
-  7 menit**, 120 frame sampel, memakai jendela per 60 detik persis seperti cara
-  crop bekerja. Perlakukan 18% sebagai satu pengamatan, bukan sebagai laju yang
-  berlaku umum. Klipnya tetap jadi; yang hilang cuma wajah orang yang sedang
-  bicara.
+- **Pelacakan crop mengikuti posisi wajah, bukan giliran bicara.** Full Screen
+  dan Blur atas-bawah dapat menggeser crop ketika wajah utama keluar dari area
+  aman. Sistem belum mengenali siapa yang sedang berbicara; jika dua orang
+  berjauhan, crop tetap memilih satu wajah.
 - **Chunking transkrip** memotong tepat di menit ke-20 tanpa menyesuaikan ke
   jeda bicara. Gemini menolak word timestamp di atas 30 menit per request,
   jadi cabang ini aktif untuk setiap audio **di atas 20 menit** — bukan cuma
@@ -494,7 +491,4 @@ diperkirakan.
 
 ## Lisensi
 
-Produk berbayar milik Agentiv, bukan open source — didistribusikan ke client
-sebagai image Docker (`agentiv/capio`), bukan lewat source ini. Mekanisme
-teknisnya (bukan syarat legalnya — itu keputusan bisnis, di luar cakupan
-dokumen ini) ada di `license/__init__.py`.
+CAPIO sekarang dibagikan gratis — tidak perlu license key. Syarat pemakaian ada di `CAPIO-LICENSE.txt`.

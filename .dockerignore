@@ -9,6 +9,8 @@ __pycache__/
 # dan isinya sekali pakai.
 clips/
 work/
+# Data perangkat dan laporan evaluasi hanya milik runtime lokal.
+data/
 tests/fixtures/sample.mp4
 *.mp4
 !web/static/contoh/*.mp4

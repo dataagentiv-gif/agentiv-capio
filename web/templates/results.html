@@ -2,7 +2,7 @@
 {% set page = 'results' %}
 {% block title %}Hasil — CAPIO{% endblock %}
 {% block heading %}Hasil{% endblock %}
-{% block lede %}Tiap klip datang dengan nilai dan alasan kenapa momen itu yang dipilih — supaya kamu bisa menilai sendiri sebelum mengunggah.{% endblock %}
+{% block lede %}Tinjau klip dan alasan pemilihannya sebelum mengunggah.{% endblock %}
 
 {% block content %}
 <section class="results-tools" aria-label="Filter hasil">
@@ -35,12 +35,13 @@ function clipHtml(c, jobId) {
       <button class="muka" data-putar="${local}"
               aria-label="Putar ${esc(c.title || c.id)}">
         <img src="${local}/poster.jpg" alt="" loading="lazy" width="116" height="206">
-        <span class="skor ${pita}">${c.score}</span>
+        ${c.editor_approved ? '' : `<span class="skor ${pita}">${c.score}</span>`}
         <span class="main">${ikon('i-play')}</span>
         <span class="durasi">${c.duration}s</span>
       </button>
       <div>
         <h3>${esc(c.title || c.id)}</h3>
+        ${c.editor_approved ? '<p class="sub">Pilihan editor · Agent</p>' : ''}
         ${c.layout_fallback ? `<div class="note warn"><b>Podcast 2 Orang memakai Penuh</b>Video tidak konsisten menampilkan tepat dua orang dalam satu frame.</div>` : ''}
         ${c.hook ? `<p class="hook">${esc(c.hook)}</p>` : ''}
         ${c.caption ? `<div class="row potong" title="${esc(c.caption)}"><b>Caption</b>${esc(c.caption)}</div>` : ''}
@@ -92,7 +93,8 @@ function jobHtml(j) {
     </div>`;
 }
 
-const resultState = {search: '', template: 'all', ratio: 'all'};
+const resultState = {search: /^[a-f0-9-]{36}$/i.test(location.hash.slice(1)) ? location.hash.slice(1) : '', template: 'all', ratio: 'all'};
+document.getElementById('results-search').value = resultState.search;
 for (const [id,key] of [['results-search','search'],['results-template','template'],['results-ratio','ratio']]) document.getElementById(id)?.addEventListener('input', e => { resultState[key]=e.target.value; drawResults(); });
 function cocokHasil(j) { const text=JSON.stringify([j.id,j.url,j.template_id,j.layout,j.adjustments,j.gaya]).toLowerCase(); if(resultState.search && !text.includes(resultState.search.toLowerCase())) return false; const custom=(j.template_id||j.layout)==='custom'; if(resultState.template==='custom'&&!custom || resultState.template==='template'&&custom) return false; return resultState.ratio==='all' || (j.adjustments||{}).output_ratio===resultState.ratio; }
 function drawResults() { const jobs = window._hasilJobs || [], shown = jobs.filter(cocokHasil); document.getElementById('list').innerHTML = shown.length ? shown.map(jobHtml).join('') : empty(jobs.length ? 'Tidak ada hasil yang cocok' : 'Belum ada klip', jobs.length ? 'Coba ubah filter pencarian atau tampilannya.' : 'Video yang sudah selesai atau gagal akan muncul di sini.'); }

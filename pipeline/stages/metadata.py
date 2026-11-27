@@ -61,6 +61,11 @@ def run(ctx: dict) -> dict:
         f"- id: {s['id']}\n  hook: {s.get('hook', '')}\n  alasan: {s.get('reason', '')}"
         for s in segments
     )
+    if ctx.get("editorial_brief"):
+        listing += "\nBrief editorial (jangan membuat klaim di luar transkrip): " + ctx["editorial_brief"]
+        listing += "\nKutipan sumber:\n" + "\n".join(
+            f"{s['id']}: " + " ".join(w["w"] for w in ctx["words"][s["start_idx"]:s["end_idx"] + 1])
+            for s in segments)
 
     try:
         result = call_llm(PROMPT.format(clips=listing), SCHEMA)

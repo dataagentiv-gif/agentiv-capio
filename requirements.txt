@@ -4,6 +4,7 @@ uvicorn>=0.30
 jinja2>=3.1
 pydantic>=2.9
 pydantic-settings>=2.5
+pydantic-ai-slim[google]==2.52.0
 python-dotenv>=1.0
 # Wajib untuk UploadFile. FastAPI tidak menariknya sendiri, dan tanpanya
 # endpoint unggah gagal saat IMPOR — bukan saat dipanggil, jadi seluruh API
@@ -34,14 +35,6 @@ Pillow>=10.0
 # Pin eksak. mediapipe 0.10.x memaksa numpy<2 + protobuf<5 dan menarik jax —
 # pin itu berantem dengan dep lain di venv ini. 1.0.1 tidak memaksa apa pun.
 mediapipe==1.0.1
-
-# --- Lisensi ---
-# Verifikasi tanda tangan RS256 pada token lisensi. Sengaja TIDAK ditulis
-# sendiri: verifikasi PKCS#1 v1.5 punya kelas bug forgery yang terkenal
-# (Bleichenbacher 2006) saat parsing padding-nya longgar, dan kegagalannya
-# senyap — token palsu diterima tanpa satu pun tanda. Ini menjaga pendapatan,
-# bukan tempat berhemat satu dependensi.
-cryptography>=42.0
 
 # --- Test ---
 pytest>=8.0

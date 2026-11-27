@@ -79,19 +79,19 @@ Caption selalu mati dan tidak ditampilkan sebagai pilihan.
 ## 3. Pembicara di samping
 
 - **ID:** `pembicara_samping`
-- **Tujuan:** klip 9:16 dengan pembicara di kiri dan ruang editorial untuk
-  caption di kanan.
+- **Tujuan:** klip 9:16 dengan pembicara dan ruang editorial caption di sisi
+  yang berlawanan.
 
 ### Karakteristik terkunci
 
 - Kanvas keluaran berukuran 1080 × 1920 (9:16).
 - Video menjadi pita horizontal di tengah kanvas; ruang di atas dan bawahnya
   berwarna hitam.
-- Pembicara memakai medium shot di sisi kiri, dengan wajah berada kira-kira di
-  sepertiga kiri pita video.
-- Sisi kanan adalah ruang caption.
-- Gradasi gelap halus menguat ke kanan untuk menjaga teks terbaca tanpa garis
-  batas kotak yang keras.
+- Crop mengikuti wajah pembicara yang terdeteksi dan menguncinya selama klip.
+- Sisi caption serta gradasi dipilih berlawanan dengan posisi pembicara; sisi
+  tidak berpindah di tengah klip.
+- Gradasi gelap halus menguat pada sisi caption untuk menjaga teks terbaca
+  tanpa garis batas kotak yang keras.
 - Font, ukuran dasar, warna dasar, posisi, dan crop adalah bagian dari
   template, bukan pengaturan umum.
 
@@ -216,7 +216,7 @@ terbaca. Semua nilai berlaku untuk seluruh klip dalam satu job.
 | Latar | hitam, warna polos, atau blur dari source video |
 | Caption | tampil/sembunyi, posisi vertikal, Poppins/Archivo Black/Anton/Lora, ukuran, 1–4 kata per grup, huruf besar semua |
 | Gaya kata aktif | `text_color`, `background`, `background_scale`, warna huruf aktif, warna blok aktif |
-| Keterbacaan | outline, shadow, kekuatan shadow |
+| Keterbacaan | outline dan shadow diterapkan otomatis oleh renderer; tidak menjadi adjustment terpisah |
 | Hook | tampil/sembunyi, teks hook otomatis dari metadata, posisi atas, tanpa blok atau kotak putih–teks hitam |
 
 ### Batasan versi awal

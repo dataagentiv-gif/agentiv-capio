@@ -92,3 +92,43 @@ def test_parser_scene_membaca_pts_time():
 
 def test_regex_silence_toleran_terhadap_spasi():
     assert _SIL.findall("silence_start:0\n")[0] == ("start", "0")
+
+
+def test_refine_menjaga_ucapan_dan_tetangga(monkeypatch, tmp_path):
+    from pipeline.stages import refine
+    from utils.ffmpeg_helpers import Deadline
+    words = [{"s": 8.0, "e": 9.8}, {"s": 10.0, "e": 10.4},
+             {"s": 69.6, "e": 70.0}, {"s": 70.2, "e": 72.0}]
+    monkeypatch.setattr(refine, "silences", lambda *args: [])
+    for cuts in ([10.5, 69.5], [9.0, 71.0]):
+        monkeypatch.setattr(refine, "_scene_cuts", lambda *args: cuts)
+        out = refine.run({"segments_raw": [{"start_idx": 1, "end_idx": 2}],
+                          "words": words, "workdir": tmp_path, "deadline": Deadline(10),
+                          "meta": {"duration": 100}, "audio": tmp_path / "audio", "source": tmp_path / "source"})
+        clip = out["segments_final"][0]
+        assert 9.8 <= clip["start"] <= 10.0
+        assert 70.0 <= clip["end"] <= 70.2
+        assert 30 <= clip["end"] - clip["start"] <= 90
+
+
+def test_refine_padding_tidak_melanggar_batas_90(monkeypatch, tmp_path):
+    from pipeline.stages import refine
+    from utils.ffmpeg_helpers import Deadline
+    monkeypatch.setattr(refine, "silences", lambda *args: [])
+    monkeypatch.setattr(refine, "_scene_cuts", lambda *args: [])
+    out = refine.run({"segments_raw": [{"start_idx": 0, "end_idx": 1}],
+                      "words": [{"s": 1.0, "e": 1.4}, {"s": 90.6, "e": 91.0}],
+                      "workdir": tmp_path, "deadline": Deadline(10), "meta": {"duration": 100},
+                      "audio": tmp_path / "audio", "source": tmp_path / "source"})
+    assert (out["segments_final"][0]["start"], out["segments_final"][0]["end"]) == (1.0, 91.0)
+
+
+def test_scene_window_membatasi_input_sebelum_filter(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from pipeline.stages import refine
+    def ff(args, deadline, **kwargs):
+        assert args.index("-t") < args.index("-i")
+        assert args[args.index("-t") + 1] == "3.000"
+        return SimpleNamespace(stderr="pts_time:0\npts_time:1.3")
+    monkeypatch.setattr(refine, "ff", ff)
+    assert refine._scene_cuts(tmp_path / "source.mp4", 10, None) == [9.8]

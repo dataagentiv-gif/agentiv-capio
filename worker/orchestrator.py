@@ -70,6 +70,7 @@ def _build_clips(ctx: dict, job_id: str) -> list[dict]:
                 "hashtags": meta["hashtags"],
                 "layout": ctx["template_id"],
                 "layout_fallback": False,
+                "editor_approved": bool(ctx.get("approved_ranges")),
             }
         )
     return clips
@@ -138,7 +139,12 @@ def run(job_id: str) -> None:
         if ctx["template_id"] not in TEMPLATES and ctx["template_id"] != "custom":
             raise ValueError("Job lama tidak memakai library template; submit ulang")
         ctx["adjustments"] = resolve(ctx["template_id"], ctx["adjustments"])
-        for i, (status, stage) in enumerate(STAGES):
+        stages = STAGES
+        if job.get("agent_snapshot"):
+            from agentic.worker import render_context
+            render_context(job["agent_snapshot"], ctx)
+            stages = STAGES[3:]
+        for i, (status, stage) in enumerate(stages):
             ctx["deadline"].check(status)
             jobs.update_status(job_id, status, progress=int(i / TOTAL_STEPS * 100),
                                 worker_id=_worker_id)
