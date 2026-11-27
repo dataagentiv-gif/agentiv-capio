@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     DATA_DIR: Path = ROOT / "data"
 
     # Ditampilkan sebagai versi kecil di nav (_layout.html).
-    VERSI: str = "1.9.0"
+    VERSI: str = "1.9.1"
 
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"

@@ -366,11 +366,17 @@ document.addEventListener('click', async (e) => {
   dialog.addEventListener('click', e => { if (e.target === dialog || e.target.closest('[data-tutup]')) dialog.close(); });
   dialog.addEventListener('close', () => dialog.querySelectorAll('video').forEach(v => v.pause()));
   document.body.append(dialog);
+  // Denyut berhenti setelah panduan pernah dibuka sekali; storage bisa ditolak browser.
+  let dilihat = false;
+  try { dilihat = localStorage.getItem('capio-panduan-dilihat') === '1'; } catch {}
+  if (!dilihat) document.querySelectorAll('[data-help]').forEach(b => b.classList.add('denyut'));
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   document.addEventListener('click', async e => {
     const b = e.target.closest('[data-help]');
     if (!b) return;
     e.preventDefault();
+    document.querySelectorAll('[data-help]').forEach(x => x.classList.remove('denyut'));
+    try { localStorage.setItem('capio-panduan-dilihat', '1'); } catch {}
     try { data = data || await (await fetch('/static/panduan/panduan.json')).json(); } catch { location.href = '/panduan'; return; }
     const langkah = data.filter(p => p.halaman === b.dataset.help);
     dialog.innerHTML = `<button class="dialog-close" data-tutup aria-label="Tutup">×</button>

@@ -144,7 +144,7 @@
 
 <main class="{% block main_class %}{% endblock %}">
   <div class="page-head">
-    <h1 class="display">{% block heading %}{% endblock %}{% if help %} <button type="button" class="tanya" data-help="{{ help }}" aria-label="Cara pakai halaman ini" title="Cara pakai">?</button>{% endif %}</h1>
+    <h1 class="display">{% block heading %}{% endblock %}{% if help %} <button type="button" class="cara-pakai" data-help="{{ help }}" title="Video singkat cara pakai halaman ini"><span aria-hidden="true">▶</span> Cara pakai</button>{% endif %}</h1>
     <p class="lede">{% block lede %}{% endblock %}</p>
   </div>
   {% block content %}{% endblock %}
