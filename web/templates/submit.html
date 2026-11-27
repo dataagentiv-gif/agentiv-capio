@@ -3,7 +3,7 @@
 {% block heading %}{% if agent_session %}Pilih tampilan untuk klip pilihanmu.{% else %}Ubah video panjang jadi klip siap posting.{% endif %}{% endblock %}
 {% block lede %}Masukkan video, lalu pilih satu tampilan dari library template CAPIO.{% endblock %}
 {% block content %}
-{% if agent_session %}<p><a href="/agent#{{ agent_session.id }}">← Kembali ke sesi</a> · {{ default_clips }} kandidat dipertahankan</p>{% else %}<p><a class="btn ghost" href="/agent">Agent · Eksperimen</a></p>{% endif %}
+{% if agent_session %}<p><a href="/agent#{{ agent_session.id }}">← Kembali ke sesi</a> · {{ default_clips }} kandidat dipertahankan</p>{% else %}<p><a class="btn ghost" href="/agent">Agent · Beta</a></p>{% endif %}
 <div id="status" class="status-strip"></div>
 <div class="submit-layout picked" id="submit-layout">
   <div class="submit-col"><div class="card">

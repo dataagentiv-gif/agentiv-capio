@@ -16,7 +16,7 @@ from pydantic_ai.messages import ModelResponse, ToolCallPart, TextPart, ToolRetu
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
 
-from agentic import editor, worker, gemini
+from agentic import editor, worker, gemini, overview
 from config.settings import settings
 from utils.ffmpeg_helpers import Deadline, JobCancelled, ffmpeg, probe
 
@@ -137,7 +137,7 @@ def test_native_adapter_rotates_same_model_and_accounts_every_attempt(monkeypatc
     assert used == [0, 1] and pool.attempts == 2
     assert records == [(pool.name, 0, 0, 0, False, False), (pool.name, 10, 2, 12)]
     assert reports[0][-1] == "Agent HTTP 401"
-    pool.attempts = 8
+    pool.requests = pool.limit
     with pytest.raises(UsageLimitExceeded):
         asyncio.run(Agent(pool).run("ping"))
 
@@ -318,7 +318,7 @@ def test_sessions_idempotency_version_preview_and_render_snapshot(dbclient):
     assert c.post('/jobs/' + job["job_id"] + '/retry').status_code == 409
     assert jobs.get(job["job_id"])["status"] == "failed"
     assert c.get('/agent').status_code == 200
-    assert 'Agent \u00b7 Eksperimen' in c.get('/').text
+    assert 'Agent \u00b7 Beta' in c.get('/').text
 
 
 def test_recovery_queue_failure_and_revision(dbclient, monkeypatch):
@@ -716,3 +716,72 @@ def test_alternative_recommendation_dedupes_prior_evidence(tmp_path):
     reply,_,_=asyncio.run(editor.turn(session,ctx,FunctionModel(answer)))
     assert [r.title for r in reply.recommendations]==['Momen lain']
     assert ctx['request_alternatives'] is True
+
+
+def _pool(monkeypatch, keys=2):
+    monkeypatch.setattr(gemini.keypool, "keys", lambda _: [f"fake-{i}" for i in range(keys)])
+    monkeypatch.setattr(gemini.keypool, "lapor", lambda *a: None)
+    monkeypatch.setattr(gemini.rute, "daftar", lambda: ["gemini-3.5-flash"])
+    monkeypatch.setattr(gemini.rute, "urutan", lambda _, models, count: [(models[0], i) for i in range(count)])
+    monkeypatch.setattr(gemini.telemetry, "record", lambda *a: None)
+    return gemini.GeminiPool("gemini-3.5-flash", Deadline(30), timeout=0.2)
+
+
+def test_hung_or_busy_gemini_rotates_without_spending_the_budget(monkeypatch):
+    pool = _pool(monkeypatch)
+    async def hang(*args):
+        await asyncio.sleep(5)
+    async def ok(*args):
+        return ModelResponse(parts=[TextPart("OK")], usage=RequestUsage(input_tokens=1, output_tokens=1))
+    pool.clients = {(pool.name, 0): SimpleNamespace(request=hang), (pool.name, 1): SimpleNamespace(request=ok)}
+    assert asyncio.run(Agent(pool).run("ping")).output == "OK"
+    assert pool.requests == 1 and pool.failures == 1 and pool.attempts == 2
+
+
+def test_last_two_requests_drop_research_tools(monkeypatch):
+    from pydantic_ai.models import ModelRequestParameters
+    from pydantic_ai.tools import ToolDefinition
+    pool = _pool(monkeypatch, keys=1)
+    seen = []
+    async def ok(messages, settings_, params):
+        seen.append(len(params.function_tools))
+        return ModelResponse(parts=[TextPart("OK")], usage=RequestUsage(input_tokens=1, output_tokens=1))
+    pool.clients = {(pool.name, 0): SimpleNamespace(request=ok)}
+    params = ModelRequestParameters(function_tools=[ToolDefinition(name="search_transcript")])
+    for _ in range(pool.limit):
+        asyncio.run(pool.request([], None, params))
+    assert seen[:pool.limit - 2] == [1] * (pool.limit - 2) and seen[-2:] == [0, 0]
+    with pytest.raises(UsageLimitExceeded):
+        asyncio.run(pool.request([], None, params))
+
+
+def test_compact_transcript_keeps_every_word_index(tmp_path):
+    session = {"brief": "", "data": {"pending": "Cari momen", "history": []}}
+    ctx = {"words": words(), "sentences": [], "deadline": Deadline(30), "workdir": tmp_path}
+    def respond(messages, info):
+        returns = [p for m in messages for p in m.parts if isinstance(p, ToolReturnPart)]
+        if not returns:
+            return ModelResponse(parts=[ToolCallPart("read_ranges", {"ranges": [{"start_idx": 0, "end_idx": 3}]})])
+        text = str(returns[-1].content)
+        assert "[0.0] 0 kata0 1 kata1" in text and "11 kata11" in text and "0.90" not in text
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"message": "OK"})])
+    asyncio.run(editor.turn(session, ctx, FunctionModel(respond)))
+
+
+def test_topic_map_quotes_come_from_the_server():
+    source = [{"i": i, "w": f"kata{i}", "s": float(i), "e": i + .9} for i in range(1200)]
+    def answer(messages, info):
+        prompt = str(messages)
+        if "Halaman" not in prompt:
+            return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"summary": "Ringkas"})])
+        page = int(prompt.split("Halaman ")[1].split("/")[0]) - 1
+        if page == 2:
+            raise RuntimeError("Gemini 503")
+        lo = page * 500
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"topics": [
+            {"title": f"T{page}", "summary": "s", "start_idx": lo + 3, "end_idx": lo + 9999}]})])
+    result = asyncio.run(overview.build(source, FunctionModel(answer), Deadline(30)))
+    assert [t["title"] for t in result["topics"]] == ["T0", "T1"]
+    first = result["topics"][0]
+    assert first["end_idx"] == 499 and first["opening_quote"].startswith("kata3 ") and first["closing_quote"].endswith("kata499")
+    assert result["partial"] and result["pages_seen"] == [0, 1] and result["summary"] == "Ringkas"

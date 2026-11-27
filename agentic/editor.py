@@ -281,8 +281,10 @@ Untuk pencarian kandidat setelah peta tersedia: gunakan search_transcript satu b
 Untuk overview: baca maksimal empat halaman dalam SATU pemanggilan, bukan satu halaman per giliran.
 Setiap topik overview juga wajib opening_quote/closing_quote 3–20 kata persis untuk memastikan timestamp sesuai sumber.
 Petakan seluruh bagian yang diringkas, termasuk bagian akhir sumber; jangan memakai indeks waktu sebagai indeks kata.
-Jangan mengaku memahami bagian yang belum dibaca. Maksimal 8 permintaan model termasuk retry/rotasi, 16 tools.
-Gunakan batch tools agar cukup. Akhiri lebih awal dengan ringkasan parsial jika belum mencakup sumber.
+Jangan mengaku memahami bagian yang belum dibaca. Maksimal 12 permintaan model dan 24 tools; dua permintaan terakhir tanpa tools.
+Gunakan batch tools agar cukup. Bila peta topik sudah lengkap, pakai indeksnya untuk search/read_ranges, jangan baca ulang halaman.
+Akhiri lebih awal dengan kandidat/rekomendasi yang sudah terverifikasi bila belum mencakup semuanya.
+Format transkrip tools: "[detik] indeks kata indeks kata ..."; indeks adalah nomor kata untuk start_idx/end_idx.
 Jika validasi menolak kandidat, perbaiki seluruh masalah dalam satu langkah. Batas durasi WAJIB, bukan opsional.
 Boleh keluarkan hanya kandidat valid dan jelaskan gagasan lain yang belum ditemukan; jangan ulangi kandidat invalid demi jumlah.
 Tidak menyetujui render. Maksimal 20 kandidat per balasan.
@@ -311,16 +313,19 @@ Tidak menyetujui render. Maksimal 20 kandidat per balasan.
 
     @agent.tool_plain
     def read_context(start_indices: list[int]) -> list[dict]:
-        """Baca konteks sekitar sampai 8 indeks temuan dalam satu batch (160 kata sebelum dan sesudah tiap indeks)."""
+        """Baca konteks sekitar sampai 8 indeks temuan dalam satu batch (80 kata sebelum dan sesudah tiap indeks)."""
         deadline.check("read context")
         event("Memeriksa konteks kandidat")
         if not 1 <= len(start_indices) <= 8 or any(type(i) is not int or not 0 <= i < len(words) for i in start_indices):
             raise ModelRetry("Kirim 1–8 indeks start_idx yang valid dari hasil pencarian.")
-        return [{"anchor_idx": i, "transcript": transcript_slice(max(0, i - 160), min(len(words)-1, i + 160))}
+        return [{"anchor_idx": i, "transcript": transcript_slice(max(0, i - 80), min(len(words)-1, i + 80))}
                 for i in dict.fromkeys(start_indices)]
 
     def transcript_slice(lo, hi):
-        return "\n".join(f"{i} [{words[i]['s']:.2f}-{words[i]['e']:.2f}] {words[i]['w']}" for i in range(lo, hi + 1))
+        # Every word keeps its index (boundaries stay exact) but timestamps only
+        # head each 12-word line: per-word "[s-e]" was ~3x the tokens of the text.
+        return "\n".join(f"[{words[i]['s']:.1f}] " + " ".join(f"{j} {words[j]['w']}" for j in range(i, min(i + 12, hi + 1)))
+                         for i in range(lo, hi + 1, 12))
 
     @agent.tool_plain
     def read_ranges(ranges: list[WordRange]) -> list[dict]:
@@ -520,7 +525,7 @@ async def turn(session, ctx, model, event=lambda name: None):
             async with agent:
                 # Official messages/state carry continuity; bulk tool returns are audit data only.
                 result = await asyncio.wait_for(agent.run(prompt,
-                    usage_limits=UsageLimits(request_limit=8, tool_calls_limit=16)), timeout=ctx["deadline"].remaining(settings.JOB_TIMEOUT_SEC))
+                    usage_limits=UsageLimits(request_limit=14, tool_calls_limit=24)), timeout=ctx["deadline"].remaining(settings.JOB_TIMEOUT_SEC))
         except Exception as exc:
             from pydantic_ai.exceptions import UsageLimitExceeded, UnexpectedModelBehavior
             from pydantic_ai.messages import ToolReturnPart, ToolCallPart

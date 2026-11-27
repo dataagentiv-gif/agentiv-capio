@@ -66,7 +66,7 @@
     const row=rows.find(r=>r.id===session.id);if(row){row.status=session.status;if(session.source_title)row.brief=session.source_title;}drawList();
     $('state').textContent = `${label(session.status)} · ${session.progress || 'Menunggu worker'}`;
     $('model').textContent = `Model ${session.model}`;
-    $('failure').hidden = !session.error; $('failure').textContent = session.error || '';
+    const newFailure = !!session.error && $('failure').hidden; $('failure').hidden = !session.error; $('failure').textContent = session.error || ''; if (newFailure) {const area=$('chat-scroll'); requestAnimationFrame(()=>area.scrollTop=area.scrollHeight);}
     $('cancel').hidden = !active(); $('cancel').disabled = busy || session.status === 'cancelling';
     $('retry').hidden = !['failed','cancelled'].includes(session.status); $('retry').disabled = busy;
     $('delete').disabled = busy || active(); $('send').disabled = busy || active() || !session.source_ready;

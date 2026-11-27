@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     DATA_DIR: Path = ROOT / "data"
 
     # Ditampilkan sebagai versi kecil di nav (_layout.html).
-    VERSI: str = "1.7.1"
+    VERSI: str = "1.8.0"
     AGENTIV_WA: str = "6285843570782"
 
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"

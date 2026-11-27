@@ -13,6 +13,10 @@ from pipeline.stages import download, transcribe
 from utils.ffmpeg_helpers import Deadline, JobCancelled, ffmpeg
 from agentic.editor import turn, merge_candidates
 from agentic.gemini import GeminiPool
+from agentic import overview as topic_map
+from utils.logging import get
+
+log = get(__name__)
 
 
 def directory(ident):
@@ -42,6 +46,7 @@ def run(ident, operation):
         row.status, row.worker_id, row.error = "preparing", WORKER_ID, None
     started = time.monotonic()
     model = None
+    map_model = None
     editorial_started = None
     preparation_seconds = 0
     tool_calls = 0
@@ -49,9 +54,10 @@ def run(ident, operation):
     overview_only = False
     def metrics():
         now = time.monotonic()
-        return {"model_requests": getattr(model, "attempts", 0), "tool_calls": tool_calls,
-                "input_tokens": getattr(model, "input_tokens", 0),
-                "output_tokens": getattr(model, "output_tokens", 0),
+        total = lambda attr: getattr(model, attr, 0) + getattr(map_model, attr, 0)
+        return {"model_requests": total("attempts"), "tool_calls": tool_calls,
+                "input_tokens": total("input_tokens"),
+                "output_tokens": total("output_tokens"),
                 "processing_seconds": round(now - started, 2),
                 "preparation_seconds": preparation_seconds,
                 "editorial_seconds": round(now - editorial_started, 2) if editorial_started is not None else 0}
@@ -98,6 +104,36 @@ def run(ident, operation):
             row.data["source_title"] = ctx["meta"].get("title", session["url"])
             if row.data.get("needs_overview"):
                 row.data.setdefault("overview", {}).setdefault("partial", True)
+        known = session["data"].get("overview") or {}
+        if not known.get("topics") or known.get("partial"):
+            # Map once with the cheap model; a failure only means the chat agent maps it the old way.
+            progress("Memetakan sumber")
+            try:
+                with stage(ident, "agent_overview"):
+                    map_model = GeminiPool(topic_map.CHEAP_MODEL, deadline, limit=None, timeout=60)
+                    mapped = asyncio.run(topic_map.build(ctx["words"], map_model, deadline, progress))
+            except JobCancelled:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                log.warning("peta topik cepat gagal (%s); Agent memetakan sendiri", type(exc).__name__)
+                mapped = None
+            if mapped is not None:
+                session["data"]["overview"] = mapped
+                with sessions.locked(ident) as (_, row):
+                    if row.operation_id != operation or row.status == "cancelling":
+                        raise JobCancelled()
+                    row.data["overview"] = mapped
+                    row.data["needs_overview"] = False
+                    if overview_only:
+                        # The map was the whole job: no editorial direction yet, so no chat turn.
+                        row.data["version"] = row.data.get("version", 0) + 1
+                        row.data["messages"].append({"role": "assistant", "text":
+                            f"Sumber siap. {mapped['summary']} Pilih topik di tab Sumber atau tulis momen yang dicari."})
+                        row.data["progress"] = "Sumber siap; menunggu arahan"
+                        row.data["pending"] = ""
+                        row.status, row.worker_id = "ready", None
+                if overview_only:
+                    return
         progress("Membaca brief dan transkrip")
         editorial_started = time.monotonic()
         with stage(ident, "agent_editor"):
@@ -163,13 +199,15 @@ def run(ident, operation):
                 row.data.setdefault("turn_history", []).append({"operation_id": operation, "status": "failed", "history": ctx["failed_history"]})
         from pydantic_ai.exceptions import UsageLimitExceeded, UnexpectedModelBehavior, ModelHTTPError
         if isinstance(exc, UsageLimitExceeded):
-            text = "Batas putaran tercapai. Kandidat sebelumnya tetap tersedia; beri arahan yang lebih spesifik atau coba ulang."
+            text = ("Agent kehabisan jatah langkah sebelum menemukan klip yang lolos pemeriksaan. "
+                    "Coba arahan yang lebih spesifik (topik atau kalimat kunci), atau klik Coba ulang.")
         elif isinstance(exc, UnexpectedModelBehavior):
-            text = "Agent belum memenuhi pemeriksaan batas atau konteks kandidat. Sumber dan pilihan sebelumnya tetap tersedia; perjelas arahan atau coba ulang."
+            text = ("Agent belum bisa membuat potongan yang lolos pemeriksaan awal/akhir kalimat. "
+                    "Perjelas momennya atau klik Coba ulang; kandidat sebelumnya tetap ada.")
         elif isinstance(exc, ModelHTTPError):
-            text = f"Gemini menolak permintaan (HTTP {exc.status_code}). Sumber tersimpan; coba ulang atau periksa konfigurasi model."
+            text = f"Gemini menolak permintaan (HTTP {exc.status_code}). Klik Coba ulang, atau periksa API key di Setting."
         elif isinstance(exc, TimeoutError):
-            text = "Waktu putaran habis. Coba ulang; persiapan yang selesai tetap digunakan."
+            text = "Waktu proses habis. Klik Coba ulang; video dan transkrip yang sudah disiapkan tetap dipakai."
         else:
             # Provider exceptions may embed credentials/request bodies. Persist only a safe type.
             from llm import LLMError
