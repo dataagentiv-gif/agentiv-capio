@@ -153,13 +153,32 @@ def load_presets(folder) -> dict[str, dict]:
             if not isinstance(ident, str) or not _ID.fullmatch(ident) or ident in TEMPLATES or ident == "custom":
                 raise ValueError(f"id preset tidak sah: {ident!r}")
             preset = {"title": str(data["title"])[:60], "description": str(data.get("description", ""))[:200],
-                      "adjustments": resolve("custom", dict(data["adjustments"]))}
+                      "adjustments": resolve("custom", dict(data["adjustments"])),
+                      "brand": _brand(data.get("brand"))}
         except (OSError, ValueError, KeyError, TypeError) as exc:
             log.warning("paket template %s dilewati: %s", path.name, exc)
             continue
         PRESETS[ident] = preset
         log.info("paket template dimuat: %s (%s)", ident, path.name)
     return PRESETS
+
+
+def _brand(value) -> dict | None:
+    """{"name", "color"} opsional: CAPIO lalu tampil atas nama brand itu
+    (label di header, tab "Khusus Brand" berisi template-nya)."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("brand harus objek")
+    name, color = str(value.get("name", "")).strip(), str(value.get("color", "800010")).lstrip("#")
+    if not 1 <= len(name) <= 40 or not HEX.fullmatch(color):
+        raise ValueError("brand butuh name 1-40 karakter dan color #RRGGBB")
+    return {"name": name, "color": color.upper()}
+
+
+def brand() -> dict | None:
+    """Brand pertama di paket yang dimuat; None di CAPIO umum."""
+    return next((p["brand"] for p in PRESETS.values() if p["brand"]), None)
 
 
 def canonical(template_id: str, adjustments: dict | None) -> tuple[str, dict]:

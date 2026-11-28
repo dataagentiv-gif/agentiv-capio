@@ -248,3 +248,24 @@ def test_hook_berbingkai_judul_panjang_tetap_dua_baris_dan_mengecil():
     pendek, panjang = baris("Self Image"), baris("Bukan Keadaannya yang Sulit Dilepaskan Tapi Cara Kita Merespons")
     assert len(pendek) == 1 and len(panjang) == 2
     assert r"\fs76" in pendek[0] and r"\fs76" not in panjang[0]
+
+
+def test_brand_paket_dan_daftar_template(tmp_path):
+    import json
+    from pipeline import templates
+    from api.routes import daftar_layout
+    try:
+        templates.load_presets(tmp_path)
+        umum = daftar_layout()
+        assert umum["brand"] is None and umum["brand_templates"] == [] and umum["default"] == "full_screen"
+        assert umum["brand_contact"].startswith("https://wa.me/") and "template%20khusus%20brand" in umum["brand_contact"]
+        (tmp_path / "a.json").write_text(json.dumps({"id": "kaisar_tv", "title": "Kaisar TV", "adjustments": KAISAR,
+                                                     "brand": {"name": "Kaisar TV", "color": "#800010"}}))
+        (tmp_path / "b.json").write_text(json.dumps({"id": "rusak", "title": "x", "adjustments": {}, "brand": "Kaisar"}))
+        templates.load_presets(tmp_path)
+        assert templates.brand() == {"name": "Kaisar TV", "color": "800010"}
+        d = daftar_layout()
+        assert [t["id"] for t in d["brand_templates"]] == ["kaisar_tv"] and d["default"] == "kaisar_tv"
+        assert "kaisar_tv" not in [t["id"] for t in d["templates"]]
+    finally:
+        templates.PRESETS.clear()

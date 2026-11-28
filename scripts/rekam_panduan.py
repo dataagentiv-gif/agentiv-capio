@@ -106,6 +106,7 @@ def adegan_tampilan(L):
     for i in (1, 2, 4):
         L.klik(kartu.nth(i), 3.5)  # beri waktu pratinjau dirender server
     L.klik("[data-mode=custom]", 3.5)
+    L.klik("[data-mode=brand]", 3)  # tunjukkan tab Khusus Brand
 
 
 def adegan_proses(L):

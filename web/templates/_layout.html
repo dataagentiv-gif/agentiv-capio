@@ -109,6 +109,7 @@
       </svg>
       <span class="brand-name">CAPIO</span>
     </a>
+    {% set b = brand() %}{% if b %}<span class="brand-pill" style="--brand:#{{ b.color }}" title="CAPIO edisi {{ b.name }}">× {{ b.name }}</span>{% endif %}
     {# Kredit pembuat, sengaja kecil dan dipisah garis dari lambang CAPIO. #}
     <a class="oleh" href="https://github.com/dataagentiv-gif/agentiv-capio" target="_blank" rel="noopener">
       by <img src="/static/agentiv.png?v={{ v }}" alt="Agentiv" width="400" height="93">

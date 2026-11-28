@@ -94,9 +94,11 @@ class Settings(BaseSettings):
     # Paket template (*.json preset Custom bernama) yang dimuat saat API start.
     # Repo paket client menyalin file-nya ke sini lewat Dockerfile-nya sendiri.
     TEMPLATE_PACK_DIR: Path = ROOT / "templates_extra"
+    # Nomor WhatsApp Agentiv untuk tombol pesan "Khusus Brand".
+    AGENTIV_WA: str = "6285843570782"
 
     # Ditampilkan sebagai versi kecil di nav (_layout.html).
-    VERSI: str = "1.10.0"
+    VERSI: str = "1.11.0"
 
     DATABASE_URL: str = "postgresql+psycopg://clipper:clipper@localhost:5432/clipper"
     REDIS_URL: str = "redis://localhost:6379/0"

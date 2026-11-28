@@ -67,6 +67,11 @@ templates.env.globals["v"] = _cap_aset()
 # di FIELDS env_store.py) dan cuma berubah lewat build image baru — sama
 # seperti `v`, aman dihitung sekali saat start.
 templates.env.globals["versi"] = settings.VERSI
+# Fungsi, bukan nilai: paket template baru dimuat di lifespan, setelah modul ini.
+def _brand_aktif():
+    from pipeline.templates import brand
+    return brand()
+templates.env.globals["brand"] = _brand_aktif
 
 
 @asynccontextmanager
@@ -285,15 +290,22 @@ def test_provider(provider: str):
 @app.get("/api/templates")
 @app.get("/api/layouts")
 def daftar_layout():
-    from pipeline.templates import PRESETS, TEMPLATES
+    from pipeline.templates import PRESETS, TEMPLATES, brand
 
-    # Preset paket tampil di depan: kalau ada, itu tampilan yang memang dipesan.
+    # Template paket tinggal di tab "Khusus Brand", bukan di library umum. Tanpa
+    # paket, tab itu menjadi pintu pemesanan ke Agentiv.
     presets = [{"id": key, "title": p["title"], "description": p["description"], "preset": True,
                 "visual": {"canvas": "1080x1920", "caption_color": p["adjustments"]["caption_color"],
                            "caption_italic": p["adjustments"]["caption_italic"]}, "defaults": {}} for key, p in PRESETS.items()]
-    return {"default": next(iter(PRESETS), "full_screen"), "templates": presets + [
-        {"id": key, **value} for key, value in TEMPLATES.items()
-    ]}
+    return {"default": next(iter(PRESETS), "full_screen"),
+            "templates": [{"id": key, **value} for key, value in TEMPLATES.items()],
+            "brand_templates": presets, "brand": brand(), "brand_contact": _kontak_brand()}
+
+
+def _kontak_brand() -> str:
+    from urllib.parse import quote
+    teks = "Halo Agentiv, saya tertarik dengan template khusus brand untuk CAPIO."
+    return f"https://wa.me/{settings.AGENTIV_WA}?text={quote(teks)}"
 
 
 @app.post("/api/templates/preview.mp4")

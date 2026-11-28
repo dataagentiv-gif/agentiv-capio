@@ -316,7 +316,10 @@ file `*.json` di folder `templates_extra/` (bisa diganti lewat `TEMPLATE_PACK_DI
 `adjustments` memakai kunci Custom (lihat `CUSTOM_DEFAULTS` di `pipeline/templates.py`),
 divalidasi saat API start; file yang tidak valid dilewati dengan pesan di log. Template
 paket tampil paling depan di halaman Submit dan dirender lewat jalur Custom dengan
-nilai yang dikunci. Untuk distribusi, buat repo terpisah berisi `templates/` dan
+nilai yang dikunci. Tambahkan `"brand": {"name": "Nama Brand", "color": "800010"}` untuk
+edisi brand: nama brand tampil di header dan tab **Khusus Brand** berisi template-nya.
+Tanpa paket brand, tab itu menjadi tombol pemesanan template khusus ke Agentiv lewat
+WhatsApp (`AGENTIV_WA`). Untuk distribusi, buat repo terpisah berisi `templates/` dan
 Dockerfile `FROM agentiv/capio:<versi>` yang menyalinnya ke `/app/templates_extra/`.
 
 ### Pemakaian Gemini
